@@ -1,3 +1,7 @@
 # Frozen integrity snapshot: byte-identical checkout on every platform.
 frontend/inventory-workbench/** -text
+# Hash-pinned registry contracts: raw bytes are the integrity pin.
+config/source_refresh_registry_69.csv -text
+config/source_refresh_registry_69.csv.sha256 -text
+config/source_refresh_profiles.yaml -text
 
