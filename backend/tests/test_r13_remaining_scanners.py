@@ -410,7 +410,7 @@ def test_claimless_guidance_chip_can_be_representative() -> None:
 
 
 def test_chips_only_law_source_scan() -> None:
-    pkg = Path(r"D:\TrendForge\backend\trendforge_api\scanners")
+    pkg = Path(__file__).resolve().parents[1] / "trendforge_api" / "scanners"
     offenders_claim = []
     offenders_order = []
     for p in pkg.glob("*.py"):
@@ -464,7 +464,7 @@ def test_post_run_still_405() -> None:
 
 
 def test_no_orb_vwap_modules() -> None:
-    pkg = Path(r"D:\TrendForge\backend\trendforge_api\scanners")
+    pkg = Path(__file__).resolve().parents[1] / "trendforge_api" / "scanners"
     names = [p.name.lower() for p in pkg.glob("*.py")]
     assert not any("orb" in n or "vwap" in n for n in names)
     for scanner_id in NATIVE_CORE_IDS:

@@ -15,7 +15,19 @@ QUARANTINE_PATH = ROOT / "config" / "source_route_quarantine.yaml"
 REGISTRY_PATH = ROOT / "config" / "source_refresh_registry_69.csv"
 PROFILES_PATH = ROOT / "config" / "source_refresh_profiles.yaml"
 DOWNLOADER_PATH = ROOT / "scripts" / "incoming_40pack" / "market_data_downloader.py"
-CATALOG_PATH = ROOT.parent / "trendforge_inventory_app" / "links_105.json"
+CATALOG_PATH = next(
+    (
+        candidate
+        for candidate in (
+            # Hermetic first: the versioned in-repo snapshot travels with this repo.
+            ROOT / "frontend" / "inventory-workbench" / "links_105.json",
+            # Fallback: the live sibling app when present beside the checkout.
+            ROOT.parent / "trendforge_inventory_app" / "links_105.json",
+        )
+        if candidate.exists()
+    ),
+    ROOT / "frontend" / "inventory-workbench" / "links_105.json",
+)
 
 EXPECTED_IDS = {
     "yahoo_badi",

@@ -263,7 +263,10 @@ def test_symbol_route_404_named(tmp_path, monkeypatch) -> None:
 def test_no_place_order_in_module() -> None:
     from pathlib import Path
 
-    source = Path(
-        r"D:\TrendForge\backend\trendforge_api\selection\r11_mcx_live.py"
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "trendforge_api"
+        / "selection"
+        / "r11_mcx_live.py"
     ).read_text(encoding="utf-8")
     assert "place_order" not in source

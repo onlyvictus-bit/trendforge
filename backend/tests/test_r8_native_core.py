@@ -431,7 +431,9 @@ def test_native_core_route_503_on_hash_mismatch(tmp_path, monkeypatch) -> None:
 def test_no_place_order_under_scanners_package() -> None:
     from pathlib import Path
 
-    pkg = Path(r"D:\TrendForge\backend\trendforge_api\scanners")
+    pkg = (
+        Path(__file__).resolve().parents[1] / "trendforge_api" / "scanners"
+    )
     offenders = [
         p.name
         for p in pkg.glob("*.py")

@@ -182,8 +182,11 @@ def test_dispatch_blocked_by_default_and_allowed_when_fully_armed() -> None:
 def test_s7_gates_module_has_no_order_path() -> None:
     from pathlib import Path
 
-    source = Path(
-        r"D:\TrendForge\backend\trendforge_api\selection\s7_state_gates.py"
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "trendforge_api"
+        / "selection"
+        / "s7_state_gates.py"
     ).read_text(encoding="utf-8")
     assert "place_order" not in source
     print("NO_ORDERS")

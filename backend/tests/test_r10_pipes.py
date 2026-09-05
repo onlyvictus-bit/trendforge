@@ -203,8 +203,11 @@ def test_intersection_requires_all_scanners(tmp_path, monkeypatch) -> None:
 def test_module_mints_no_claims_and_pins_zero_confirmed() -> None:
     from pathlib import Path
 
-    source = Path(
-        r"D:\TrendForge\backend\trendforge_api\scanners\pipe_dsl.py"
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "trendforge_api"
+        / "scanners"
+        / "pipe_dsl.py"
     ).read_text(encoding="utf-8")
     assert "EvidenceClaim(" not in source
     assert "claim_id" not in source

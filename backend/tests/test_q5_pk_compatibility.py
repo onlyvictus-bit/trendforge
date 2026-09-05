@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
@@ -483,9 +484,10 @@ def test_production_route_inventory_contains_no_pk_shadow_routes() -> None:
 
 
 def test_developer_cli_outputs_fixture_artifact_without_production_fields() -> None:
+    backend_root = Path(__file__).resolve().parents[1]
     process = subprocess.run(
         [sys.executable, "-m", "trendforge_api.scanners"],
-        cwd="D:/TrendForge/backend",
+        cwd=str(backend_root),
         capture_output=True,
         text=True,
         timeout=15,

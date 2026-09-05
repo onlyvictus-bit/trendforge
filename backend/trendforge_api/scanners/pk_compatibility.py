@@ -181,6 +181,8 @@ class PKFixtureManifest(BaseModel):
             if (
                 artifact_path.name != artifact
                 or artifact_path.is_absolute()
+                or re.match(r"^[A-Za-z]:", artifact)
+                or "\\" in artifact
                 or artifact_path.suffix.lower() not in ALLOWED_FIXTURE_SUFFIXES
             ):
                 raise ValueError("only sanitized JSON fixture artifacts are allowed")
