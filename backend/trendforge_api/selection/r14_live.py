@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime, time
 from math import isfinite
 from typing import Any, Literal
 from zoneinfo import ZoneInfo

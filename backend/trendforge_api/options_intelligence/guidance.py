@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from math import isfinite, log, sqrt
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 from pydantic.alias_generators import to_camel
 
 from .pricing import OptionRight, norm_cdf

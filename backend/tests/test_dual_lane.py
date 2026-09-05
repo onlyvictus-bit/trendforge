@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 
 from trendforge_api.selection.data_lane import DataLaneStateV1, resolve_lane
 from trendforge_api.selection.research_quantity import (
-    ResearchQtyBatchV1,
     ResearchQtyRowV1,
     compute_research_quantity,
 )
@@ -86,7 +84,6 @@ def test_strength_does_not_increase_qty() -> None:
         regime_label="RISK_ON", index_suspect=False,
     )
     low = compute_research_quantity(**kw)
-    high = compute_research_quantity(**kw)
     # qty is not a strength knob — same stop means same qty regardless of evidence strength
     assert isinstance(low["researchQuantity"], int)
 

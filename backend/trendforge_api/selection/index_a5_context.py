@@ -20,7 +20,7 @@ from ..parsers.nse_index_close_parser import (
     parse_nse_index_close,
 )
 from ..source_contracts import SourceContract, SourceRole
-from .cash_a3_discovery import CashDiscoveryBatch, CashDiscoveryRow, latest_cash_discovery
+from .cash_a3_discovery import CashDiscoveryBatch, latest_cash_discovery
 from .cash_a4_history import CashHistoryBatch, latest_cash_history
 from .contracts import SelectionState
 

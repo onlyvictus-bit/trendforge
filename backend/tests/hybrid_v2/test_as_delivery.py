@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from trendforge_api import storage
 from trendforge_api.hybrid_v2.as_lab.delivery import (
     MIN_SESSIONS,
     build_as_delivery_evidence,
@@ -14,7 +13,6 @@ from trendforge_api.hybrid_v2.tests_support.fixtures import (
     TRADING_DATE,
     mto_row,
     persist_overlay_lineage,
-    store_flat_history,
     store_mto_parse_result,
 )
 

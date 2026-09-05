@@ -8,7 +8,6 @@ from pydantic import ValidationError
 
 from trendforge_api.main import app
 from trendforge_api.selection.contracts import (
-    DataMode,
     EvidenceClaim,
     EvidenceDirection,
     EvidenceFamily,

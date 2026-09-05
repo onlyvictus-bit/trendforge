@@ -19,7 +19,6 @@ from trendforge_api.selection.contracts import (
 from trendforge_api.source_extended_field_proofs import (
     ALLOWED_EXTENDED_FIELDS,
     proof_for_source,
-    reviewed_extended_field_proofs,
 )
 from trendforge_api.source_inventory_compiler import (
     DEFAULT_WORKBOOK,

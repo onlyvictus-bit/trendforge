@@ -28,7 +28,6 @@ from trendforge_api.main import app
 from trendforge_api.scanners.native_core import (
     build_native_core_run,
     representative_guidance_chips,
-    representative_matches,
 )
 from trendforge_api.scanners.native_extended import (
     _rsi14,

@@ -930,7 +930,7 @@ def test_r14_api_is_hash_scoped_read_only(tmp_path, monkeypatch) -> None:
     assert structure_before.status_code == 503
     assert structure_before.json()["detail"]["code"] == "R5_STRUCTURE_NOT_READY"
 
-    structure = persist_r5_structure_batch(_r5(bundle, attention, identity, stored))
+    persist_r5_structure_batch(_r5(bundle, attention, identity, stored))
     structure_response = client.get("/api/v1/selection/structure")
     assert structure_response.status_code == 200
     structure_payload = structure_response.json()

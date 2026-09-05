@@ -77,7 +77,6 @@ def _honest_change_percent(
     previous = _opt_float(row, ("previous_close", "previousClose", "prev_close"))
     if previous is not None and previous <= 0:
         previous = None
-    derived_from_points = False
 
     # Corroborated recompute first: it beats any unverified claim.
     recompute_source = None
@@ -94,7 +93,6 @@ def _honest_change_percent(
             if abs(candidate) <= 30.0:
                 recomputed = round(candidate, 6)
                 recompute_source = "RECOMPUTED_FROM_POINTS"
-                derived_from_points = True
 
     if claimed is not None:
         # Small claims are plausible official percents.

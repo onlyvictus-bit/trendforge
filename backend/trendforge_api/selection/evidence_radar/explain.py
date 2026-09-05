@@ -116,11 +116,6 @@ def build_explain(
         f"EOD file known after 15:35 IST; horizon {horizon}; "
         f"freshness {freshness}"
     )
-    next_confirm = (
-        "; ".join(fact.code for fact in unknown_facts[:2])
-        if unknown_facts
-        else "next independent family confirmation pending source activation"
-    )
     invalidation = (
         "close back inside prior structure on adjusted series"
         if structure

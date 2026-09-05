@@ -123,7 +123,6 @@ def test_falling_path_with_chain_pcr(monkeypatch: pytest.MonkeyPatch, tmp_path) 
 
 
 def test_zero_call_denominator_is_unknown(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    from trendforge_api import storage
     from trendforge_api.options_intelligence.surface import pcr_oi
 
     assert pcr_oi(put_oi=100.0, call_oi=0.0) is None

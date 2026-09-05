@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
@@ -76,7 +75,6 @@ def build_pit_gate(
 
     enough_sessions = total_horizon_complete >= MIN_HORIZON_COMPLETE
     has_costs = True  # placeholder costs declared per S9 prompt §2.3
-    no_blockers = len(blockers) == 0 or total_horizon_complete > 0
 
     auto_approve = (
         enough_sessions

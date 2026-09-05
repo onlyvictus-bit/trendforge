@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 """Pure parsers for the seven inventory gap feeds.
 
 Fetching and raw archival remain owned by source_monitor/source_resolver.  Every
 parser returns the normal TrendForge source_result envelope and fails closed on
 empty or malformed payloads.
 """
+
+from __future__ import annotations
 
 import csv
 import io

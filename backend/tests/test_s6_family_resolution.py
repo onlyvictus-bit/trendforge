@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,16 +20,13 @@ from trendforge_api.selection.contracts import (
     StateCeiling,
 )
 from trendforge_api.selection.r5_live import build_r5_structure_batch, persist_r5_structure_batch
-from trendforge_api.selection.s4_structure_pack import build_s4_structure_pack
 from trendforge_api.selection.s6_family_resolution import (
     ACCEPTANCE_CEILING,
     STRENGTH_LABEL,
     build_s6_resolution,
 )
-from trendforge_api.selection.attention_order import InventoryDiscoveryV1, persist_attention_order
+from trendforge_api.selection.attention_order import persist_attention_order
 from trendforge_api.selection.inventory_source_bundle import (
-    InventorySourceBundleV1,
-    StockEvidenceRecordV1,
     persist_inventory_source_bundle,
 )
 from trendforge_api.selection.r4_live import build_r4_identity_pin, persist_r4_identity_pin

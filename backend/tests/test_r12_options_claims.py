@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-import pytest
 
 from trendforge_api.selection.r12_options_claims import mint_options_claims
 

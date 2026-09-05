@@ -33,7 +33,7 @@ from .guidance import hero_zero_guidance
 from .hard_blocks import WAIT_MARGIN_API, evaluate_hard_blocks
 from .iv_recorder import chain_snapshots
 from .mwpl_gate import official_mwpl_state
-from .quadrant import ObservationCode, QuadrantResult, observation_quadrant
+from .quadrant import ObservationCode, observation_quadrant
 from .surface import max_pain_reference, pcr_oi, unsigned_cash_gamma_per_strike, walls
 
 SCHEMA_VERSION = "trendforge.tools.oi-options.v1"

@@ -171,6 +171,8 @@ __all__ = [
     "parse_rupeevest_mf_flows",
     "parse_bse_offer_index",
     "parse_bse_offer_xbrl",
+    "parse_bse_fii_dii",
+    "parse_bse_participant_oi",
     "parse_cftc_cot_positions",
     "parse_mcx_bhavcopy",
     "parse_nse_large_deals",

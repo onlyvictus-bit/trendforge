@@ -224,7 +224,6 @@ def _compression_tag(row: R5StructureRowV1) -> S4SetupTagV1 | None:
         ),
         None,
     )
-    window = nr_setup[2:] if len(nr_setup) > 2 else "7"
     return S4SetupTagV1(
         tag=f"{nr_setup}_COMPRESSION",
         feature_id=nr_claim.feature_id if nr_claim else "FTR-007",

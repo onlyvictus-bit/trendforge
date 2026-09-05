@@ -248,9 +248,8 @@ from .selection.r11_mcx_live import (
     McxMasterRowV1,
     build_mcx_master,
 )
-from .selection.store import list_latest_selection_payloads as _list_payloads
 from .selection.data_lane import DataLaneStateV1, resolve_lane
-from .selection.research_quantity import ResearchFundsV1, ResearchQtyBatchV1
+from .selection.research_quantity import ResearchQtyBatchV1
 from .hybrid_v2.contracts import HybridOverlayBatchV1, HybridOverlayRowV1
 from .hybrid_v2.pipeline import build_hybrid_v2_overlay
 from .selection.use_matrix_c0 import (
@@ -2486,7 +2485,6 @@ def post_data_lane(body: dict | None = None) -> DataLaneStateV1:
 @app.get("/api/v1/selection/research-quantity", response_model=ResearchQtyBatchV1, response_model_by_alias=True)
 def research_quantity() -> ResearchQtyBatchV1:
     from .selection.research_quantity import (
-        ResearchFundsV1,
         ResearchQtyRowV1,
         compute_research_quantity,
     )
@@ -2504,7 +2502,6 @@ def research_quantity() -> ResearchQtyBatchV1:
         ) from exc
 
     rows: list[ResearchQtyRowV1] = []
-    funds = ResearchFundsV1()
     for card in s7_board.rows:
         try:
             result = compute_research_quantity(
@@ -2521,13 +2518,6 @@ def research_quantity() -> ResearchQtyBatchV1:
                 index_suspect=False,
             )
             qty = int(result.get("researchQuantity", 0) or 0)
-            if qty > 0:
-                funds = ResearchFundsV1(
-                    capital_inr=100_000.0,
-                    reserved_risk_inr=float(result.get("reservedRiskInr") or 0),
-                    position_notional_inr=float(result.get("notionalInr") or 0),
-                    remaining_capital_inr=float(result.get("remainingCapitalInr") or 100_000.0),
-                )
             rows.append(ResearchQtyRowV1(
                 symbol=card.symbol,
                 public_state=card.public_state.value,

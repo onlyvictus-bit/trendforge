@@ -388,7 +388,6 @@ def test_tickertape_and_dhan_screens_become_info_holdings_not_certified_fii() ->
         ),
         generated_at=NOW,
     )
-    by_symbol = {item.symbol: item for item in snapshot.fii_holding_changes if item.symbol}
     infy = next(item for item in snapshot.fii_holding_changes if item.symbol == "INFY" and item.source_key == "tickertape_fii_holding_change_3m")
     dhan = next(item for item in snapshot.fii_holding_changes if item.symbol == "TCS" and item.source_key == "dhan_fii_holding_change")
     assert infy.fii_pct == 31.2
@@ -396,7 +395,6 @@ def test_tickertape_and_dhan_screens_become_info_holdings_not_certified_fii() ->
     assert dhan.fii_pct is None
     assert dhan.holding_level_note == "holding level not supplied"
     assert dhan.fii_pct_change == 3.1
-    names = {item.company_name: item for item in snapshot.fii_holding_changes}
     mapped = [
         item
         for item in snapshot.fii_holding_changes

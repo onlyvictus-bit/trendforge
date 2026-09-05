@@ -10,8 +10,6 @@ Ceiling LIVE_R12_CLAIMS_WAIT_ONLY.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -23,7 +21,6 @@ from .contracts import (
     StateCeiling,
     stable_id,
 )
-from .s5_shortlist_enrichment import S5EnrichmentBatchV1
 
 SCHEMA_VERSION = "trendforge.r12-options-claims.v1"
 PROFILE_ID = "PRF-R12-OPTIONS-CLAIMS"

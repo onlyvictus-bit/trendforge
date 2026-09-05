@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, time
+from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
-import pytest
 from fastapi.testclient import TestClient
 
 import test_s4_structure_pack as s4f

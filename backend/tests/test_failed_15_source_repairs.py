@@ -15,7 +15,6 @@ import pytest
 
 from trendforge_api.market_data_registry import load_market_data_registry
 from trendforge_api.market_data_service import (
-    AcquisitionState,
     MarketDataService,
     ParameterContext,
     ParsedSourcePayload,
@@ -63,14 +62,6 @@ def test_fno_ban_future_effective_date_is_clamped_not_failed() -> None:
     registry = load_market_data_registry()
     contract = registry.by_key["nse_fno_ban"]
     body = b"Securities in Ban For Trade Date 07-AUG-2026:\n1,BANDHANBNK\n2,LICI\n"
-    service = MarketDataService(
-        transport=None,
-        normalizer=lambda c, acq, ctx: ParsedSourcePayload(
-            parser_state="PARSED_STRUCTURED",
-            records=({"symbol": "BANDHANBNK", "isBanned": True},),
-            data_date=date(2026, 8, 7),
-        ),
-    )
     # Use real normalizer path via structured parse
     from trendforge_api.market_data_service import default_normalizer
 
@@ -87,20 +78,6 @@ def test_fno_ban_future_effective_date_is_clamped_not_failed() -> None:
     parsed = default_normalizer(contract, acq, _context())
     assert parsed.records
     assert parsed.data_date == date(2026, 8, 7)  # parser keeps ban-for date
-
-    service = MarketDataService(
-        transport=type(
-            "T",
-            (),
-            {
-                "fetch_resolver": staticmethod(
-                    lambda source_key, catalog_url: asyncio.sleep(0, result=acq[0])
-                    if False
-                    else None
-                )
-            },
-        )(),
-    )
 
     class _T:
         async def fetch_endpoint(self, *a, **k):

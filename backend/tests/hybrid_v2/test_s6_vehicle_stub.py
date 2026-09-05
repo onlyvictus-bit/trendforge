@@ -7,7 +7,6 @@ from trendforge_api.hybrid_v2.contracts import S6_VEHICLE_STATUS
 from trendforge_api.hybrid_v2.pipeline import build_hybrid_v2_overlay
 from trendforge_api.hybrid_v2.stages.s6_vehicle import s6_vehicle_status
 from trendforge_api.hybrid_v2.tests_support.fixtures import persist_overlay_lineage
-from trendforge_api.selection.r5_live import R5StructureRowV1
 
 
 def test_c9_s6_is_always_unknown_needs_r12(tmp_path, monkeypatch) -> None:

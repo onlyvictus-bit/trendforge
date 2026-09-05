@@ -6,7 +6,7 @@ import hashlib
 import json
 from datetime import UTC, date, datetime
 from enum import StrEnum
-from typing import Any, Mapping
+from typing import Mapping
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel

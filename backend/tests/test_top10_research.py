@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-from datetime import UTC, date, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -18,9 +16,7 @@ from trendforge_api.selection.top10_research import (
 )
 from tests.test_r6_live import (
     DECISION_AT,
-    TRADING_DATE,
     _deal,
-    _hash,
     _loader,
     _r14,
     _signals,

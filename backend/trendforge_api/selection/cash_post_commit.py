@@ -31,11 +31,11 @@ from .cash_a2_identity import (
     persist_cash_identity,
 )
 from .cash_a3_discovery import build_cash_discovery_batch, persist_cash_discovery
-from .cash_a4_history import build_cash_history_batch, latest_cash_history, persist_cash_history
+from .cash_a4_history import build_cash_history_batch, persist_cash_history
 from .attention_order import build_attention_order, latest_attention_order, persist_attention_order
 from .cash_c1_rank import build_cash_rank_batch, persist_cash_rank
 from .fo_a6_enrichment import build_fo_enrichment_batch, persist_fo_enrichment
-from .index_a5_context import build_cash_context_batch, latest_cash_context, persist_cash_context
+from .index_a5_context import build_cash_context_batch, persist_cash_context
 from .inventory_source_bundle import (
     FRESHNESS_POLICY_VERSION,
     build_inventory_source_bundle,

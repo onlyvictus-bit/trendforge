@@ -32,9 +32,9 @@ from .calculate import (
     rs_fact,
     shp_context_fact,
 )
-from .catalog import Horizon, SlotCatalog, build_slot_catalog
-from .explain import ExplainV1, build_explain
-from .fuse import FusionResultV1, fuse_instrument
+from .catalog import build_slot_catalog
+from .explain import build_explain
+from .fuse import fuse_instrument
 from ..inventory_source_bundle import InventorySourceBundleV1
 from .slots import CoverageReportV1, fill_slots
 

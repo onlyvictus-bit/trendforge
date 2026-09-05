@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime, time
 from math import isfinite
 from zoneinfo import ZoneInfo
 
@@ -26,7 +26,6 @@ from .cash_a1_staging import CashStagingBatch, latest_cash_staging
 from .cash_a2_identity import CashIdentityBatch, latest_cash_identity
 from .cash_a4_history import (
     CashHistoryBatch,
-    CashHistoryRow,
     CashRawSessionBar,
     latest_cash_history,
     list_raw_bars,
@@ -52,7 +51,6 @@ from .r4_live import latest_r4_identity_pin
 from .store import latest_selection_payload, persist_selection_payload
 from .structure import (
     ClosedBar,
-    StructureAnalysis,
     StructureMetrics,
     StructureProfile,
     analyze_closed_bar_structure,

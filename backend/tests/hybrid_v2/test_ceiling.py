@@ -6,7 +6,6 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from trendforge_api import storage
 from trendforge_api.hybrid_v2.contracts import (
     MANDATORY_WARNING,
     S6_VEHICLE_STATUS,

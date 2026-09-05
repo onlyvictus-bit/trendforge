@@ -344,7 +344,6 @@ def _persist_twice(tmp_path, monkeypatch):
 
 
 def test_store_roundtrip_and_immutability(tmp_path, monkeypatch) -> None:
-    import trendforge_api.storage as storage
     from trendforge_api.selection.s8_persist_run import PROFILE_ID
     from trendforge_api.selection.store import get_selection_payload
 

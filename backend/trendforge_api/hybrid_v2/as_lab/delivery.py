@@ -133,7 +133,6 @@ def accumulation_day_count(
     bars = raw_bars_fn(symbol, through=session_date)
     if not bars:
         return None, "WAIT_A4_BARS_MISSING"
-    close_by_date = {bar.trade_date: float(bar.close) for bar in bars if bar.close}
     returns: dict[date, float] = {}
     previous: float | None = None
     for bar in sorted(bars, key=lambda item: item.trade_date):

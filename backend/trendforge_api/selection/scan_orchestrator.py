@@ -12,15 +12,14 @@ from __future__ import annotations
 
 import sys
 import time
-from datetime import datetime, timezone
 
 from ..scanners.native_core import build_native_core_run
 from .r5_live import latest_r5_structure_batch
 from .s2_market_weather import build_s2_market_weather
 from .s4_structure_pack import build_s4_structure_pack
-from .s5_shortlist_enrichment import S5EnrichmentBatchV1, build_s5_enrichment
-from .s6_family_resolution import S6ResolutionBatchV1, build_s6_resolution
-from .s7_state_gates import S7StateBatchV1, build_s7_state
+from .s5_shortlist_enrichment import build_s5_enrichment
+from .s6_family_resolution import build_s6_resolution
+from .s7_state_gates import build_s7_state
 from .s8_persist_run import (
     S8ScanBlobV1,
     build_s8_scan,
@@ -104,7 +103,6 @@ def _build_and_persist(
     prior_payload=None,
     **_,
 ) -> S8ScanBlobV1:
-    from .s8_persist_run import persist_s8_scan
 
     blob = build_s8_scan(
         s7=s7, s6=s6, pack=pack, r5=r5,
@@ -122,9 +120,6 @@ def main() -> None:
         summary = run_daily_scan()
     except Exception as exc:
         print(f"SCAN FAILED: {exc}")
-        if "stages" in dir():
-            for s in stages:
-                print(f"  {s['stage']}: {'OK' if s.get('ok') else 'FAIL'} ({s.get('elapsed_s', '?')}s)")
         sys.exit(1)
 
     print(f"runId: {summary['runId']}")
@@ -139,5 +134,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    import sys as _sys
     main()

@@ -14,15 +14,12 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 from pydantic.alias_generators import to_camel
 
-from .contracts import SelectionState, stable_id
-from .r5_live import latest_r5_structure_batch
+from .contracts import stable_id
 from .cash_a4_history import list_raw_bars_by_symbol
 from .store import (
-    get_selection_payload,
-    list_latest_selection_payloads,
     persist_selection_payload,
 )
 
@@ -114,7 +111,6 @@ def build_s9_pit_homework(
         sym = s8_row.get("symbol", "")
         state = s8_row.get("publicState", "WAIT")
         direction_raw = s8_row.get("evidenceDirection", "")
-        entry = s8_row.get("researchEntry") or s8_row.get("nextTrigger")
 
         if state == "REJECT":
             obs_rows.append(S9ObservationRowV1(
@@ -261,7 +257,6 @@ def load_future_bars_from_a4(
     sessions per symbol. Bars are from cash_a4_history (official authority).
     """
     from datetime import date as date_type
-    import datetime as dt_module
 
     if isinstance(s8_as_of, str):
         as_of = date_type.fromisoformat(s8_as_of[:10])

@@ -2,16 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 
-import pytest
 
 from trendforge_api.selection.s9_pit_homework import (
-    ACCEPTANCE_CEILING,
-    PROFILE_ID,
-    VALIDATION_STATUS,
-    S9ObservationRowV1,
-    S9PitHomeworkBatchV1,
     build_s9_pit_homework,
 )
 
@@ -85,7 +78,6 @@ def test_loss_path_with_falling_bars() -> None:
 def test_censored_never_coerced_to_zero() -> None:
     # Only 2 forward bars (horizon is 5) → CENSORED with mfe/mae stored.
     closes = [101.0, 102.0]
-    bars = _bars(closes)
     batch = build_s9_pit_homework(
         s8_payload=_s8_payload("AAA"),
         future_bars_by_symbol={"AAA": [{"open": b, "high": b * 1.01, "low": b * 0.99, "close": b} for b in closes]},
