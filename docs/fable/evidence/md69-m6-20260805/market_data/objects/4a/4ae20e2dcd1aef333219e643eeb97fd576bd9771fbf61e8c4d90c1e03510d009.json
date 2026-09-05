@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_block_deal_live","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_block_deal"},"rawContentHashes":["2bb46ed49c449158b61835039a9b15904ae1a307b044312998b835b55b8dfcbc"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_BLOCK_DEAL"}],"sourceKey":"nse_block_deal"}

@@ -1,0 +1,64 @@
+# Local credentials and broker/session state
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+credentials/
+secrets/
+private/
+
+# Python and JavaScript dependencies/caches
+.venv/
+venv/
+node_modules/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+**/.pytest_cache/
+.mypy_cache/
+**/.mypy_cache/
+.ruff_cache/
+**/.ruff_cache/
+.coverage
+htmlcov/
+
+# Runtime databases, logs and temporary output
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+.tmp/
+tmp/
+.codex_helper_probe.tmp
+
+# Downloaded/generated market data stays local. Keep only canonical inventory
+# contracts needed to understand and rebuild the collector.
+data/**
+!data/reports/
+data/reports/**
+!data/reports/SOURCE_LINK_INVENTORY_MASTER.xlsx
+!data/reports/SOURCE_LINK_INVENTORY_MASTER.csv
+!data/reports/SOURCE_LINK_INVENTORY_MASTER.updated.xlsx
+
+# Generated/duplicate analysis surfaces
+graphify-out/
+frontend/inventory_gallery_backup/
+delete/
+_kimi_sections/
+_kimi_*_bundle.txt
+TrendForgeTREND_FORGE_ARCHITECTURE.md
+TrendForgedocsARCHITECTURE.md
+documentation_consolidation_manifest.json
+*.orig
+*.bak
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp

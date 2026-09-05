@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_market_activity","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_large_deals_snapshot"},"rawContentHashes":["dc8017dca2c19b7a83aec107aa4e66b07fbd9190370ace2401e729ef11995643"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_LARGE_DEALS_SNAPSHOT"}],"sourceKey":"nse_large_deals_snapshot"}

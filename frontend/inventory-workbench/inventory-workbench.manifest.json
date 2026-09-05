@@ -1,0 +1,179 @@
+{
+    "contract": "trendforge.inventoryWorkbenchSnapshot.v1",
+    "source_root": "D:\\trendforge_inventory_app",
+    "source_app_edited": true,
+    "overlay_mode": "declared",
+    "overlay_files": [
+        "ARCHITECTURE.md",
+        "GRAPH.md",
+        "INDEX.md",
+        "app.js",
+        "index.html",
+        "styles.css"
+    ],
+    "copied_at": "2026-08-16T10:07:12Z",
+    "serving_path": "/inventory-workbench/",
+    "embed_path": "/inventory-workbench/?embed=terminal",
+    "behavior": "read_only_research_glass",
+    "state_authority": "NONE",
+    "excluded": [
+        "node_modules",
+        "*.bak",
+        ".pytest_*",
+        "temp*",
+        "output*",
+        "cache*"
+    ],
+    "files": [
+        {
+            "path": "index.html",
+            "bytes": 26761,
+            "source_sha256": "A803585344180F824C430483E2C1988AD1591207EA96DDC5CB5BD312E0C749C3",
+            "copied_sha256": "64156F6C745D3DAB37AE2DA3B19A93B34C7A8EAD096587EFF867AF9EFA7BDDCB",
+            "overlay": true
+        },
+        {
+            "path": "styles.css",
+            "bytes": 40259,
+            "source_sha256": "4D4DFC65C3B852ABE3E3751EB09823DCA1B39B35A71EAEB49642ACF575ECF2F0",
+            "copied_sha256": "BD46E2FEBDED345852E01C34823EC5FA85720AA6A10587EBC7CDC3F186A6CFB8",
+            "overlay": true
+        },
+        {
+            "path": "gap_feeds.css",
+            "bytes": 254,
+            "source_sha256": "5162C42F630E911D805DEDD0941C05D93D615D2E0313BD03E0D8C32E47EF7D39",
+            "copied_sha256": "5162C42F630E911D805DEDD0941C05D93D615D2E0313BD03E0D8C32E47EF7D39"
+        },
+        {
+            "path": "sector_screener.css",
+            "bytes": 9616,
+            "source_sha256": "F7A3AFAF924484DAF58D83E25DEA450C4C28662B997EDF5DC28C62863C9A3606",
+            "copied_sha256": "F7A3AFAF924484DAF58D83E25DEA450C4C28662B997EDF5DC28C62863C9A3606"
+        },
+        {
+            "path": "card_collapse.css",
+            "bytes": 1689,
+            "source_sha256": "EED8E852E6B2EB7C27EE941424DB78E3ABCCD5D2656005A390F72E908C210164",
+            "copied_sha256": "EED8E852E6B2EB7C27EE941424DB78E3ABCCD5D2656005A390F72E908C210164"
+        },
+        {
+            "path": "header_collapse.css",
+            "bytes": 2239,
+            "source_sha256": "04D9783FB83F9B6E7C02926F637C396503E9DCB3D8E60E7E2AB10FC5AD45CB81",
+            "copied_sha256": "04D9783FB83F9B6E7C02926F637C396503E9DCB3D8E60E7E2AB10FC5AD45CB81"
+        },
+        {
+            "path": "sidebar_collapse.css",
+            "bytes": 1717,
+            "source_sha256": "9AAE09DA764871F5B4D1D1840A329443CFEB44CEE6E6134C66B38002EB4EC234",
+            "copied_sha256": "9AAE09DA764871F5B4D1D1840A329443CFEB44CEE6E6134C66B38002EB4EC234"
+        },
+        {
+            "path": "consensus_compact.css",
+            "bytes": 853,
+            "source_sha256": "405B895EFF580A08F0787531879793F7FC6F8497088D54C1C5B7393A7C4DFB63",
+            "copied_sha256": "405B895EFF580A08F0787531879793F7FC6F8497088D54C1C5B7393A7C4DFB63"
+        },
+        {
+            "path": "live_panels.css",
+            "bytes": 1468,
+            "source_sha256": "C9BA83F5D4559C3C92DF96D5AF2BFB008FFC6AF95C6249BB1129178986785089",
+            "copied_sha256": "C9BA83F5D4559C3C92DF96D5AF2BFB008FFC6AF95C6249BB1129178986785089"
+        },
+        {
+            "path": "fii_stock_signals.css",
+            "bytes": 2488,
+            "source_sha256": "A4B7EC6FAC8E9308A5ADF389C692400325F9ADC3C112FCD1CB4054D0CDC187B7",
+            "copied_sha256": "A4B7EC6FAC8E9308A5ADF389C692400325F9ADC3C112FCD1CB4054D0CDC187B7"
+        },
+        {
+            "path": "schemas.js",
+            "bytes": 55912,
+            "source_sha256": "BCBC56FC6FD1B8DB22B90150641567F54A12985CDC8C7EC18483B1291BACD542",
+            "copied_sha256": "BCBC56FC6FD1B8DB22B90150641567F54A12985CDC8C7EC18483B1291BACD542"
+        },
+        {
+            "path": "consensus.js",
+            "bytes": 82947,
+            "source_sha256": "9FA85556017D2DBF924882A97093FEC71F6F8B9D40A49CA081973C4649782C8E",
+            "copied_sha256": "9FA85556017D2DBF924882A97093FEC71F6F8B9D40A49CA081973C4649782C8E"
+        },
+        {
+            "path": "consensus_plugins.js",
+            "bytes": 2181,
+            "source_sha256": "7A9BD21D4F1DACCF975B5129994BD5CB0621F3DB98D0DEA0F6030AB0C0A06061",
+            "copied_sha256": "7A9BD21D4F1DACCF975B5129994BD5CB0621F3DB98D0DEA0F6030AB0C0A06061"
+        },
+        {
+            "path": "screener.js",
+            "bytes": 90816,
+            "source_sha256": "D3A6860F20DC81BF228F84C73B6352FEC496CEA64376B7560BCF0EE5E5C3F356",
+            "copied_sha256": "D3A6860F20DC81BF228F84C73B6352FEC496CEA64376B7560BCF0EE5E5C3F356"
+        },
+        {
+            "path": "sector_screener.js",
+            "bytes": 15108,
+            "source_sha256": "D89FA5863DA674B15291F2011C1CA2AEA7863015A30CEAB819749F3421386F58",
+            "copied_sha256": "D89FA5863DA674B15291F2011C1CA2AEA7863015A30CEAB819749F3421386F58"
+        },
+        {
+            "path": "live_panels.js",
+            "bytes": 21839,
+            "source_sha256": "387496C40246AFCE37913030303E2BE54E91DCEF88668DF5089D1E6D53CBAA1E",
+            "copied_sha256": "387496C40246AFCE37913030303E2BE54E91DCEF88668DF5089D1E6D53CBAA1E"
+        },
+        {
+            "path": "fii_stock_signals_panel.js",
+            "bytes": 7480,
+            "source_sha256": "528F7714EE248012E399EA617D72AFDCF67D9C42C1CE2878ABB7D5B5215E153F",
+            "copied_sha256": "528F7714EE248012E399EA617D72AFDCF67D9C42C1CE2878ABB7D5B5215E153F"
+        },
+        {
+            "path": "app.js",
+            "bytes": 118839,
+            "source_sha256": "D626680C93AA08ADB40770063DB5EE6A25B111227ED1ACE231A0667BDE6E1407",
+            "copied_sha256": "A8578D6344C42195E31DC97EB0A694BC5963CAA003474CD048E3934ECC0C5C7C",
+            "overlay": true
+        },
+        {
+            "path": "header_collapse.js",
+            "bytes": 906,
+            "source_sha256": "D46E222D9338F7532193ABCCE45596A091C04D550EE36D74C6155867ABD172A2",
+            "copied_sha256": "D46E222D9338F7532193ABCCE45596A091C04D550EE36D74C6155867ABD172A2"
+        },
+        {
+            "path": "sidebar_collapse.js",
+            "bytes": 879,
+            "source_sha256": "3F1E199EF44DE7705D465175035A236AD07408A717FAAB5F031B4E17F4D0FA30",
+            "copied_sha256": "3F1E199EF44DE7705D465175035A236AD07408A717FAAB5F031B4E17F4D0FA30"
+        },
+        {
+            "path": "links_105.json",
+            "bytes": 35618680,
+            "source_sha256": "EFE1105B0C9C2321746123B753268FD1E785872C900540554CA804ADDAC054C0",
+            "copied_sha256": "EFE1105B0C9C2321746123B753268FD1E785872C900540554CA804ADDAC054C0"
+        },
+        {
+            "path": "INDEX.md",
+            "bytes": 26217,
+            "source_sha256": "F77D4C2AA293791845650B225E833D153D500E635E887F278158E499DB97CF91",
+            "copied_sha256": "CD331F305442CABFB46EADDF5AB70F76D11CF48BA4C4DEC6CCF6991AF1C3A272",
+            "overlay": true
+        },
+        {
+            "path": "ARCHITECTURE.md",
+            "bytes": 38850,
+            "source_sha256": "452E8380AD696CD40AC40574FF0A1FAAD5739EF1F26A227E04156020C39B6BBC",
+            "copied_sha256": "6A7727E21C0C5008C141A216F1B58C4FFB0B9563787524F09419598E854F4D88",
+            "overlay": true
+        },
+        {
+            "path": "GRAPH.md",
+            "bytes": 23159,
+            "source_sha256": "A8ADA76F23ED2055DF10C3645EB0DF51DE92DCE01FD739ACA9D3D4D077D92425",
+            "copied_sha256": "F537B558CC4BED23F4EBC52D69EABEFAA56CC2DB17191C4CA6AA2894214FE473",
+            "overlay": true
+        }
+    ]
+}

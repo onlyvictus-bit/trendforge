@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_all_indices","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_all_indices"},"rawContentHashes":["275b84e1e9c43f200410eba47e16cde1e2bc170211aaa0c5e15d965f12dcdb2e"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_ALL_INDICES"}],"sourceKey":"nse_all_indices"}

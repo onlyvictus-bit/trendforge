@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_market_activity","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_most_active_volume"},"rawContentHashes":["eff35da019642debcc49fe8819640d010388d9db10ba4b39307285cc12635b68"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_MOST_ACTIVE_VOLUME"}],"sourceKey":"nse_most_active_volume"}

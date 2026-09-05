@@ -1,0 +1,78 @@
+route_id,file,item,required_output,resolution_owner,state,evidence_or_gate,notes
+F1-01,1,1,CFTC COT positions and sentiment,cftc_cot,POPULATED,96 parsed rows 2026-07-28,Official weekly positioning context
+F1-02,1,2,NSE FII DII cash buy sell net,nse_fii_dii,POPULATED,2 parsed rows 2026-08-06,Official cash flow
+F1-03,1,3,NSE participant open interest,nse_participant_oi,POPULATED,4 parsed rows 2026-08-06,Official participant categories
+F1-04,1,4,NSE FII derivatives activity,nse_fii_derivatives_stats,POPULATED,18 parsed rows 2026-08-06,Official derivatives statistics
+F1-05,1,5,BSE participant open interest,bse_participant_oi,POPULATED,4 parsed rows 2026-08-10,Official BSE participant categories
+F1-06,1,6,BSE FII DII cash activity,bse_fii_dii,POPULATED,2 parsed rows 2026-08-10,Official BSE cash activity
+F1-07,1,7,Third-exchange participant OI context,nse_participant_oi|bse_participant_oi,OUTPUT_EQUIVALENT_POPULATED,NSE and BSE participant OI both populated,Exact MSE workbook remains unreachable and is not fabricated
+F1-08,1,8,MCX warehouse and delivery context,mcx_warehouse_stocks|mcx_delivery_reports,POPULATED,24 plus 24 parsed rows 2026-08-06,Official delayed commodity context
+F2-01,2,1,NSDL FPI sector holdings,nsdl_fpi_fortnightly,OUTPUT_EQUIVALENT_POPULATED,48 parsed rows 2026-07-31,Existing key reuses exact bytes and rows
+F2-02,2,2,AMFI monthly category AUM,amfi_monthly_aum,POPULATED,61 parsed rows 2026-06-30,Official AMFI workbook
+F2-03,2,3,Real Baltic Dry Index,tradingeconomics_bdi,POPULATED,1 parsed row 2026-08-10,Approved third-party BDI page and zero-score
+F2-04,2,4,Dry-bulk market proxy history,yahoo_bdry_shipping_proxy,POPULATED,251 parsed bars 2026-08-10,BDRY is labelled ETF proxy and never BDI
+F2-05,2,5,Current India search trends,google_trends_india_rss,POPULATED,10 parsed items 2026-08-10,RSS topics replace unreliable pytrends but do not claim keyword history
+F2-06,2,6,LME prices and aggregate stocks,lme_warehouse_stocks,POPULATED,918 parsed rows 2026-08-10,Westmetall delayed fallback is visibly third-party
+F3-01,3,1,NSE FII DII wrapper output,nse_fii_dii,OUTPUT_EQUIVALENT_POPULATED,2 parsed rows,Reuses official owner
+F3-02,3,2,Sector relative strength bull bear output,nse_all_indices|sector_pulse,DERIVED_OUTPUT_EXISTING,Top five bull and bear panel is populated,Exact RRG ratio-momentum history is not claimed as an independent source
+F3-03,3,3,CRISIL rating actions,crisil_ratings,POPULATED,100 parsed rows 2026-08-10,Official rating rationales
+F3-04,3,4,ICRA rating actions,icra_ratings,POPULATED,20 parsed rows 2026-08-10,Official rating rationales
+F3-05,3,5,CARE rating actions,care_ratings,POPULATED,1000 parsed rows 2026-08-10,Official rating rationales
+F3-06,3,6,Free headline metadata,google_news_rss,OUTPUT_EQUIVALENT_POPULATED,4 retained fresh rows,Replaces API-key NewsAPI output without full-article scraping
+F3-07,3,7,Google News RSS headlines,google_news_rss,POPULATED,4 retained fresh rows,Public RSS
+F3-08,3,8,FII sector and pattern context,nse_fii_dii|nsdl_fpi_fortnightly|sector_pulse,OUTPUT_EQUIVALENT_POPULATED,Official flow and derived sector outputs populated,StockEdge AI output is analytics and not registered as source evidence
+F3-09,3,9,NSE bulk deals,nse_bulk_deals_today_csv|nse_bulk_deal_symbol,OUTPUT_EQUIVALENT_POPULATED,139 plus 50 parsed rows,Official source reuse
+F3-10,3,10,NSE block deals,nse_block_deal,OUTPUT_EQUIVALENT_POPULATED,3 parsed rows,Official source reuse
+F4-01,4,1,Realtime quotes bars and depth,upstox_full_market_quote|upstox_historical_candles,FREE_ADAPTER_READY_TOKEN_REQUIRED,GET-only adapter and normalizers tested,Exact tick-by-tick CVD remains licensed but free read-only quote depth and bars cover screener use
+F4-02,4,2,USDA WASDE values,usda_wasde_cornell,POPULATED,5414 parsed rows 2026-07-10,Official USDA data
+F4-03,4,3,USDA release discovery and fallback,usda_wasde_cornell,OUTPUT_EQUIVALENT_POPULATED,Same persisted official object,Discovery route is not counted as duplicate signal
+F4-04,4,4,Angel instrument master,angelone_instrument_master,POPULATED,24063 normalized from 152044 source rows,Public reference data
+F4-05,4,5,Angel candle and quote output,upstox_full_market_quote|upstox_historical_candles,FREE_ADAPTER_READY_TOKEN_REQUIRED,GET-only adapter and normalizers tested,Uses one free read-only provider instead of trading credential flow
+F4-06,4,6,Dhan instrument master,dhan_instrument_master,POPULATED,24283 normalized from 205781 source rows,Public reference data
+F4-07,4,7,Dhan chart output,upstox_historical_candles,FREE_ADAPTER_READY_TOKEN_REQUIRED,Historical candle adapter tested,Free Analytics Token required
+F4-08,4,8,FYERS quote history and depth output,upstox_full_market_quote|upstox_historical_candles,FREE_ADAPTER_READY_TOKEN_REQUIRED,Quote depth and candle adapters tested,No order endpoint exists
+F4-09,4,9,Global quote depth deal and flow output,upstox_full_market_quote|nse_large_deals|nse_fii_dii,FREE_HYBRID_READY_TOKEN_REQUIRED,Official deal-flow rows populated and quote adapter tested,Licensed vendor-specific tick stream is not claimed
+F4-10,4,10,OPEC production adjustment policy,opec_production_adjustment,POPULATED,1 parsed official release row,Production adjustment is not basket price
+F4-11,4,11,EIA OPEC supply and capacity context,eia_steo_opec_supply,POPULATED,360 parsed rows 2026-07-01,Supply is never relabelled quota
+F5-01,5,1,NSE market status,nse_market_status,POPULATED,5 valid rows 2026-08-10,Official session context
+F5-02,5,2,NSE equity universe,nse_equity_universe,OUTPUT_EQUIVALENT_POPULATED,2397 parsed rows,Official identity owner
+F5-03,5,3,Nifty 500 universe,nse_nifty500_constituents,OUTPUT_EQUIVALENT_POPULATED,500 parsed rows,Official membership
+F5-04,5,4,NSE PIT insider direction,nse_pit_symbol,POPULATED,100 parsed rows,Direction parser v1.1
+F5-05,5,5,NSE deal history,nse_large_deals|nse_bulk_deals_today_csv|nse_block_deal,OUTPUT_EQUIVALENT_POPULATED,Positive official rows,No duplicate score votes
+F5-06,5,6,NSE delivery bhavcopy,nse_bhavcopy_eod,OUTPUT_EQUIVALENT_POPULATED,2415 parsed rows,Official A-family price volume owner
+F5-07,5,7,BSE insider disclosures,bse_insider_trading,OUTPUT_EQUIVALENT_POPULATED,148 parsed rows,Official source
+F5-08,5,8,BSE bulk deals,bse_bulk_deals,OUTPUT_EQUIVALENT_POPULATED,73 parsed rows,Official source
+F5-09,5,9,Company identity search,nse_equity_universe,OUTPUT_EQUIVALENT_POPULATED,2397 official identity rows,Search helper is not a separate source
+F5-10,5,10,Saved fundamental screen output,bse_financial_results_xbrl|fundamental_ratios_v1,WAIT_DETAILED_XBRL_FACTS,BSE filing index is populated and the ratio calculator fails closed,No ratio row is invented from filing metadata
+F5-11,5,11,Insider-table output,nse_pit_symbol|bse_insider_trading,OUTPUT_EQUIVALENT_POPULATED,Official NSE and BSE records populated,Trendlyne mirror rejected
+F5-12,5,12,Bulk and block table output,nse_large_deals|bse_bulk_deals,OUTPUT_EQUIVALENT_POPULATED,Official records populated,Trendlyne mirror rejected
+F5-13,5,13,Stock mutual-fund holdings and flows,rupeevest_mf_flows|amfi_scheme_wise|amfi_portfolio_disclosure,OUTPUT_EQUIVALENT_POPULATED,1148 flow rows plus official AMFI context,Third-party screen contract is replaced and zero-score
+F5-14,5,14,RupeeVest monthly stock flows,rupeevest_mf_flows,POPULATED,1148 parsed rows 2026-06-30,Third-party informational context
+F5-15,5,15,Corporate filing discovery,nse_corporate_filings_actions|bse_corporate_announcements|sebi_pit_sast,OUTPUT_EQUIVALENT_POPULATED,Direct official filing owners populated,SEBI hub metadata is not duplicated
+F6-01,6,1,Company fundamentals pages,bse_financial_results_xbrl|fundamental_ratios_v1,WAIT_DETAILED_XBRL_FACTS,5126 official BSE filing-index rows are saved but numeric iXBRL facts are not yet materialized,No automated Screener copying and no metadata-to-ratio invention
+F6-02,6,2,Raw fundamental screen output,bse_financial_results_xbrl|fundamental_ratios_v1,WAIT_DETAILED_XBRL_FACTS,Fail-closed calculator is implemented and tested,Requires bounded context-aware iXBRL fact ingestion
+F6-03,6,3,Automated fundamentals and disclosure export,bse_financial_results_xbrl|nse_corporate_filings_actions,OFFICIAL_DISCLOSURE_INDEX_POPULATED,Official BSE filing index and existing exchange disclosures are populated,Numeric ratios remain WAIT_DETAILED_XBRL_FACTS
+F6-04,6,4,NSE index option chains,nse_option_chain_nifty|nse_option_chain_banknifty|nse_index_option_chain_v3,OUTPUT_EQUIVALENT_POPULATED,18 plus 6 plus 113 rows,Official source reuse
+F6-05,6,5,NSE equity option chain,nse_option_chain_equity,POPULATED,84 parsed rows 2026-08-10,Identity fallback repaired
+F6-06,6,6,Global proxy price history,yahoo_cme_proxy|yahoo_lme_proxy|yahoo_bdry_shipping_proxy,OUTPUT_EQUIVALENT_POPULATED,192 plus 48 plus 251 rows,Every proxy is explicitly labelled
+F6-07,6,7,Option chain and provider Greeks,nse_option_chain_equity|rbi_tbill_yield|option_greeks_calculated_v1,CALCULATED_OUTPUT_POPULATED,65 dated Black-Scholes-Merton rows are persisted from official IV spot expiry and RBI rate,Calculated Greeks are assumptions-labelled and never source-published values
+F6-08,6,8,FII and mutual-fund holding context,nse_shareholding_pattern|nse_fii_dii|amfi_scheme_wise|amfi_portfolio_disclosure|rupeevest_mf_flows,OUTPUT_EQUIVALENT_POPULATED,Positive rows in every accepted owner,No fuzzy direction invented
+F6-09,6,9,Option Greeks,nse_option_chain_equity|rbi_tbill_yield|option_greeks_calculated_v1,CALCULATED_OUTPUT_POPULATED,65 calculated rows persist exact lineage hashes and model assumptions,Informational zero-score calculation only
+F6-10,6,10,Unified normalized record plane,source_parser|market_data_store,NOT_A_SOURCE_REPLACED,Existing archive parse normalize plane retained,Generated mock records are rejected
+F7-01,7,1,Company fundamentals,bse_financial_results_xbrl|fundamental_ratios_v1,WAIT_DETAILED_XBRL_FACTS,Official filing discovery is populated and calculation code is fail-closed,No ratio output until numeric iXBRL contexts are parsed
+F7-02,7,2,Fundamental screen query,bse_financial_results_xbrl|fundamental_ratios_v1,WAIT_DETAILED_XBRL_FACTS,Local calculator preserves missing values as missing,No private query route or invented ratios
+F7-03,7,3,Fundamental and disclosure tables,bse_financial_results_xbrl|bse_shareholding_pattern|official_disclosures,OFFICIAL_DISCLOSURE_INDEX_POPULATED,5126 financial and 5508 shareholding filing-index rows are saved,Detail percentages and statement facts remain a later bounded stage
+F7-04,7,4,Option IV OI Greeks PCR and max pain,nse_option_chain_equity|rbi_tbill_yield|option_greeks_calculated_v1|pcr_max_pain_history_v1,CALCULATED_OUTPUT_POPULATED,65 Greeks rows and one prospective PCR/max-pain observation are saved,No old history is backfilled or invented
+F7-05,7,5,Option analytics output,nse_option_chain_equity|rbi_tbill_yield|option_greeks_calculated_v1|pcr_max_pain_history_v1,CALCULATED_OUTPUT_POPULATED,Official source inputs produce dated calculated outputs with lineage,Research-only and zero-score
+F7-06,7,6,NSE index option chains,nse_option_chain_nifty|nse_option_chain_banknifty|nse_index_option_chain_v3,OUTPUT_EQUIVALENT_POPULATED,Positive official rows,No new duplicate source
+F7-07,7,7,NSE equity option chain,nse_option_chain_equity,OUTPUT_EQUIVALENT_POPULATED,84 parsed rows,Existing repair reused
+F7-08,7,8,Dhan option chain and Greeks output,nse_option_chain_equity|rbi_tbill_yield|option_greeks_calculated_v1,CALCULATED_OUTPUT_POPULATED,Official exchange inputs plus RBI rate produce 65 dated rows,Output-equivalent research fields only and no broker path
+F7-09,7,9,FYERS quote and candle output,upstox_full_market_quote|upstox_historical_candles,FREE_ADAPTER_READY_TOKEN_REQUIRED,Typed read-only replacement ready,No order route
+F7-10,7,10,Zerodha quote and candle output,upstox_full_market_quote|upstox_historical_candles,FREE_ADAPTER_READY_TOKEN_REQUIRED,Typed read-only replacement ready,Kite paid API not needed for these outputs
+F7-11,7,11,Upstox market and option data,upstox_readonly_adapter,FREE_ADAPTER_READY_TOKEN_REQUIRED,15 GET-only contracts and normalizers tested,One free one-year Analytics Token required
+F7-12,7,12,FII and mutual-fund holdings,nse_shareholding_pattern|nse_fii_dii|amfi_scheme_wise|rupeevest_mf_flows,OUTPUT_EQUIVALENT_POPULATED,Positive accepted-owner rows,Informational only
+F7-13,7,13,Option Greeks,nse_option_chain_equity|rbi_tbill_yield|option_greeks_calculated_v1,CALCULATED_OUTPUT_POPULATED,65 calculated rows are saved with model and assumption fields,Not represented as provider-supplied Greeks
+F7-14,7,14,Max pain from official OI,nse_option_chain_equity|pcr_max_pain_history_v1,OUTPUT_EQUIVALENT_POPULATED,One prospective official-OI-derived observation is persisted,History grows only from real future observations
+F7-15,7,15,252-session ATM IV rank,nse_option_chain|upstox_option_chain|iv_rank,DERIVED_ACCUMULATING,Fail-closed calculator tested and archive has only 8 to 22 attempts,Rank remains WAIT until 252 distinct sessions and never invents history
+F7-16,7,16,User data ingestion output,market_data_store|source_parser,NOT_A_SOURCE_REPLACED,Automated archive and parsers already own supported data,Manual CSV is optional transport and not a source link
+F7-17,7,17,Deterministic analysis output,existing_screener_engine,NOT_A_SOURCE_REPLACED,Existing explainable engine retained,Generated predictions and mock rows are rejected as source evidence

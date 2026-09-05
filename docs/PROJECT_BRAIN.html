@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>TrendForge — Project Brain</title>
+<style>
+:root{--bg:#070b12;--text:#e8eef9;--muted:#8fa3c1;--line:#1e2f4a;--teal:#2dd4bf}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--text);line-height:1.35;font-size:13px}
+header{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:1.15rem}
+header p{margin:2px 0 0;color:var(--muted);font-size:.82rem;max-width:52ch}
+.badge{font-size:.68rem;padding:4px 8px;border-radius:999px;border:1px solid var(--line);color:var(--teal)}
+main{padding:14px 16px 28px;max-width:1200px;margin:0 auto}
+.path{background:#0c1220;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:14px;color:var(--muted)}
+.path strong{color:var(--teal)}
+.boss{color:#fbbf24}
+h2{margin:16px 0 8px;font-size:.72rem;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.card{background:#101a2b;border:1px solid var(--line);border-radius:12px;padding:10px 12px;border-left:4px solid var(--k)}
+.card h3{margin:0 0 6px;font-size:.92rem}
+.card p{margin:4px 0;color:var(--muted)}
+.card .one{color:var(--text)}
+.card .lab{margin:6px 0 2px;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#5d7394}
+.card ul{margin:0;padding-left:16px;color:var(--muted)}
+.card li{margin:2px 0}
+.card .files code{font-size:.68rem;color:var(--teal);word-break:break-word}
+.card .warn{color:#fde68a;font-size:.78rem}
+.conns{margin:0;padding-left:18px;color:var(--muted)}
+.conns li{margin:4px 0}
+.gloss{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:8px}
+.g{background:#101a2b;border:1px solid var(--line);border-radius:10px;padding:8px}
+.g dt{color:var(--teal);font-weight:700;font-size:.8rem}
+.g dd{margin:2px 0 0;color:var(--muted);font-size:.75rem}
+footer{padding:10px 16px;color:#5d7394;font-size:.7rem;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+<div>
+<h1>TrendForge</h1>
+<p>Research scanner for NSE/BSE/MCX. Scan stocks through gates and scores. Radar shows research results. No broker orders.</p>
+</div>
+<span class="badge">RESEARCH ONLY · ACTIVATION OFF</span>
+</header>
+<main>
+<div class="path"><strong>The Path:</strong> Outside data is monitored and parsed, gates block activation, scanner runs symbols through structure and evidence, causal scores, radar shows wait/reject research results. <span class="boss">Boss: SCANNER SCHEDULER.</span></div>
+<section><h2>ENGINE</h2><div class="grid"><article class="card" style="--k:#818cf8">
+<h3>SCANNER SCHEDULER</h3>
+<p class="one"><b>One-liner:</b> Boss of one research scan run.</p>
+<p class="lab">Job</p><ul><li>Calls sources and gates.</li><li>Scores symbols and saves results.</li></ul>
+<p><b>Why exist:</b> Need one cook running the kitchen line.</p>
+<p><b>When it wakes up:</b> Run-once click or schedule.</p>
+<p><b>Who calls it:</b> User, FastAPI, scheduler thread</p>
+<p class="files"><b>Files / APIs:</b> <code>scanner_scheduler.py, POST /api/scanner/run-once</code></p>
+<p><b>Caveman analogy:</b> Like a head chef with the only ticket.</p>
+<p class="warn">&#9888;&#65039; Warning: BOSS of scan. Still research only.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>SOURCE MONITOR</h3>
+<p class="one"><b>One-liner:</b> Checks if outside data is awake.</p>
+<p class="lab">Job</p><ul><li>Fetches critical sources.</li><li>Records success or broken state.</li></ul>
+<p><b>Why exist:</b> Cannot score on missing files.</p>
+<p><b>When it wakes up:</b> Each scanner run.</p>
+<p><b>Who calls it:</b> Scanner Scheduler</p>
+<p class="files"><b>Files / APIs:</b> <code>source_monitor.py, source_resolver.py</code></p>
+<p><b>Caveman analogy:</b> Like a mailroom stamp: arrived or not.</p>
+<p class="warn">&#9888;&#65039; Warning: HTTP 200 is not clean data.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>SOURCE PARSER</h3>
+<p class="one"><b>One-liner:</b> Turns messy files into clean rows.</p>
+<p class="lab">Job</p><ul><li>Parses raw downloads.</li><li>Fails closed on bad shape.</li></ul>
+<p><b>Why exist:</b> Engines need neat tables.</p>
+<p><b>When it wakes up:</b> After monitor in a scan.</p>
+<p><b>Who calls it:</b> Scanner Scheduler</p>
+<p class="files"><b>Files / APIs:</b> <code>source_parser.py, parsers/*</code></p>
+<p><b>Caveman analogy:</b> Like a lab tech rejecting dirty samples.</p>
+<p class="warn">&#9888;&#65039; Warning: Metadata-only parse cannot unlock ready.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>GATE READINESS</h3>
+<p class="one"><b>One-liner:</b> Hard stop if data is not allowed.</p>
+<p class="lab">Job</p><ul><li>Checks source readiness.</li><li>Blocks confirm when activation off.</li></ul>
+<p><b>Why exist:</b> Scores must not outrun truth.</p>
+<p><b>When it wakes up:</b> Each scanner run.</p>
+<p><b>Who calls it:</b> Scanner Scheduler, Compiler</p>
+<p class="files"><b>Files / APIs:</b> <code>gate_readiness.py, GET /api/gates/readiness</code></p>
+<p><b>Caveman analogy:</b> Like airport security before boarding.</p>
+<p class="warn">&#9888;&#65039; Warning: WAIT_SOURCE_ACTIVATION is normal now.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>EXCHANGE CALENDAR</h3>
+<p class="one"><b>One-liner:</b> Knows if market day is open.</p>
+<p class="lab">Job</p><ul><li>Checks trading day.</li><li>Stops scheduled scans on holidays.</li></ul>
+<p><b>Why exist:</b> Holiday scans are silly.</p>
+<p><b>When it wakes up:</b> Scheduled scan and status call.</p>
+<p><b>Who calls it:</b> Scanner Scheduler</p>
+<p class="files"><b>Files / APIs:</b> <code>exchange_calendar.py, GET /api/calendar/status</code></p>
+<p><b>Caveman analogy:</b> Like a shop open/closed sign.</p>
+<p class="warn">&#9888;&#65039; Warning: Manual research may still run.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>MARKET CONTEXT</h3>
+<p class="one"><b>One-liner:</b> Snapshot of whole market mood.</p>
+<p class="lab">Job</p><ul><li>Builds market context.</li><li>Builds sector mood gates.</li></ul>
+<p><b>Why exist:</b> Stock setup needs market weather.</p>
+<p><b>When it wakes up:</b> During scanner run.</p>
+<p><b>Who calls it:</b> Scanner Scheduler</p>
+<p class="files"><b>Files / APIs:</b> <code>market_context.py, nse_eod_ingestion.py</code></p>
+<p><b>Caveman analogy:</b> Like checking weather before sailing.</p>
+<p class="warn">&#9888;&#65039; Warning: Research mood only. Not a crystal ball.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>CORPORATE ACTIONS</h3>
+<p class="one"><b>One-liner:</b> Fixes splits so charts do not lie.</p>
+<p class="lab">Job</p><ul><li>Reconciles corporate actions.</li><li>Fails integrity if chart is broken.</li></ul>
+<p><b>Why exist:</b> Split charts fake patterns.</p>
+<p><b>When it wakes up:</b> Per symbol in scan.</p>
+<p><b>Who calls it:</b> Scanner Scheduler</p>
+<p class="files"><b>Files / APIs:</b> <code>corporate_actions.py, parsers/corporate_events_parser.py</code></p>
+<p><b>Caveman analogy:</b> Like fixing a map after roads move.</p>
+<p class="warn">&#9888;&#65039; Warning: Integrity fail rejects structure path.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>HARMONIC ENGINE</h3>
+<p class="one"><b>One-liner:</b> Finds chart shapes like Gartley.</p>
+<p class="lab">Job</p><ul><li>Detects harmonic patterns.</li><li>Scores pattern quality.</li></ul>
+<p><b>Why exist:</b> Structure evidence for research.</p>
+<p><b>When it wakes up:</b> Per symbol after integrity pass.</p>
+<p><b>Who calls it:</b> Scanner Scheduler</p>
+<p class="files"><b>Files / APIs:</b> <code>harmonic_detector.py, harmonic_advanced.py</code></p>
+<p><b>Caveman analogy:</b> Like spotting animal shapes in clouds.</p>
+<p class="warn">&#9888;&#65039; Warning: Shape alone is not product confirm.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>HARMONIC LIFECYCLE</h3>
+<p class="one"><b>One-liner:</b> Tracks same pattern over time.</p>
+<p class="lab">Job</p><ul><li>Builds pattern identity.</li><li>Flags conflicts and waits.</li></ul>
+<p><b>Why exist:</b> Do not mix old and new patterns.</p>
+<p><b>When it wakes up:</b> After harmonic detect.</p>
+<p><b>Who calls it:</b> Scanner Scheduler</p>
+<p class="files"><b>Files / APIs:</b> <code>harmonic_lifecycle.py, harmonic_scan_lifecycle.py</code></p>
+<p><b>Caveman analogy:</b> Like naming a storm to track it.</p>
+<p class="warn">&#9888;&#65039; Warning: Lifecycle wait is not a buy signal.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>FEATURE ENGINE</h3>
+<p class="one"><b>One-liner:</b> Builds math numbers from candles.</p>
+<p class="lab">Job</p><ul><li>Computes point-in-time features.</li><li>Pins engine and registry version.</li></ul>
+<p><b>Why exist:</b> Causal scorer needs numbers.</p>
+<p><b>When it wakes up:</b> Per symbol in scan.</p>
+<p><b>Who calls it:</b> Scanner Scheduler</p>
+<p class="files"><b>Files / APIs:</b> <code>feature_engineering.py, feature_registry.py, indicator_engine.py</code></p>
+<p><b>Caveman analogy:</b> Like measuring ingredients with a scale.</p>
+<p class="warn">&#9888;&#65039; Warning: Bad warm-up fails feature state.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>EVIDENCE BUILDER</h3>
+<p class="one"><b>One-liner:</b> Collects proof from deals and filings.</p>
+<p class="lab">Job</p><ul><li>Builds cause/sponsor claims.</li><li>Saves claims to storage.</li></ul>
+<p><b>Why exist:</b> Chart needs a story with proof.</p>
+<p><b>When it wakes up:</b> Per symbol in scan.</p>
+<p><b>Who calls it:</b> Scanner Scheduler</p>
+<p class="files"><b>Files / APIs:</b> <code>evidence_builder.py, GET /api/evidence/{symbol}</code></p>
+<p><b>Caveman analogy:</b> Like clipping news to a crime board.</p>
+<p class="warn">&#9888;&#65039; Warning: Unofficial proof cannot unlock alone.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>CAUSAL ENGINE</h3>
+<p class="one"><b>One-liner:</b> Scores layers and emits research state.</p>
+<p class="lab">Job</p><ul><li>Scores cause/sponsor/structure/flow.</li><li>Applies independence penalties.</li></ul>
+<p><b>Why exist:</b> Need a clear auditable judge.</p>
+<p><b>When it wakes up:</b> Batch after all symbols prepared.</p>
+<p><b>Who calls it:</b> Scanner Scheduler</p>
+<p class="files"><b>Files / APIs:</b> <code>causal_engine.py, scanner_causal.py</code></p>
+<p><b>Caveman analogy:</b> Like a debate judge with four score cards.</p>
+<p class="warn">&#9888;&#65039; Warning: Research states. Scanner radar often wait/reject only.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>RADAR ENGINE</h3>
+<p class="one"><b>One-liner:</b> Fetches latest results for the screen.</p>
+<p class="lab">Job</p><ul><li>Loads latest candidates.</li><li>Builds source health view.</li></ul>
+<p><b>Why exist:</b> UI must not speak raw SQL.</p>
+<p><b>When it wakes up:</b> Radar and command-bar APIs.</p>
+<p><b>Who calls it:</b> Frontend Panel</p>
+<p class="files"><b>Files / APIs:</b> <code>engine.py, list_candidates, GET /api/radar</code></p>
+<p><b>Caveman analogy:</b> Like a scoreboard for last match.</p>
+<p class="warn">&#9888;&#65039; Warning: Demo mode can show fake rows if empty.</p>
+</article></div></section><section><h2>HUB</h2><div class="grid"><article class="card" style="--k:#60a5fa">
+<h3>FASTAPI SERVER</h3>
+<p class="one"><b>One-liner:</b> Main door from browser to engines.</p>
+<p class="lab">Job</p><ul><li>Receives HTTP calls.</li><li>Routes work to engines.</li></ul>
+<p><b>Why exist:</b> One door beats many messy scripts.</p>
+<p><b>When it wakes up:</b> Server is running.</p>
+<p><b>Who calls it:</b> Frontend Panel</p>
+<p class="files"><b>Files / APIs:</b> <code>backend/trendforge_api/main.py, backend/run_server.py</code></p>
+<p><b>Caveman analogy:</b> Like a hotel front desk.</p>
+<p class="warn">&#9888;&#65039; Warning: Local research server. No broker login.</p>
+</article></div></section><section><h2>GOV</h2><div class="grid"><article class="card" style="--k:#a78bfa">
+<h3>INVENTORY COMPILER</h3>
+<p class="one"><b>One-liner:</b> Rule book for source maturity.</p>
+<p class="lab">Job</p><ul><li>Reads inventory workbook.</li><li>Sets activation and permissions.</li></ul>
+<p><b>Why exist:</b> Stop fake sources from faking ready.</p>
+<p><b>When it wakes up:</b> When gates or report run.</p>
+<p><b>Who calls it:</b> Gate Readiness, report API</p>
+<p class="files"><b>Files / APIs:</b> <code>source_inventory_compiler.py, GET /api/source-inventory/compiler-report</code></p>
+<p><b>Caveman analogy:</b> Like a building inspector stamp.</p>
+<p class="warn">&#9888;&#65039; Warning: Activation is false today. Confirm blocked.</p>
+</article></div></section><section><h2>SAFETY</h2><div class="grid"><article class="card" style="--k:#ff6b6b">
+<h3>SAFETY ENGINE</h3>
+<p class="one"><b>One-liner:</b> Panic lights and personal locks.</p>
+<p class="lab">Job</p><ul><li>Evaluates lock states.</li><li>Handles panic lock request.</li></ul>
+<p><b>Why exist:</b> Protect human from bad days.</p>
+<p><b>When it wakes up:</b> Scan and panic button.</p>
+<p><b>Who calls it:</b> Scanner, Frontend via API</p>
+<p class="files"><b>Files / APIs:</b> <code>safety_engine.py, POST /api/safety/panic-lock</code></p>
+<p><b>Caveman analogy:</b> Like a car that locks after hard stops.</p>
+<p class="warn">&#9888;&#65039; Warning: executable always false. No live trade.</p>
+</article></div></section><section><h2>STORE</h2><div class="grid"><article class="card" style="--k:#34d399">
+<h3>OHLCV STORAGE</h3>
+<p class="one"><b>One-liner:</b> Warehouse of price candles.</p>
+<p class="lab">Job</p><ul><li>Stores OHLCV bars.</li><li>Serves series with enough history.</li></ul>
+<p><b>Why exist:</b> Need local history for patterns.</p>
+<p><b>When it wakes up:</b> Ingest write; scan read.</p>
+<p><b>Who calls it:</b> Scanner, adapters</p>
+<p class="files"><b>Files / APIs:</b> <code>ohlcv_adapter.py, parquet_store.py, data/parquet/</code></p>
+<p><b>Caveman analogy:</b> Like a filing cabinet of game tapes.</p>
+<p class="warn">&#9888;&#65039; Warning: Need enough bars or symbol skips.</p>
+</article><article class="card" style="--k:#34d399">
+<h3>SQLITE STORAGE</h3>
+<p class="one"><b>One-liner:</b> Diary of runs, gates, and claims.</p>
+<p class="lab">Job</p><ul><li>Saves scanner runs.</li><li>Saves candidates and gate decisions.</li></ul>
+<p><b>Why exist:</b> Must answer what we knew when.</p>
+<p><b>When it wakes up:</b> Every scan write.</p>
+<p><b>Who calls it:</b> Scanner, engines</p>
+<p class="files"><b>Files / APIs:</b> <code>storage.py, data/trendforge.db, records.py</code></p>
+<p><b>Caveman analogy:</b> Like a ship logbook.</p>
+<p class="warn">&#9888;&#65039; Warning: Local research DB. Not multi-tenant cloud.</p>
+</article></div></section><section><h2>SIDE</h2><div class="grid"><article class="card" style="--k:#c084fc">
+<h3>RISK ENGINE</h3>
+<p class="one"><b>One-liner:</b> Pretend size math. Always zero size.</p>
+<p class="lab">Job</p><ul><li>Computes research geometry.</li><li>Returns quantity zero always.</li></ul>
+<p><b>Why exist:</b> Keep shape without live sizing product.</p>
+<p><b>When it wakes up:</b> Position-size API call.</p>
+<p><b>Who calls it:</b> API only (side)</p>
+<p class="files"><b>Files / APIs:</b> <code>risk_engine.py, POST /api/risk/position-size</code></p>
+<p><b>Caveman analogy:</b> Like a tape measure that never cuts cloth.</p>
+<p class="warn">&#9888;&#65039; Warning: quantity always 0. Not real size.</p>
+</article><article class="card" style="--k:#c084fc">
+<h3>Q5 SELECTION</h3>
+<p class="one"><b>One-liner:</b> Fixture contracts for selection states.</p>
+<p class="lab">Job</p><ul><li>Serves selection fixtures.</li><li>Tests four-state contracts.</li></ul>
+<p><b>Why exist:</b> Freeze product language early.</p>
+<p><b>When it wakes up:</b> Fixture API / tests.</p>
+<p><b>Who calls it:</b> Tests, governance tools</p>
+<p class="files"><b>Files / APIs:</b> <code>selection/*, GET /api/v1/selection/fixtures/*</code></p>
+<p><b>Caveman analogy:</b> Like a dress rehearsal script.</p>
+<p class="warn">&#9888;&#65039; Warning: Not the scanner boss path.</p>
+</article><article class="card" style="--k:#c084fc">
+<h3>DERIVATIVES ENGINE</h3>
+<p class="one"><b>One-liner:</b> Options math calculator on the side.</p>
+<p class="lab">Job</p><ul><li>Prices options math.</li><li>Computes Greeks on request.</li></ul>
+<p><b>Why exist:</b> Need local option numbers.</p>
+<p><b>When it wakes up:</b> Derivatives API call.</p>
+<p><b>Who calls it:</b> API side tools</p>
+<p class="files"><b>Files / APIs:</b> <code>derivatives_engine.py, POST /api/derivatives/*</code></p>
+<p><b>Caveman analogy:</b> Like a desk calculator.</p>
+<p class="warn">&#9888;&#65039; Warning: Not scan boss.</p>
+</article><article class="card" style="--k:#c084fc">
+<h3>INSTITUTIONAL STACK</h3>
+<p class="one"><b>One-liner:</b> Big institutional research modules.</p>
+<p class="lab">Job</p><ul><li>Serves institutional reports.</li><li>Runs research-only tools.</li></ul>
+<p><b>Why exist:</b> Deep research needs its own room.</p>
+<p><b>When it wakes up:</b> Institutional API calls.</p>
+<p><b>Who calls it:</b> API side tools</p>
+<p class="files"><b>Files / APIs:</b> <code>institutional_*.py, GET /api/institutional/*</code></p>
+<p><b>Caveman analogy:</b> Like a specialist lab next door.</p>
+<p class="warn">&#9888;&#65039; Warning: Does not drive scanner final state.</p>
+</article></div></section><section><h2>UI</h2><div class="grid"><article class="card" style="--k:#22d3ee">
+<h3>FRONTEND PANEL</h3>
+<p class="one"><b>One-liner:</b> One screen for radar, lights, and buttons.</p>
+<p class="lab">Job</p><ul><li>Shows radar list.</li><li>Shows safety and calendar lights.</li></ul>
+<p><b>Why exist:</b> One human needs one control room.</p>
+<p><b>When it wakes up:</b> Page load and button clicks.</p>
+<p><b>Who calls it:</b> User</p>
+<p class="files"><b>Files / APIs:</b> <code>frontend/app.js, frontend/index.html, GET /api/radar</code></p>
+<p><b>Caveman analogy:</b> Like a cockpit with many gauges.</p>
+<p class="warn">&#9888;&#65039; Warning: Display only. Does not place orders.</p>
+</article></div></section><section><h2>EXTERNAL</h2><div class="grid"><article class="card" style="--k:#fb923c">
+<h3>EXTERNAL MARKETS</h3>
+<p class="one"><b>One-liner:</b> Outside markets that send raw data.</p>
+<p class="lab">Job</p><ul><li>Hosts NSE/BSE/MCX feeds.</li><li>Provides official files to download.</li></ul>
+<p><b>Why exist:</b> Truth lives outside the laptop.</p>
+<p><b>When it wakes up:</b> Always outside; monitor pulls.</p>
+<p><b>Who calls it:</b> Source Monitor, adapters</p>
+<p class="files"><b>Files / APIs:</b> <code>data/raw_sources/, TREND_FORGE_SOURCE_REGISTRY.md</code></p>
+<p><b>Caveman analogy:</b> Like weather stations in the real world.</p>
+<p class="warn">&#9888;&#65039; Warning: Unofficial sources cannot unlock alone.</p>
+</article><article class="card" style="--k:#fb923c">
+<h3>OPENALGO</h3>
+<p class="one"><b>One-liner:</b> Broker tool check. Read only.</p>
+<p class="lab">Job</p><ul><li>Assesses capability.</li><li>May fetch history read-only.</li></ul>
+<p><b>Why exist:</b> Future data path without order rights.</p>
+<p><b>When it wakes up:</b> Capability / optional history.</p>
+<p><b>Who calls it:</b> API</p>
+<p class="files"><b>Files / APIs:</b> <code>openalgo_client.py, assess_openalgo_capability</code></p>
+<p><b>Caveman analogy:</b> Like a library card, not a credit card.</p>
+<p class="warn">&#9888;&#65039; Warning: Never sends real orders.</p>
+</article></div></section>
+<section>
+<h2>How they talk</h2>
+<ol class="conns"><li>EXTERNAL MARKETS send raw files to SOURCE MONITOR so monitor can check freshness.</li><li>SOURCE MONITOR sends archives to SOURCE PARSER so rows become clean.</li><li>INVENTORY COMPILER sends activation rules to GATE READINESS so gates can block confirm.</li><li>GATE READINESS sends blocked flags to SCANNER SCHEDULER so all symbols stay research-safe.</li><li>SCANNER SCHEDULER sends work to SAFETY and MARKET CONTEXT so mood and locks apply.</li><li>OHLCV STORAGE sends candles to CORPORATE ACTIONS then HARMONIC ENGINE so charts stay honest.</li><li>FEATURE ENGINE and EVIDENCE BUILDER send numbers/claims to CAUSAL ENGINE so it can score.</li><li>CAUSAL ENGINE sends states to SQLITE STORAGE so the diary keeps the run.</li><li>SQLITE STORAGE sends latest run to RADAR ENGINE so FRONTEND can paint the list.</li><li>FRONTEND PANEL sends run-once to FASTAPI SERVER so SCANNER SCHEDULER starts the boss path.</li></ol>
+</section>
+<section>
+<h2>Word list</h2>
+<div class="gloss"><div class="g"><dt>Scanner</dt><dd>One research pass over stocks.</dd></div><div class="g"><dt>Gate</dt><dd>Hard pass/fail data check.</dd></div><div class="g"><dt>Compiler</dt><dd>Source maturity rule book.</dd></div><div class="g"><dt>Causal</dt><dd>Four-layer research scorer.</dd></div><div class="g"><dt>Harmonic</dt><dd>Chart shape pattern find.</dd></div><div class="g"><dt>Radar</dt><dd>Latest results list.</dd></div><div class="g"><dt>Activation</dt><dd>Boss switch for sources.</dd></div><div class="g"><dt>Research only</dt><dd>No real broker orders.</dd></div><div class="g"><dt>OHLCV</dt><dd>Open high low close volume.</dd></div><div class="g"><dt>CONFIRMED</dt><dd>Product confirm still blocked.</dd></div></div>
+</section>
+</main>
+<footer>Compact project brain. Research / paper only. No live broker orders.</footer>
+</body>
+</html>

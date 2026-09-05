@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Trade Vision — Project Brain</title>
+<style>
+:root{--bg:#070b12;--text:#e8eef9;--muted:#8fa3c1;--line:#1e2f4a;--teal:#2dd4bf}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--text);line-height:1.35;font-size:13px}
+header{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:1.15rem}
+header p{margin:2px 0 0;color:var(--muted);font-size:.82rem;max-width:52ch}
+.badge{font-size:.68rem;padding:4px 8px;border-radius:999px;border:1px solid var(--line);color:var(--teal)}
+main{padding:14px 16px 28px;max-width:1200px;margin:0 auto}
+.path{background:#0c1220;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:14px;color:var(--muted)}
+.path strong{color:var(--teal)}
+.boss{color:#fbbf24}
+h2{margin:16px 0 8px;font-size:.72rem;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.card{background:#101a2b;border:1px solid var(--line);border-radius:12px;padding:10px 12px;border-left:4px solid var(--k)}
+.card h3{margin:0 0 6px;font-size:.92rem}
+.card p{margin:4px 0;color:var(--muted)}
+.card .one{color:var(--text)}
+.card .lab{margin:6px 0 2px;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#5d7394}
+.card ul{margin:0;padding-left:16px;color:var(--muted)}
+.card li{margin:2px 0}
+.card .files code{font-size:.68rem;color:var(--teal);word-break:break-word}
+.card .warn{color:#fde68a;font-size:.78rem}
+.conns{margin:0;padding-left:18px;color:var(--muted)}
+.conns li{margin:4px 0}
+.gloss{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:8px}
+.g{background:#101a2b;border:1px solid var(--line);border-radius:10px;padding:8px}
+.g dt{color:var(--teal);font-weight:700;font-size:.8rem}
+.g dd{margin:2px 0 0;color:var(--muted);font-size:.75rem}
+footer{padding:10px 16px;color:#5d7394;font-size:.7rem;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+<div>
+<h1>Trade Vision</h1>
+<p>Paper guidance desk. One symbol freezes, scores, Arbiter judges, card shows. Live trading blocked.</p>
+</div>
+<span class="badge">PAPER ONLY · NO LIVE ORDERS</span>
+</header>
+<main>
+<div class="path"><strong>The Path:</strong> Local candles get cleaned, frozen, scored by evidence and ORB, judged by Arbiter, shown on screen, optionally saved as fake trades. <span class="boss">Boss: ARBITER.</span></div>
+<section><h2>DATA</h2><div class="grid"><article class="card" style="--k:#2dd4bf">
+<h3>CANDLE SOURCE</h3>
+<p class="one"><b>One-liner:</b> Loads tiny price bars from a local file.</p>
+<p class="lab">Job</p><ul><li>Reads 1-minute bars.</li><li>Shows a preview to the app.</li></ul>
+<p><b>Why exist:</b> Need real prices without a live broker feed.</p>
+<p><b>When it wakes up:</b> When user imports or loads local data.</p>
+<p><b>Who calls it:</b> User, Web Shell</p>
+<p class="files"><b>Files / APIs:</b> <code>client.behaviorImportLocalReliancePreview, GET /api/v1/behavior/data/local/reliance-1m/preview</code></p>
+<p><b>Caveman analogy:</b> Like opening a box of old baseball cards.</p>
+<p class="warn">&#9888;&#65039; Warning: Local sample data. Not live market stream.</p>
+</article><article class="card" style="--k:#2dd4bf">
+<h3>UI BUILD</h3>
+<p class="one"><b>One-liner:</b> Cleans raw bars into a neat package.</p>
+<p class="lab">Job</p><ul><li>Resamples bars for NSE rules.</li><li>Builds the ORB guidance payload.</li></ul>
+<p><b>Why exist:</b> Server must get clean data, not messy junk.</p>
+<p><b>When it wakes up:</b> Before Analyze / paper-guidance call.</p>
+<p><b>Who calls it:</b> Web Shell, User</p>
+<p class="files"><b>Files / APIs:</b> <code>App.tsx buildOrbGuidancePayload, resampleNseSeries</code></p>
+<p><b>Caveman analogy:</b> Like packing a lunch before school.</p>
+<p class="warn">&#9888;&#65039; Warning: Only prepares data. Does not decide trades.</p>
+</article><article class="card" style="--k:#2dd4bf">
+<h3>HTTP IN</h3>
+<p class="one"><b>One-liner:</b> Sends the package from browser to server.</p>
+<p class="lab">Job</p><ul><li>Posts payload to paper-guidance.</li><li>Waits for the server answer.</li></ul>
+<p><b>Why exist:</b> Browser cannot run the full boss spine alone.</p>
+<p><b>When it wakes up:</b> On Analyze / paper run click.</p>
+<p><b>Who calls it:</b> UI Build, Web Shell</p>
+<p class="files"><b>Files / APIs:</b> <code>client.ts paperGuidanceRun, POST /paper-guidance/run</code></p>
+<p><b>Caveman analogy:</b> Like mailing a letter to HQ.</p>
+<p class="warn">&#9888;&#65039; Warning: Network hop only. Not the judge.</p>
+</article><article class="card" style="--k:#2dd4bf">
+<h3>SNAPSHOT FREEZE</h3>
+<p class="one"><b>One-liner:</b> Freezes prices so future cannot sneak in.</p>
+<p class="lab">Job</p><ul><li>Locks closed candles.</li><li>Stops look-ahead cheat.</li></ul>
+<p><b>Why exist:</b> Honest research needs a fixed past.</p>
+<p><b>When it wakes up:</b> Start of paper-guidance spine (P0).</p>
+<p><b>Who calls it:</b> Paper spine, HTTP IN</p>
+<p class="files"><b>Files / APIs:</b> <code>paper_guidance_spine P0, freeze_d2_closed_candle_snapshot</code></p>
+<p><b>Caveman analogy:</b> Like taking a photo and locking the camera.</p>
+<p class="warn">&#9888;&#65039; Warning: If freeze fails, whole run is unsafe.</p>
+</article><article class="card" style="--k:#2dd4bf">
+<h3>GUIDANCE OUT</h3>
+<p class="one"><b>One-liner:</b> Wraps the decision as JSON for the UI.</p>
+<p class="lab">Job</p><ul><li>Packages plan and blockers.</li><li>Returns envelope to browser.</li></ul>
+<p><b>Why exist:</b> UI needs a stable shape every time.</p>
+<p><b>When it wakes up:</b> After Arbiter decides.</p>
+<p><b>Who calls it:</b> Arbiter, HTTP layer</p>
+<p class="files"><b>Files / APIs:</b> <code>models.PaperTradeGuidance, envelope()</code></p>
+<p><b>Caveman analogy:</b> Like sealing a scorecard in an envelope.</p>
+<p class="warn">&#9888;&#65039; Warning: Delivery only. Does not change the call.</p>
+</article></div></section><section><h2>ENGINE</h2><div class="grid"><article class="card" style="--k:#818cf8">
+<h3>EVIDENCE PACK</h3>
+<p class="one"><b>One-liner:</b> Runs eight mini tools to grade the idea.</p>
+<p class="lab">Job</p><ul><li>Scores chart and levels.</li><li>Checks multi-timeframe and risk clues.</li></ul>
+<p><b>Why exist:</b> One score is weak. Many checks are better.</p>
+<p><b>When it wakes up:</b> After snapshot freeze.</p>
+<p><b>Who calls it:</b> Paper spine, Arbiter</p>
+<p class="files"><b>Files / APIs:</b> <code>CHART_REASONING, CANDLE_CONDITION, LEVEL_CONTEXT, SNAPSHOT_INDICATOR_RUNTIME, MTF_CONFIRMATION, PERSISTED_INDICATOR_MEMORY, MARKET_STRUCTURE_LIQUIDITY, EXECUTION_EVENT_OI_RISK</code></p>
+<p><b>Caveman analogy:</b> Like eight scouts reporting to one general.</p>
+<p class="warn">&#9888;&#65039; Warning: Evidence advises. Arbiter still decides.</p>
+</article><article class="card" style="--k:#818cf8">
+<h3>9C INDICATORS</h3>
+<p class="one"><b>One-liner:</b> Extra indicator panels for research.</p>
+<p class="lab">Job</p><ul><li>Computes 9-candle style views.</li><li>Serves reliability routes.</li></ul>
+<p><b>Why exist:</b> More chart tools for study.</p>
+<p><b>When it wakes up:</b> Indicator / reliability routes.</p>
+<p><b>Who calls it:</b> Research UI</p>
+<p class="files"><b>Files / APIs:</b> <code>nine_candle_*, indicator_registry, reliability routes</code></p>
+<p><b>Caveman analogy:</b> Like spare tools in a toolbox.</p>
+<p class="warn">&#9888;&#65039; Warning: Not on main paper boss path.</p>
+</article></div></section><section><h2>HUB</h2><div class="grid"><article class="card" style="--k:#60a5fa">
+<h3>ARBITER (BOSS)</h3>
+<p class="one"><b>One-liner:</b> Boss judge. Picks WAIT, WATCH, or ENTER_PAPER.</p>
+<p class="lab">Job</p><ul><li>Reads evidence and ORB plan.</li><li>Applies confluence rules.</li><li>Emits final band.</li></ul>
+<p><b>Why exist:</b> Need one boss so side tools cannot hijack.</p>
+<p><b>When it wakes up:</b> End of paper-guidance scoring.</p>
+<p><b>Who calls it:</b> Evidence Pack, ORB, Safety</p>
+<p class="files"><b>Files / APIs:</b> <code>final_confluence_arbiter.py</code></p>
+<p><b>Caveman analogy:</b> Like a referee with the final whistle.</p>
+<p class="warn">&#9888;&#65039; Warning: BOSS. Kronos/Twin/AI do not override it.</p>
+</article></div></section><section><h2>SAFETY</h2><div class="grid"><article class="card" style="--k:#ff6b6b">
+<h3>SAFETY & AUDIT</h3>
+<p class="one"><b>One-liner:</b> Kill switch that can stop everything.</p>
+<p class="lab">Job</p><ul><li>Enforces safety invariants.</li><li>Blocks live trading paths.</li></ul>
+<p><b>Why exist:</b> One hard no must beat all yes.</p>
+<p><b>When it wakes up:</b> Always checked on risky paths.</p>
+<p><b>Who calls it:</b> Arbiter path, system</p>
+<p class="files"><b>Files / APIs:</b> <code>state.py, SAFETY_INVARIANTS, operational_safety, red_team_final_gate</code></p>
+<p><b>Caveman analogy:</b> Like a big red emergency stop button.</p>
+<p class="warn">&#9888;&#65039; Warning: If Safety says no, everything stops.</p>
+</article></div></section><section><h2>RESEARCH</h2><div class="grid"><article class="card" style="--k:#ffd56a">
+<h3>ORB PLAYBOOK</h3>
+<p class="one"><b>One-liner:</b> Looks for open-range breakout patterns.</p>
+<p class="lab">Job</p><ul><li>Builds entry, stop, and target plan.</li><li>Lists playbooks for the setup.</li></ul>
+<p><b>Why exist:</b> Team wants a clear day-trade recipe.</p>
+<p><b>When it wakes up:</b> Inside paper guidance after freeze.</p>
+<p><b>Who calls it:</b> Paper spine, Arbiter</p>
+<p class="files"><b>Files / APIs:</b> <code>orb/core/build_orb_candidate.py, list_orb_playbooks</code></p>
+<p><b>Caveman analogy:</b> Like a fishing guide pointing where to cast.</p>
+<p class="warn">&#9888;&#65039; Warning: Proposes paper plan only. Not live orders.</p>
+</article><article class="card" style="--k:#ffd56a">
+<h3>KRONOS</h3>
+<p class="one"><b>One-liner:</b> Forecast charts for research looking.</p>
+<p class="lab">Job</p><ul><li>Fetches forecast views.</li><li>Draws pretty research charts.</li></ul>
+<p><b>Why exist:</b> Humans like another research lens.</p>
+<p><b>When it wakes up:</b> On Kronos routes / panels.</p>
+<p><b>Who calls it:</b> User, Jarvis</p>
+<p class="files"><b>Files / APIs:</b> <code>kronos_proxy, kronos routes</code></p>
+<p><b>Caveman analogy:</b> Like a weather map that cannot fly the plane.</p>
+<p class="warn">&#9888;&#65039; Warning: Does NOT control Arbiter decision.</p>
+</article><article class="card" style="--k:#ffd56a">
+<h3>TWIN</h3>
+<p class="one"><b>One-liner:</b> Second-opinion engine on a side lane.</p>
+<p class="lab">Job</p><ul><li>Runs twin analysis.</li><li>Returns parallel research view.</li></ul>
+<p><b>Why exist:</b> Want a second brain for reading.</p>
+<p><b>When it wakes up:</b> Twin routes only.</p>
+<p><b>Who calls it:</b> User, research UI</p>
+<p class="files"><b>Files / APIs:</b> <code>twin_arbiter, full_twin_analysis</code></p>
+<p><b>Caveman analogy:</b> Like a twin who comments but never drives.</p>
+<p class="warn">&#9888;&#65039; Warning: Not connected to Arbiter final call.</p>
+</article><article class="card" style="--k:#ffd56a">
+<h3>TRENDFORGE BRIDGE</h3>
+<p class="one"><b>One-liner:</b> Pulls signed research packs from outside.</p>
+<p class="lab">Job</p><ul><li>Pulls latest TrendForge packet.</li><li>Stores pack for reading only.</li></ul>
+<p><b>Why exist:</b> Reuse TrendForge research without merging apps.</p>
+<p><b>When it wakes up:</b> On pull-latest integration call.</p>
+<p><b>Who calls it:</b> User, bridge API</p>
+<p class="files"><b>Files / APIs:</b> <code>trendforge_bridge.py, POST /api/v1/integrations/trendforge/pull-latest</code></p>
+<p><b>Caveman analogy:</b> Like reading a sealed report from another office.</p>
+<p class="warn">&#9888;&#65039; Warning: Read-only. Does not write TV paper ledger.</p>
+</article><article class="card" style="--k:#ffd56a">
+<h3>GEMINI + GROK</h3>
+<p class="one"><b>One-liner:</b> AI chat that reviews and talks opinions.</p>
+<p class="lab">Job</p><ul><li>Reads evidence text.</li><li>Writes human-style comments.</li></ul>
+<p><b>Why exist:</b> Fast second opinion for reading.</p>
+<p><b>When it wakes up:</b> When AI panel is used.</p>
+<p><b>Who calls it:</b> User, evidence views</p>
+<p class="files"><b>Files / APIs:</b> <code>gemini_provider, grok_provider</code></p>
+<p><b>Caveman analogy:</b> Like a loud friend at the whiteboard.</p>
+<p class="warn">&#9888;&#65039; Warning: AI scores ignored by Arbiter.</p>
+</article><article class="card" style="--k:#ffd56a">
+<h3>REGIME FEEDBACK</h3>
+<p class="one"><b>One-liner:</b> Reports market mood on a side API.</p>
+<p class="lab">Job</p><ul><li>Computes regime feedback.</li><li>Returns mood labels.</li></ul>
+<p><b>Why exist:</b> Context helps humans read the day.</p>
+<p><b>When it wakes up:</b> Regime API call.</p>
+<p><b>Who calls it:</b> Research UI</p>
+<p class="files"><b>Files / APIs:</b> <code>market_regime_feedback.py</code></p>
+<p><b>Caveman analogy:</b> Like a weather radio on the desk.</p>
+<p class="warn">&#9888;&#65039; Warning: Not used inside paper run boss path.</p>
+</article><article class="card" style="--k:#ffd56a">
+<h3>LAG VOTING</h3>
+<p class="one"><b>One-liner:</b> Checks if indicators are lagging liars.</p>
+<p class="lab">Job</p><ul><li>Votes on indicator lag.</li><li>Flags stale signals.</li></ul>
+<p><b>Why exist:</b> Catch lying late indicators.</p>
+<p><b>When it wakes up:</b> Lag voting route.</p>
+<p><b>Who calls it:</b> Research UI</p>
+<p class="files"><b>Files / APIs:</b> <code>indicator_lag_voting.py</code></p>
+<p><b>Caveman analogy:</b> Like catching a clock that runs late.</p>
+<p class="warn">&#9888;&#65039; Warning: Main path score hardcoded to 0.</p>
+</article></div></section><section><h2>STORE</h2><div class="grid"><article class="card" style="--k:#34d399">
+<h3>PAPER LEDGER</h3>
+<p class="one"><b>One-liner:</b> Saves a pretend trade when you record it.</p>
+<p class="lab">Job</p><ul><li>Writes simulated ledger entry.</li><li>Keeps local JSON store safe.</li></ul>
+<p><b>Why exist:</b> Practice tracking without real money.</p>
+<p><b>When it wakes up:</b> User clicks Record.</p>
+<p><b>Who calls it:</b> User, UI Screen</p>
+<p class="files"><b>Files / APIs:</b> <code>simulated_paper_ledger, atomic_json_store, POST /record-simulated</code></p>
+<p><b>Caveman analogy:</b> Like writing in a pretend bank book.</p>
+<p class="warn">&#9888;&#65039; Warning: Fake trades only. No real cash moves.</p>
+</article><article class="card" style="--k:#34d399">
+<h3>OUTCOME WATCHER</h3>
+<p class="one"><b>One-liner:</b> Later checks if the pretend trade won.</p>
+<p class="lab">Job</p><ul><li>Observes paper lifecycle.</li><li>Reports win or loss result.</li></ul>
+<p><b>Why exist:</b> Learn if the plan was good.</p>
+<p><b>When it wakes up:</b> On observe / lifecycle check.</p>
+<p><b>Who calls it:</b> Paper Ledger, User</p>
+<p class="files"><b>Files / APIs:</b> <code>orb_paper_lifecycle, POST /observe</code></p>
+<p><b>Caveman analogy:</b> Like checking the score after the match.</p>
+<p class="warn">&#9888;&#65039; Warning: Outcome is simulated, not brokerage P and L.</p>
+</article></div></section><section><h2>UI</h2><div class="grid"><article class="card" style="--k:#22d3ee">
+<h3>WEB SHELL</h3>
+<p class="one"><b>One-liner:</b> Main app shell with Analyze button.</p>
+<p class="lab">Job</p><ul><li>Hosts cards and buttons.</li><li>Loads client API helpers.</li></ul>
+<p><b>Why exist:</b> One place for the whole paper desk.</p>
+<p><b>When it wakes up:</b> App load and user clicks.</p>
+<p><b>Who calls it:</b> User</p>
+<p class="files"><b>Files / APIs:</b> <code>App.tsx, client.ts, main.tsx</code></p>
+<p><b>Caveman analogy:</b> Like the control room walls and switches.</p>
+<p class="warn">&#9888;&#65039; Warning: Shell only. Boss is still Arbiter.</p>
+</article><article class="card" style="--k:#22d3ee">
+<h3>UI SCREEN</h3>
+<p class="one"><b>One-liner:</b> Shows the final guidance card to the user.</p>
+<p class="lab">Job</p><ul><li>Renders band and plan.</li><li>Shows blockers and reasons.</li></ul>
+<p><b>Why exist:</b> Humans need a clear answer card.</p>
+<p><b>When it wakes up:</b> When guidance response arrives.</p>
+<p><b>Who calls it:</b> Guidance Out, Web Shell</p>
+<p class="files"><b>Files / APIs:</b> <code>App.tsx setOrbGuidance, ORB Paper Guidance card</code></p>
+<p><b>Caveman analogy:</b> Like the big scoreboard at a game.</p>
+<p class="warn">&#9888;&#65039; Warning: Display only. Not a broker terminal.</p>
+</article><article class="card" style="--k:#22d3ee">
+<h3>JARVIS ROOM</h3>
+<p class="one"><b>One-liner:</b> Side room full of research widgets.</p>
+<p class="lab">Job</p><ul><li>Shows extra research panels.</li><li>Holds helper dashboards.</li></ul>
+<p><b>Why exist:</b> Deep research without cluttering main card.</p>
+<p><b>When it wakes up:</b> When user opens Jarvis room.</p>
+<p><b>Who calls it:</b> User, Web Shell</p>
+<p class="files"><b>Files / APIs:</b> <code>jarvis_decision_room, many jarvis_* panels</code></p>
+<p><b>Caveman analogy:</b> Like a gadget wall in a spy movie.</p>
+<p class="warn">&#9888;&#65039; Warning: Side panels. Not the Arbiter boss path.</p>
+</article></div></section><section><h2>EXTERNAL</h2><div class="grid"><article class="card" style="--k:#fb923c">
+<h3>OPENALGO</h3>
+<p class="one"><b>One-liner:</b> Broker preview tool. Dry run only.</p>
+<p class="lab">Job</p><ul><li>Previews handoff shape.</li><li>Checks transport gates.</li></ul>
+<p><b>Why exist:</b> Practice broker shape without sending orders.</p>
+<p><b>When it wakes up:</b> On OpenAlgo handoff preview.</p>
+<p><b>Who calls it:</b> User, safety gates</p>
+<p class="files"><b>Files / APIs:</b> <code>openalgo_transport, handoff_gate</code></p>
+<p><b>Caveman analogy:</b> Like a flight sim that never leaves the ground.</p>
+<p class="warn">&#9888;&#65039; Warning: No real orders allowed.</p>
+</article><article class="card" style="--k:#fb923c">
+<h3>STOCK APP</h3>
+<p class="one"><b>One-liner:</b> Another app with its own database.</p>
+<p class="lab">Job</p><ul><li>Runs separate sim APIs.</li><li>Keeps its own store.</li></ul>
+<p><b>Why exist:</b> Different product boundary.</p>
+<p><b>When it wakes up:</b> When Stock App is used alone.</p>
+<p><b>Who calls it:</b> Stock App users only</p>
+<p class="files"><b>Files / APIs:</b> <code>server.py, /api/sim/*</code></p>
+<p><b>Caveman analogy:</b> Like a neighbor house with its own fridge.</p>
+<p class="warn">&#9888;&#65039; Warning: Does not talk to TV paper ledger.</p>
+</article></div></section>
+<section>
+<h2>How they talk</h2>
+<ol class="conns"><li>CANDLE SOURCE sends raw bars to UI BUILD so UI BUILD can clean them.</li><li>UI BUILD sends payload to HTTP IN so server can run paper guidance.</li><li>HTTP IN sends request to SNAPSHOT FREEZE so past data locks hard.</li><li>SNAPSHOT FREEZE sends frozen bars to EVIDENCE PACK so tools can score.</li><li>SNAPSHOT FREEZE sends frozen bars to ORB PLAYBOOK so it can propose a plan.</li><li>EVIDENCE PACK and ORB send scores/plan to ARBITER so boss can judge.</li><li>SAFETY sends stop flags to ARBITER so bad days cannot ENTER_PAPER.</li><li>ARBITER sends decision to GUIDANCE OUT so UI gets a clean JSON card.</li><li>GUIDANCE OUT sends card to UI SCREEN so user can read the answer.</li><li>UI SCREEN sends record click to PAPER LEDGER so fake trades save; OUTCOME WATCHER later checks win/loss.</li></ol>
+</section>
+<section>
+<h2>Word list</h2>
+<div class="gloss"><div class="g"><dt>ORB</dt><dd>Open range breakout plan.</dd></div><div class="g"><dt>Arbiter</dt><dd>Boss decision judge.</dd></div><div class="g"><dt>Paper</dt><dd>Fake practice trade.</dd></div><div class="g"><dt>Snapshot</dt><dd>Frozen past prices.</dd></div><div class="g"><dt>ENTER_PAPER</dt><dd>Allowed to record fake trade.</dd></div><div class="g"><dt>Evidence pack</dt><dd>Eight mini scorers.</dd></div><div class="g"><dt>Dry-run</dt><dd>No real broker order.</dd></div><div class="g"><dt>TrendForge bridge</dt><dd>Read-only outside research.</dd></div></div>
+</section>
+</main>
+<footer>Compact project brain. Research / paper only. No live broker orders.</footer>
+</body>
+</html>

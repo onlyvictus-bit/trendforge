@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_market_activity","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_volume_gainers"},"rawContentHashes":["8579543f96243ccbe4202adfabb3422d581c99e4dbd9ec3f9eaffe792de51333"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_VOLUME_GAINERS"}],"sourceKey":"nse_volume_gainers"}

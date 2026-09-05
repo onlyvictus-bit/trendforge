@@ -1,0 +1,93 @@
+{
+  "pack": "6.txt",
+  "reviewedAt": "2026-08-11T00:00:00+05:30",
+  "candidateCount": 10,
+  "productionSourceCountBefore": 112,
+  "productionSourceCountAfter": 112,
+  "candidates": [
+    {
+      "candidate": "Screener.in individual company pages",
+      "classification": "REJECTED",
+      "reason": "Automated copying is outside the approved source policy and the published service license permits only personal transitory viewing. Manual user-provided CSV remains the allowed route.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Screener.in /screen/raw query",
+      "classification": "BLOCKED",
+      "reason": "Login-gated; no credentials were supplied and TrendForge does not bypass authentication.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Trendlyne automatic endpoints or browser export",
+      "classification": "BLOCKED",
+      "reason": "WAF/login/manual-browser dependency; no stable unattended acquisition contract exists in the pack.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "NSE index option chains",
+      "classification": "REUSED_EXACT_OUTPUT",
+      "reason": "The same official index-chain outputs already use TrendForge's cookie/session-aware resolver and structured parser.",
+      "productionKeys": [
+        "nse_option_chain_nifty",
+        "nse_option_chain_banknifty",
+        "nse_index_option_chain_v3"
+      ]
+    },
+    {
+      "candidate": "NSE equity option chain",
+      "classification": "ENHANCED_EXISTING",
+      "reason": "Existing production acquisition was retained; parser v1.1.0 now fills symbol and expiry from the request contract when individual CE/PE rows omit identity, and fails closed if identity remains absent.",
+      "productionKeys": ["nse_option_chain_equity"]
+    },
+    {
+      "candidate": "Yahoo Finance chart API",
+      "classification": "REUSED_EXACT_OUTPUT",
+      "reason": "The same chart endpoint family already powers explicitly labelled proxy datasets; Pack 6 supplies no additional ticker dataset.",
+      "productionKeys": [
+        "yahoo_cme_proxy",
+        "yahoo_lme_proxy",
+        "yahoo_bdry_shipping_proxy"
+      ]
+    },
+    {
+      "candidate": "Dhan option-chain and Greeks API",
+      "classification": "BLOCKED",
+      "reason": "The official API requires a client ID and access token. The public Dhan instrument master remains available, but it is not live option-chain data.",
+      "productionKeys": ["dhan_instrument_master"]
+    },
+    {
+      "candidate": "FII and mutual-fund shareholding context",
+      "classification": "REUSED_EXACT_OUTPUT",
+      "reason": "Existing official NSE shareholding/FII-DII and AMFI plus RupeeVest normalized feeds already cover the proposed context without a Trendlyne mirror.",
+      "productionKeys": [
+        "nse_shareholding_pattern",
+        "nse_fii_dii",
+        "amfi_scheme_wise",
+        "amfi_portfolio_disclosure",
+        "rupeevest_mf_flows"
+      ]
+    },
+    {
+      "candidate": "Black-Scholes synthetic Greeks",
+      "classification": "REJECTED",
+      "reason": "A formula is not a source link, and TrendForge's approved contract does not invent Greeks when the upstream source does not provide them.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Generated unified parser and mock-data pipeline",
+      "classification": "REJECTED",
+      "reason": "It creates a second ingestion plane, contains mock market rows and a syntax error, and median-imputes missing market values. TrendForge keeps its existing acquisition, archive, validator and normalizer spine.",
+      "productionKeys": []
+    }
+  ],
+  "liveEvidence": {
+    "tradingDate": "2026-08-10",
+    "attempts": {
+      "nse_option_chain_nifty": {"attemptId": 1531, "rows": 18},
+      "nse_option_chain_banknifty": {"attemptId": 1532, "rows": 6},
+      "nse_index_option_chain_v3": {"attemptId": 1533, "rows": 113},
+      "nse_option_chain_equity": {"attemptId": 1534, "rows": 84}
+    }
+  },
+  "scorePolicy": "No consensus or screener formula changes; option-chain data remains supporting derivatives evidence."
+}

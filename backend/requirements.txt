@@ -1,0 +1,16 @@
+fastapi==0.135.1
+uvicorn==0.42.0
+pydantic==2.12.5
+yfinance==0.2.58
+pandas==2.3.3
+numpy==2.4.3
+pyarrow==23.0.1
+openpyxl==3.1.5
+nselib==2.5.1
+httpx==0.28.1
+curl-cffi==0.16.0
+PyYAML==6.0.3
+scikit-learn==1.8.0
+scipy==1.17.1
+# Optional future adapters:
+# openchart

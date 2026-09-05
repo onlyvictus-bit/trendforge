@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_oi_spurts_contracts","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_oi_spurts_contracts"},"rawContentHashes":["c2c54c3848f3a64ff2890a2835f5d1234969f17e2795964b4b56ce3b18f25413"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_OI_SPURTS_CONTRACTS"}],"sourceKey":"nse_oi_spurts_contracts"}

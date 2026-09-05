@@ -1,0 +1,9 @@
+{
+  "name": "trendforge-frontend-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node tests/q5-contract.test.js && node tests/acceptance-check.js && node tests/selection-live-adapter.test.js && node tests/r17-openalgo-shadow.test.js && node tests/s3-cheap-discovery.test.js && node tests/inventory-workbench.test.js"
+  }
+}

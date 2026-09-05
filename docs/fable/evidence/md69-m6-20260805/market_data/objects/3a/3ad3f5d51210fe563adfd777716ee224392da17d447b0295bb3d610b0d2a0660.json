@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_option_chain","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_option_chain_equity"},"rawContentHashes":["dd62955e211df58479c18c00c3c3d58896a572b315f26b04aceaa10d63218ea8"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_OPTION_CHAIN_EQUITY"}],"sourceKey":"nse_option_chain_equity"}

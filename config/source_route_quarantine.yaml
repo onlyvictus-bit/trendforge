@@ -1,0 +1,44 @@
+schema_version: 1
+policy: >-
+  These routes are retained as audit hints only. They are not acquisition
+  contracts and must not be fetched, scheduled, normalized, scored, or shown
+  as active catalog links.
+routes:
+  - id: yahoo_badi
+    route: "https://query1.finance.yahoo.com/v8/finance/chart/%5EBADI"
+    status: NOT_IN_USE
+    reason: "Yahoo returns zero price records for ^BADI."
+    replacement_source_keys:
+      - tradingeconomics_bdi
+      - yahoo_bdry_shipping_proxy
+    replacement_note: "Trading Economics is the BDI context; BDRY is only a shipping ETF proxy."
+  - id: pytrends
+    route: "python-package:pytrends"
+    status: NOT_IN_USE
+    reason: "Unofficial, archived and unreliable under Google rate limiting."
+    replacement_source_keys:
+      - google_trends_india_rss
+    replacement_note: "RSS supplies current India topics, not keyword-history scores."
+  - id: stockedge_api
+    route: "https://stockedge.com/"
+    status: NOT_IN_USE
+    reason: "No stable public market-data API contract was verified."
+    replacement_source_keys:
+      - nse_fii_dii
+      - nsdl_fpi_fortnightly
+      - nse_all_indices
+    replacement_note: "Use official sources for each output family; no StockEdge-specific AI output is substituted."
+  - id: bse_fiidii_legacy
+    route: "https://api.bseindia.com/BseIndiaAPI/api/FIIDII/w"
+    status: NOT_IN_USE
+    reason: "Returns an HTML shell instead of usable FII/DII records."
+    replacement_source_keys:
+      - bse_fii_dii
+    replacement_note: "Production endpoint is CategoryTurnover/w."
+  - id: bse_participant_oi_legacy
+    route: "https://api.bseindia.com/BseIndiaAPI/api/ParticipantWiseOI/w"
+    status: NOT_IN_USE
+    reason: "Returns an HTML shell instead of usable participant-OI records."
+    replacement_source_keys:
+      - bse_participant_oi
+    replacement_note: "Production endpoint is DeriMarketDisclosureData_ng/w."

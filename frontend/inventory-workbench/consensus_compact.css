@@ -1,0 +1,38 @@
+.consensus-side-sr {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+@media (max-width: 760px) {
+  #consensus-strip .consensus-row {
+    flex-wrap: wrap;
+  }
+
+  #consensus-strip .consensus-label-col {
+    box-sizing: border-box;
+    flex: 1 0 100% !important;
+    min-width: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  #consensus-strip .consensus-side-col {
+    box-sizing: border-box;
+    flex: 1 1 100% !important;
+    min-width: 0;
+    border-right: 0 !important;
+  }
+
+  #consensus-strip .consensus-note-col {
+    box-sizing: border-box;
+    flex: 1 0 100% !important;
+    min-width: 0 !important;
+    border-left: 0 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+  }
+}

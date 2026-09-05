@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"bse_block_deals","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"bse_block_deals"},"rawContentHashes":["75d7b73a621e7c7f95c2c0c7022a69d196efda12b1cd3bad7b69c302404bffab"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"BSE_BLOCK_DEALS"}],"sourceKey":"bse_block_deals"}

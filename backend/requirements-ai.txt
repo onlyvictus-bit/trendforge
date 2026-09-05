@@ -1,0 +1,3 @@
+-r requirements.txt
+hmmlearn==0.3.3
+xgboost==3.3.0

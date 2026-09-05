@@ -1,0 +1,136 @@
+{
+  "pack": "7.txt",
+  "reviewedAt": "2026-08-11T00:30:00+05:30",
+  "candidateCount": 17,
+  "productionSourceCountBefore": 112,
+  "productionSourceCountAfter": 112,
+  "candidates": [
+    {
+      "candidate": "Screener.in individual company pages",
+      "classification": "REJECTED",
+      "reason": "Automated copying is outside the approved policy and published service license; manual user CSV only.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Screener.in /screen/raw query",
+      "classification": "BLOCKED",
+      "reason": "Login-gated and no credentials were supplied.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Trendlyne automatic or browser-assisted extraction",
+      "classification": "BLOCKED",
+      "reason": "WAF/login/CAPTCHA/manual-browser dependency is not an unattended production contract.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Sensibull option analytics",
+      "classification": "BLOCKED",
+      "reason": "Login-only product with no approved anonymous production endpoint in the pack.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Opstra option analytics",
+      "classification": "BLOCKED",
+      "reason": "Login-only product with no approved anonymous production endpoint in the pack.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "NSE index option chains",
+      "classification": "REUSED_EXACT_OUTPUT",
+      "reason": "Existing official cookie/session-aware production sources already return and persist the same chain data.",
+      "productionKeys": [
+        "nse_option_chain_nifty",
+        "nse_option_chain_banknifty",
+        "nse_index_option_chain_v3"
+      ]
+    },
+    {
+      "candidate": "NSE equity option chain",
+      "classification": "REUSED_EXACT_OUTPUT",
+      "reason": "Pack 6 already repaired and live-verified the existing production route; Pack 7 adds no distinct output.",
+      "productionKeys": ["nse_option_chain_equity"]
+    },
+    {
+      "candidate": "Dhan option-chain and Greeks API",
+      "classification": "BLOCKED",
+      "reason": "Official endpoint requires client ID and access token; no broker credentials or broker path are approved.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "FYERS market and option data API",
+      "classification": "BLOCKED",
+      "reason": "Requires a FYERS client app, app secret and authenticated access token; broker/order integration is outside scope.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Zerodha Kite market and option data API",
+      "classification": "BLOCKED",
+      "reason": "Requires active trading/developer accounts, API key/secret and daily access token; broker/order integration is outside scope.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Upstox option-chain API",
+      "classification": "BLOCKED",
+      "reason": "Requires an app/token or user-generated read-only analytics token; none was supplied or approved.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "FII and mutual-fund holdings context",
+      "classification": "REUSED_EXACT_OUTPUT",
+      "reason": "Existing official NSE/AMFI plus normalized RupeeVest sources cover the proposed context without scraped mirrors.",
+      "productionKeys": [
+        "nse_shareholding_pattern",
+        "nse_fii_dii",
+        "amfi_scheme_wise",
+        "amfi_portfolio_disclosure",
+        "rupeevest_mf_flows"
+      ]
+    },
+    {
+      "candidate": "Black-Scholes synthetic Greeks",
+      "classification": "REJECTED",
+      "reason": "A formula is not source evidence; fixed risk-free-rate and assumed time inputs would create invented Greeks.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Max Pain derived from official open interest",
+      "classification": "REUSED_EXACT_OUTPUT",
+      "reason": "The existing structured NSE option-chain parser already computes deterministic max-pain and OI walls from upstream contracts.",
+      "productionKeys": [
+        "nse_option_chain_equity",
+        "nse_option_chain_nifty",
+        "nse_option_chain_banknifty",
+        "nse_index_option_chain_v3"
+      ]
+    },
+    {
+      "candidate": "252-trading-day ATM IV history and IV Rank dataset",
+      "classification": "BLOCKED",
+      "reason": "The pack supplies no historical source or backfill; a true 252-day series must accumulate from dated snapshots before rank can be claimed.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Manual CSV or Excel imports",
+      "classification": "BLOCKED",
+      "reason": "No user export artifact or schema contract was supplied; manual inputs are not unattended production links.",
+      "productionKeys": []
+    },
+    {
+      "candidate": "Generated unified prediction parser and synthetic demo",
+      "classification": "REJECTED",
+      "reason": "It duplicates the existing acquisition/archive/normalization spine, introduces synthetic features and silently substitutes missing values.",
+      "productionKeys": []
+    }
+  ],
+  "officialEvidence": {
+    "screenerTerms": "https://www.screener.in/guides/terms/",
+    "nseOptionChain": "https://www.nseindia.com/option-chain/",
+    "dhanOptionChain": "https://dhanhq.co/docs/v2/option-chain/",
+    "fyersAuthentication": "https://support.fyers.in/portal/en/kb/articles/how-does-the-authentication-and-login-flow-work-for-user-apps-on-fyers",
+    "zerodhaAuthentication": "https://www.kite.trade/docs/connect/v3/user/",
+    "upstoxAuthentication": "https://upstox.com/developer/api-documentation/authentication/",
+    "upstoxAnalyticsToken": "https://upstox.com/developer/api-documentation/analytics-token/"
+  },
+  "scorePolicy": "No broker/order path, no synthetic Greeks, no consensus or screener formula changes."
+}

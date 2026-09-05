@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_market_turnover","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_market_turnover"},"rawContentHashes":["144916f352e0356af29867bde52807a12ee72912321e808523eac06d81229872"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_MARKET_TURNOVER"}],"sourceKey":"nse_market_turnover"}

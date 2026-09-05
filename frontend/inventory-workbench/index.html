@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrendForge | Market Source Inventory Catalog</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css?v=20260815-collector-alias-lastgood">
+  <link rel="stylesheet" href="gap_feeds.css">
+  <link rel="stylesheet" href="sector_screener.css">
+  <link rel="stylesheet" href="card_collapse.css">
+  <link rel="stylesheet" href="header_collapse.css">
+  <link rel="stylesheet" href="sidebar_collapse.css">
+  <link rel="stylesheet" href="consensus_compact.css">
+  <link rel="stylesheet" href="live_panels.css?v=20260805-2">
+  <link rel="stylesheet" href="fii_stock_signals.css?v=20260813-identity">
+</head>
+<body>
+
+  <!-- Top Header & KPI Strip -->
+  <header class="header" id="inventory-header">
+    <div class="header-top">
+      <div class="brand">
+        <div class="brand-icon">TF</div>
+        <div>
+          <h1 class="brand-title">TrendForge Market-Source Inventory</h1>
+          <div class="brand-subtitle" id="brand-subtitle">Loading linked sources…</div>
+        </div>
+      </div>
+      <div class="header-ops">
+        <div class="collector-control" aria-label="Market data collector controls">
+          <button id="manual-refresh-button" type="button" class="manual-refresh-button"
+                  aria-busy="false" title="Download every registered source now">Refresh</button>
+          <div class="collector-copy">
+            <div id="collector-schedule" class="collector-schedule">Auto schedule loading…</div>
+            <div id="collector-result" class="collector-result" aria-live="polite">Connecting…</div>
+          </div>
+        </div>
+        <button id="header-kpi-toggle" type="button" class="header-kpi-toggle"
+                aria-expanded="true"
+                aria-controls="kpi-strip" aria-label="Hide inventory summary cards"
+                title="Hide inventory summary cards">⌃</button>
+      </div>
+    </div>
+
+    <!-- KPI Strip -->
+    <div class="kpi-strip" id="kpi-strip">
+      <div class="kpi-card active" onclick="filterKPI('ALL')">
+        <div class="kpi-label">Total Inventory Links</div>
+        <div class="kpi-value" id="kpi-total">—</div>
+        <div class="kpi-desc">Full linked inventory list</div>
+      </div>
+      <div class="kpi-card" onclick="filterKPI('STRONG')">
+        <div class="kpi-label">Strong Market Feeds</div>
+        <div class="kpi-value" id="kpi-strong" style="color: var(--status-strong);">—</div>
+        <div class="kpi-desc">Price / OI / Deal / Pledge YES</div>
+      </div>
+      <div class="kpi-card" onclick="filterKPI('RESEARCH')">
+        <div class="kpi-label">Research Screener</div>
+        <div class="kpi-value" id="kpi-research" style="color: var(--accent-blue);">—</div>
+        <div class="kpi-desc">Linked screener research sources</div>
+      </div>
+      <div class="kpi-card" onclick="filterKPI('EMPTY')">
+        <div class="kpi-label">Empty / Soft Contracts</div>
+        <div class="kpi-value" id="kpi-empty" style="color: var(--status-empty);">—</div>
+        <div class="kpi-desc">Valid empty / option-chain {}</div>
+      </div>
+      <div class="kpi-card" onclick="filterKPI('NEWS')">
+        <div class="kpi-label">News & Announcements</div>
+        <div class="kpi-value" id="kpi-news" style="color: var(--status-news);">—</div>
+        <div class="kpi-desc">Context-only catalyst feeds</div>
+      </div>
+    </div>
+    <!-- Operational source health. Uses compiler/monitor/last-good APIs, never catalog samples. -->
+    <section class="source-ops-panel" id="source-ops-panel" aria-labelledby="source-ops-title">
+      <div class="source-ops-head">
+        <div>
+          <div class="source-ops-eyebrow">SOURCE OPERATIONS</div>
+          <div class="source-ops-title-row">
+            <h2 id="source-ops-title">Collection to research fact</h2>
+            <span class="source-ops-state is-loading" id="source-ops-panel-state">LOADING</span>
+          </div>
+          <p id="source-ops-contract">Operational health comes from compiler, fetch and parser evidence.</p>
+        </div>
+        <div class="source-ops-actions">
+          <span class="source-ops-asof" id="source-ops-asof">As of --</span>
+          <button class="source-ops-button" id="source-ops-reload" type="button">Reload status</button>
+          <button class="source-ops-button" id="source-ops-toggle" type="button" aria-expanded="false" aria-controls="source-ops-detail">View sources</button>
+        </div>
+      </div>
+
+      <div class="source-ops-pipeline" aria-label="Source processing pipeline">
+        <div class="source-ops-stage"><span id="ops-contracts">--</span><small>Compiler contracts</small></div>
+        <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+        <div class="source-ops-stage"><span id="ops-monitored">--</span><small>Monitored keys</small></div>
+        <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+        <div class="source-ops-stage"><span id="ops-attempted">--</span><small>Input observed</small></div>
+        <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+        <div class="source-ops-stage"><span id="ops-parsed">--</span><small>Parsed records</small></div>
+        <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+        <div class="source-ops-stage"><span id="ops-current">--</span><small>Current facts</small></div>
+        <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+        <div class="source-ops-stage is-final"><span id="ops-usable">--</span><small>Fact usable for research</small></div>
+      </div>
+      <p class="source-ops-lastgood" id="source-ops-lastgood">Last-good keys: --</p>
+
+      <div class="source-ops-cash" id="source-ops-cash" aria-label="Cash research pipeline A1 to C1">
+        <div class="source-ops-cash-head">
+          <strong>CASH RESEARCH FLOW</strong>
+          <span id="source-ops-cash-state">No post-commit run yet</span>
+        </div>
+        <p id="source-ops-cash-detail">A1–C1 runs only after a cash-relevant last-good save. HTTP 200 does not start it.</p>
+        <div class="source-ops-pipeline source-ops-cash-pipeline" id="source-ops-cash-pipeline">
+          <div class="source-ops-stage" data-cash-stage="A1"><span id="cash-stage-A1">--</span><small>A1 staging</small></div>
+          <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+          <div class="source-ops-stage" data-cash-stage="A2"><span id="cash-stage-A2">--</span><small>A2 identity</small></div>
+          <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+          <div class="source-ops-stage" data-cash-stage="A3"><span id="cash-stage-A3">--</span><small>A3 WATCH</small></div>
+          <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+          <div class="source-ops-stage" data-cash-stage="A4"><span id="cash-stage-A4">--</span><small>A4 history</small></div>
+          <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+          <div class="source-ops-stage" data-cash-stage="A5"><span id="cash-stage-A5">--</span><small>A5 context</small></div>
+          <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+          <div class="source-ops-stage" data-cash-stage="A6"><span id="cash-stage-A6">--</span><small>A6 F&amp;O</small></div>
+          <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+          <div class="source-ops-stage" data-cash-stage="C0"><span id="cash-stage-C0">--</span><small>C0 perms</small></div>
+          <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+          <div class="source-ops-stage" data-cash-stage="B"><span id="cash-stage-B">--</span><small>B MWPL</small></div>
+          <div class="source-ops-arrow" aria-hidden="true">&rsaquo;</div>
+          <div class="source-ops-stage is-final" data-cash-stage="C1"><span id="cash-stage-C1">--</span><small>C1 rank</small></div>
+        </div>
+      </div>
+
+      <div class="source-ops-summary" id="source-ops-summary" aria-label="Source health filters">
+        <button type="button" class="source-ops-filter" data-source-state="HEALTHY"><i class="is-healthy"></i>Healthy <b id="ops-count-HEALTHY">--</b></button>
+        <button type="button" class="source-ops-filter" data-source-state="VALID_EMPTY"><i class="is-empty"></i>Valid empty <b id="ops-count-VALID_EMPTY">--</b></button>
+        <button type="button" class="source-ops-filter" data-source-state="STALE_PARTIAL"><i class="is-stale"></i>Stale / partial <b id="ops-count-STALE_PARTIAL">--</b></button>
+        <button type="button" class="source-ops-filter" data-source-state="BLOCKED"><i class="is-blocked"></i>Blocked <b id="ops-count-BLOCKED">--</b></button>
+        <button type="button" class="source-ops-filter" data-source-state="FAILED"><i class="is-failed"></i>Failed <b id="ops-count-FAILED">--</b></button>
+        <button type="button" class="source-ops-filter" data-source-state="NOT_ATTEMPTED"><i class="is-idle"></i>Not attempted <b id="ops-count-NOT_ATTEMPTED">--</b></button>
+        <span class="source-ops-permission" id="source-ops-permission">Activation and gate permission loading...</span>
+      </div>
+
+      <div class="source-ops-detail" id="source-ops-detail" hidden>
+        <div class="source-ops-detail-head">
+          <strong id="source-ops-detail-count">Sources needing attention</strong>
+          <span>Health is operational evidence only. It does not authorize rank, CONFIRMED, quantity or execution.</span>
+        </div>
+        <div class="source-ops-table-wrap">
+          <table class="source-ops-table">
+            <thead><tr><th>Source / link</th><th>Observed state</th><th>Last proof</th><th>Research effect</th><th>Fetch policy</th></tr></thead>
+            <tbody id="source-ops-table-body"></tbody>
+          </table>
+          <div class="source-ops-empty" id="source-ops-empty" hidden>No sources match this filter.</div>
+        </div>
+      </div>
+    </section>
+  </header>
+
+  <!-- App Main Layout -->
+  <div class="app-container" id="app-container">
+    
+    <!-- Left Sidebar: Topics & Tag Cloud -->
+    <aside class="sidebar" id="topic-sidebar">
+      <button id="sidebar-toggle" type="button" class="sidebar-toggle"
+              aria-expanded="true" aria-controls="sidebar-content"
+              aria-label="Hide topic and field filters" title="Hide topic and field filters">‹</button>
+      <div class="sidebar-content" id="sidebar-content">
+        <div>
+          <div class="sidebar-section-title">Topic Groups</div>
+          <div class="topic-list" id="topic-list">
+            <!-- Populated by app.js -->
+          </div>
+        </div>
+
+        <div>
+          <div class="sidebar-section-title">Filter by Market Field</div>
+          <div class="field-cloud" id="field-cloud">
+            <!-- Populated by app.js -->
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- Daily sector context derived from the existing nse_all_indices snapshot -->
+      <div id="sector-screener-panel" aria-live="polite" style="min-height:80px;margin-bottom:0.75rem;">
+        <div style="padding:0.85rem;font-size:0.75rem;color:#64748b;text-align:center;background:#0f1625;border:1px solid #233047;border-radius:12px;">
+          Loading NSE sector pulse…
+        </div>
+      </div>
+
+      <!-- Consensus: (1) all-universe BUY/SELL (2) Nifty-filtered BUY/SELL below -->
+      <div id="consensus-strip"
+           style="background:rgba(15,22,41,0.85);border:1px solid rgba(255,255,255,0.07);
+                  border-radius:10px;margin-bottom:0.75rem;overflow:hidden;min-height:58px;
+                  backdrop-filter:blur(8px);box-shadow:0 2px 12px rgba(0,0,0,0.3);"
+           title="Top: all-board consensus. Bottom: same scores filtered to Nifty 50/500. Not financial advice.">
+        <!-- populated by consensus.js after inventory loads -->
+        <div style="padding:1rem;font-size:0.75rem;color:#334155;text-align:center;">
+          Computing cross-board consensus…
+        </div>
+      </div>
+
+      <!-- Informational stock-name evidence; never a consensus vote or score -->
+      <div id="fii-stock-signals-panel" aria-live="polite">
+        <div class="fii-signals-message">Loading saved large-deal and quarterly FII/FPI evidence…</div>
+      </div>
+
+      <!-- Screener: feature table (separate from consensus voting) — see SCREENER.md -->
+      <div id="screener-panel"
+           style="margin-bottom:0.85rem;min-height:48px;"
+           title="Symbol screener from useful A/B/C feeds. Cached samples only. Not financial advice.">
+        <div style="padding:0.85rem;font-size:0.75rem;color:#334155;text-align:center;
+                    background:rgba(15,22,41,0.55);border:1px solid rgba(255,255,255,0.06);
+                    border-radius:10px;">
+          Loading screener…
+        </div>
+      </div>
+
+      <!-- Controls Toolbar -->
+      <div class="controls-bar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" class="search-input" placeholder="Search by symbol, source key, URL, JSON payload keys/values, topic...">
+        </div>
+
+        <div class="filter-group">
+          <select id="status-filter" class="select-input">
+            <option value="ALL">All Statuses</option>
+            <option value="STRONG">STRONG (Real Market Data)</option>
+            <option value="SUPPORTING">SUPPORTING (Unscored Evidence)</option>
+            <option value="THIRD_PARTY">THIRD_PARTY (Reference Only)</option>
+            <option value="CONTEXT_NEWS">CONTEXT_NEWS (Announcements)</option>
+            <option value="PROVENANCE">PROVENANCE (Navigation Web Pages)</option>
+            <option value="COMPANION">COMPANION (Backup Official Sources)</option>
+            <option value="VALID_EMPTY">EMPTY / SOFT / BLOCKED</option>
+          </select>
+
+          <select id="sort-select" class="select-input">
+            <option value="usable_rows_desc">Usable Rows (High to Low)</option>
+            <option id="sort-row-number" value="row_no_asc">Row Number</option>
+            <option value="title_asc">Source Title (A to Z)</option>
+          </select>
+
+          <div class="view-toggle">
+            <button id="view-grid-btn" class="view-btn active" onclick="setViewMode('grid')" title="Grid Cards View">▦ Cards</button>
+            <button id="view-table-btn" class="view-btn" onclick="setViewMode('table')" title="Compact Table View">≡ Table</button>
+          </div>
+
+          <button id="dedupe-toggle-btn" class="view-btn active" onclick="toggleCollapseDuplicates()"
+                  title="Showing one strong primary per feed; mirrors as hints (inventory rows kept)">
+            ▣ Strong feeds only
+          </button>
+        </div>
+      </div>
+
+      <!-- Results Count Info -->
+      <div class="results-info">
+        <span id="results-count">Showing primary feeds…</span>
+        <div class="results-actions">
+          <button id="collapse-all-cards-btn" type="button" class="btn collapse-all-cards-btn"
+                  onclick="toggleAllSourceCards()" aria-pressed="false" disabled
+                  title="Minimize all primary feed cards">⌃ Minimize all</button>
+          <button class="btn results-action-btn" onclick="resetAllFilters()">Reset Filters</button>
+        </div>
+      </div>
+
+      <!-- Cards Grid / Table Container -->
+      <div id="main-container" class="cards-grid">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </main>
+  </div>
+
+  <!-- Detail Slide-Out Drawer (Right Side) -->
+  <div class="drawer-backdrop" id="drawer-backdrop" onclick="closeDrawer()"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span class="row-num" id="drawer-row-num">#1</span>
+        <h2 style="font-size: 1.1rem; color: #fff;" id="drawer-title">Source Detail</h2>
+        <span id="drawer-status" class="status-chip">STRONG</span>
+      </div>
+      <button class="icon-btn" style="font-size: 1.2rem;" onclick="closeDrawer()">✕</button>
+    </div>
+    
+    <div class="drawer-body">
+      <!-- Dynamic Metadata Sections -->
+      <div id="drawer-body-content"></div>
+
+      <!-- Smart Payload Table —  human-readable view -->
+      <div class="drawer-section">
+        <div class="drawer-section-title">📊 Live Sample Row (Structured)</div>
+        <div id="drawer-payload">Loading...</div>
+      </div>
+
+      <!-- Full Raw JSON Section -->
+      <div class="drawer-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <div class="drawer-section-title" style="margin-bottom: 0;">{ } Raw JSON Payload</div>
+          <button class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;" onclick="copyDrawerJSON()">📋 Copy JSON</button>
+        </div>
+        <div class="code-block" id="drawer-json">Loading sample payload...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stock & Dataset Explorer Slide-Out Panel (Left Side) -->
+  <div class="drawer-backdrop" id="explorer-backdrop" onclick="closeExplorer()"></div>
+  <div class="explorer-drawer" id="explorer-drawer">
+    <div class="explorer-header">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span class="row-num" id="explorer-row-num">#1</span>
+        <div>
+          <h2 style="font-size: 1.15rem; color: #fff;" id="explorer-title">Stock & Dataset Explorer</h2>
+          <div style="font-size: 0.75rem; color: var(--text-muted);" id="explorer-subtitle">Loading records...</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <button class="btn btn-primary" style="padding: 0.3rem 0.7rem; font-size: 0.775rem;" onclick="exportExplorerCSV()">📥 Export Dataset CSV</button>
+        <button class="icon-btn" style="font-size: 1.2rem;" onclick="closeExplorer()">✕</button>
+      </div>
+    </div>
+
+    <div class="explorer-body">
+      <!-- Search & Filter Controls inside Explorer Panel -->
+      <div class="explorer-filter-bar">
+        <div class="search-box" style="margin-bottom: 0;">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="explorer-search-input" class="search-input" placeholder="Search stock symbol, company, price, client name inside this dataset...">
+        </div>
+        <span style="font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-mono);" id="explorer-match-count">0 rows</span>
+      </div>
+
+      <!-- Clickable Stock Symbol Chips Cloud -->
+      <div>
+        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;">
+          📌 Unique Stock Symbols / Entities (<span id="explorer-entity-total">0</span>)
+        </div>
+        <div class="explorer-stock-cloud" id="explorer-stock-cloud">
+          <!-- Populated by app.js -->
+        </div>
+      </div>
+
+      <!-- Paginated Full Dataset Table -->
+      <div class="explorer-table-wrap" id="explorer-table-wrap">
+        <!-- Table rendered by app.js -->
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Python / cURL Code Snippet Modal -->
+  <div class="modal-backdrop" id="code-modal-backdrop" onclick="closeCodeModal()"></div>
+  <div class="modal" id="code-modal">
+    <div class="modal-header">
+      <h3 style="font-size: 1.1rem; color: #fff;" id="code-modal-title">Python Fetch Code</h3>
+      <button class="icon-btn" onclick="closeCodeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+          <label style="font-size: 0.8rem; font-weight: 600; color: var(--accent-blue);">Python Request Snippet</label>
+          <button class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;" onclick="copyPythonSnippet()">📋 Copy Code</button>
+        </div>
+        <div class="code-block" id="python-code-block"></div>
+      </div>
+
+      <div>
+        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">cURL Terminal Command</label>
+        <div class="code-block" id="curl-code-block"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend & Honest Audit Rules Modal -->
+  <div class="modal-backdrop" id="legend-modal-backdrop" onclick="closeLegendModal()"></div>
+  <div class="modal" id="legend-modal">
+    <div class="modal-header">
+      <h3 style="font-size: 1.1rem; color: #fff;">📖 Honest Audit Legend & Rules</h3>
+      <button class="icon-btn" onclick="closeLegendModal()">✕</button>
+    </div>
+    <div class="modal-body" style="line-height: 1.6; font-size: 0.85rem;">
+      <h4 style="color: var(--accent-blue); margin-bottom: 0.5rem;">Inventory Counts Breakdown</h4>
+      <ul style="padding-left: 1.2rem; margin-bottom: 1rem; color: var(--text-muted);">
+        <li><strong style="color: #fff;"><span id="about-total">—</span> Linked Rows:</strong> Inventory contracts in <code>LINKED_SOURCES</code> (<span id="about-unique">—</span> unique source keys after splitting aliases).</li>
+        <li><strong style="color: var(--status-strong);">Strong:</strong> Real parsed market data; the KPI above is calculated from <code>links_105.json</code>.</li>
+        <li><strong style="color: var(--accent-blue);">Research Screener:</strong> Research, gate and supporting-evidence rows; the KPI above is calculated.</li>
+        <li><strong style="color: var(--status-news);">News:</strong> BSE/NSE corporate announcements (<code>CONTEXT_NEWS</code>).</li>
+        <li><strong style="color: #94a3b8;">Provenance / Companion:</strong> Landing pages and backup sources remain visible for audit.</li>
+      </ul>
+      <p style="margin-bottom: 1rem; color: var(--text-muted); font-size: 0.8rem;">
+        Full docs: <a href="INDEX.md" target="_blank" style="color: var(--accent-blue);">INDEX</a> ·
+        <a href="ARCHITECTURE.md" target="_blank" style="color: var(--accent-blue);">ARCHITECTURE</a> ·
+        <a href="GRAPH.md" target="_blank" style="color: var(--accent-blue);">GRAPH</a><br>
+        Screener/support useful rows (live): <strong style="color:#fff;"><span id="about-useful">—</span> / <span id="about-total-copy">—</span></strong> ·
+        <strong style="color:#fff;">12</strong> classic movers · <strong style="color:#fff;">0</strong> greeks —
+        see INDEX usefulness audit.
+      </p>
+
+      <h4 style="color: var(--accent-blue); margin-bottom: 0.5rem;">Status Badges Legend</h4>
+      <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
+        <div><span class="status-chip status-STRONG">STRONG</span> Real market feed with verified usable records.</div>
+        <div><span class="status-chip status-SUPPORTING">SUPPORTING</span> Parsed evidence shown in the screener without adding score.</div>
+        <div><span class="status-chip status-THIRD_PARTY">THIRD_PARTY</span> Third-party reference data; cannot unlock readiness.</div>
+        <div><span class="status-chip status-CONTEXT_NEWS">CONTEXT_NEWS</span> Corporate announcements & news catalyst feed only.</div>
+        <div><span class="status-chip status-PROVENANCE">PROVENANCE</span> Official exchange website navigation page (keeps audit trail, not for auto-fetch).</div>
+        <div><span class="status-chip status-COMPANION">COMPANION</span> Secondary/backup official source used when primary feed is empty.</div>
+        <div><span class="status-chip status-VALID_EMPTY">VALID_EMPTY</span> Connected API endpoint returning 0 events currently (not a hard failure).</div>
+        <div><span class="status-chip status-SOFT_EMPTY">SOFT_EMPTY</span> Endpoint returned empty structure (e.g. option chain <code>{}</code>).</div>
+        <div><span class="status-chip status-BLOCKED">BLOCKED</span> Access restricted (e.g. NSDL fortnightly WAF challenge).</div>
+      </div>
+
+      <h4 style="color: var(--accent-blue); margin-bottom: 0.5rem;">Honest Data Rules</h4>
+      <ol style="padding-left: 1.2rem; color: var(--text-muted);">
+        <li>Never call HTTP 200 alone "success".</li>
+        <li>Do not auto-delete web page links; web pages are PROVENANCE_OR_NAVIGATION.</li>
+        <li>Distinct derivative contracts (Stock Opt vs Stock Fut vs BankNifty) are separate datasets.</li>
+        <li>Cross-board consensus uses the guarded TrendForge panel snapshot. If it is unavailable or stale, cached voting records are blocked. Not financial advice.</li>
+        <li>Standard feeds do not include option greeks (delta/gamma/theta/vega/IV).</li>
+        <li>Add future consensus voters via <code>consensus_plugins.js</code> without editing the engine core.</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="schemas.js"></script>
+  <script src="consensus.js?v=20260811-v41-rails"></script>
+  <!-- Optional: register extra inventory sources without editing the engine -->
+  <script src="consensus_plugins.js"></script>
+  <!-- Screener feature table (after plugins so extractors can be extended) -->
+  <script src="screener.js?v=20260805-current-eod"></script>
+  <!-- Compact daily sector context (does not vote or score) -->
+  <script src="sector_screener.js"></script>
+  <script src="live_panels.js?v=20260811-fii-refresh-2"></script>
+  <script src="fii_stock_signals_panel.js?v=20260813-identity"></script>
+  <script src="app.js?v=20260815-collector-alias-lastgood"></script>
+  <script src="header_collapse.js?v=20260804-1"></script>
+  <script src="sidebar_collapse.js?v=20260804-1"></script>
+</body>
+</html>

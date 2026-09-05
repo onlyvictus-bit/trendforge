@@ -1,0 +1,127 @@
+.header-kpi-toggle {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 5px;
+  color: #94a3b8;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 26px;
+  font: 800 0.78rem/1 var(--font-mono);
+  height: 26px;
+  justify-content: center;
+  margin-left: 0.75rem;
+  padding: 0;
+  width: 26px;
+}
+
+.header-kpi-toggle:hover,
+.header-kpi-toggle:focus-visible {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: var(--accent-blue);
+  color: #7dd3fc;
+  outline: none;
+}
+
+.header .brand {
+  min-width: 0;
+}
+
+.header.kpis-collapsed .header-top {
+  margin-bottom: 0;
+}
+
+.header.kpis-collapsed .kpi-strip {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .header-kpi-toggle {
+    margin-left: 0.5rem;
+  }
+}
+
+.header-ops,
+.collector-control {
+  align-items: center;
+  display: flex;
+}
+
+.header-ops {
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.collector-control {
+  background: rgba(15, 23, 42, 0.74);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 8px;
+  gap: 0.65rem;
+  max-width: min(51vw, 620px);
+  padding: 0.4rem 0.55rem;
+}
+
+.manual-refresh-button {
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  border: 1px solid rgba(125, 211, 252, 0.38);
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: 700 0.76rem/1 var(--font-sans);
+  min-height: 30px;
+  padding: 0.48rem 0.75rem;
+}
+
+.manual-refresh-button:hover:not(:disabled),
+.manual-refresh-button:focus-visible {
+  filter: brightness(1.13);
+  outline: 2px solid rgba(56, 189, 248, 0.38);
+  outline-offset: 2px;
+}
+
+.manual-refresh-button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.collector-copy {
+  min-width: 0;
+}
+
+.collector-schedule,
+.collector-result {
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collector-schedule {
+  color: #94a3b8;
+  font-size: 0.61rem;
+}
+
+.collector-result {
+  color: #7dd3fc;
+  font-size: 0.64rem;
+  margin-top: 0.12rem;
+}
+
+@media (max-width: 900px) {
+  .header-top {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .header-ops {
+    margin-left: auto;
+    width: 100%;
+  }
+
+  .collector-control {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+}

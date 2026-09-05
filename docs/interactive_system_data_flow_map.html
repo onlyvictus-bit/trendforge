@@ -1,0 +1,1783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TrendForge — Interactive System Data-Flow Map</title>
+<style>
+  :root {
+    --bg: #070b12;
+    --bg2: #0c1220;
+    --panel: #101a2b;
+    --panel2: #152238;
+    --border: #243652;
+    --text: #e8eef9;
+    --muted: #8fa3c1;
+    --faint: #5d7394;
+    --teal: #2dd4bf;
+    --teal-dim: #0f766e;
+    --cyan: #22d3ee;
+    --blue: #3b82f6;
+    --indigo: #6366f1;
+    --violet: #a78bfa;
+    --amber: #fbbf24;
+    --rose: #fb7185;
+    --green: #34d399;
+    --orange: #fb923c;
+    --strong: #1e40af;
+    --strong-line: #2563eb;
+    --weak-line: #475569;
+    --spine: #1d4ed8;
+    --shadow: 0 12px 40px rgba(0,0,0,.45);
+    --radius: 14px;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+  body {
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    min-height: 100vh;
+  }
+  header.app-header {
+    display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0e1628 0%, var(--bg) 100%);
+  }
+  .brand { display: flex; gap: 12px; align-items: center; }
+  .mark {
+    width: 42px; height: 42px; border-radius: 12px;
+    display: grid; place-items: center; font-weight: 800;
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    box-shadow: 0 0 24px rgba(56,189,248,.35);
+  }
+  .brand h1 { margin: 0; font-size: 1.05rem; letter-spacing: .02em; }
+  .brand p { margin: 2px 0 0; color: var(--muted); font-size: .78rem; }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; }
+  .badge {
+    font-size: .72rem; padding: 5px 10px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--muted); background: var(--panel);
+  }
+  .badge.warn { color: var(--amber); border-color: #854d0e; background: #1c1405; }
+  .badge.ok { color: var(--green); border-color: #065f46; background: #052e1f; }
+  .badge.danger { color: var(--rose); border-color: #9f1239; background: #2a0b14; }
+  nav.tabs {
+    display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--border);
+    background: var(--bg2); overflow-x: auto;
+  }
+  nav.tabs button {
+    appearance: none; border: 1px solid transparent; background: transparent;
+    color: var(--muted); padding: 9px 14px; border-radius: 10px; cursor: pointer;
+    font-weight: 600; font-size: .84rem; white-space: nowrap;
+  }
+  nav.tabs button:hover { color: var(--text); background: #16233a; }
+  nav.tabs button.active {
+    color: var(--text); background: var(--panel2);
+    border-color: var(--border); box-shadow: inset 0 0 0 1px rgba(45,212,191,.15);
+  }
+  main { min-height: 0; overflow: auto; }
+  .view { display: none; height: 100%; }
+  .view.active { display: block; }
+  .legend-bar {
+    display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+    padding: 10px 18px; border-bottom: 1px solid var(--border);
+    background: rgba(16,26,43,.7); position: sticky; top: 0; z-index: 5;
+  }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: .75rem; color: var(--muted); }
+  .swatch { width: 18px; height: 3px; border-radius: 2px; }
+  .swatch.strong { background: var(--strong-line); }
+  .swatch.weak { background: var(--weak-line); border-top: 1px dashed var(--weak-line); height: 0; width: 18px; border-top-width: 2px; }
+  .swatch.path { background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+  .legend-bar label { font-size: .75rem; color: var(--muted); display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .legend-bar button.tool {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: .75rem;
+  }
+  .legend-bar button.tool:hover { border-color: var(--teal-dim); }
+
+  /* Process flow */
+  #processView { padding: 20px 18px 48px; max-width: 980px; margin: 0 auto; }
+  .process-intro {
+    background: linear-gradient(135deg, #10203a, #0d1524);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; margin-bottom: 22px; box-shadow: var(--shadow);
+  }
+  .process-intro h2 { margin: 0 0 6px; font-size: 1.1rem; }
+  .process-intro p { margin: 0; color: var(--muted); font-size: .86rem; line-height: 1.45; }
+  .process-intro code { color: var(--cyan); font-size: .8rem; }
+  .timeline { position: relative; padding-left: 34px; }
+  .timeline::before {
+    content: ""; position: absolute; left: 13px; top: 8px; bottom: 8px; width: 3px;
+    background: linear-gradient(180deg, var(--teal), var(--blue), var(--indigo));
+    border-radius: 3px; opacity: .85;
+  }
+  .step {
+    position: relative; margin: 0 0 16px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px 12px;
+    box-shadow: var(--shadow);
+  }
+  .step::before {
+    content: attr(data-n); position: absolute; left: -34px; top: 16px;
+    width: 28px; height: 28px; border-radius: 50%;
+    display: grid; place-items: center; font-size: .72rem; font-weight: 800;
+    background: #0b1220; border: 2px solid var(--spine); color: var(--text);
+    z-index: 1;
+  }
+  .step.path-step { border-color: rgba(45,212,191,.45); box-shadow: 0 0 0 1px rgba(45,212,191,.12), var(--shadow); }
+  .step.path-step::before { border-color: var(--teal); color: var(--teal); box-shadow: 0 0 12px rgba(45,212,191,.35); }
+  .step.side-step { opacity: .92; }
+  .step.side-step::before { border-color: var(--faint); color: var(--faint); }
+  .step-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; justify-content: space-between; }
+  .step-head h3 { margin: 0; font-size: .95rem; }
+  .step-meta { font-size: .72rem; color: var(--faint); }
+  .step-what { margin: 6px 0 10px; color: var(--muted); font-size: .84rem; line-height: 1.4; }
+  .subgrid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;
+  }
+  .subbox {
+    background: var(--bg2); border: 1px solid #1e2f4a; border-radius: 10px;
+    padding: 8px 10px; font-size: .72rem; color: var(--muted);
+  }
+  .subbox strong { display: block; color: var(--text); font-size: .76rem; margin-bottom: 2px; }
+  .tag {
+    display: inline-block; font-size: .65rem; font-weight: 700; letter-spacing: .04em;
+    padding: 2px 7px; border-radius: 999px; text-transform: uppercase;
+  }
+  .tag.cyan { background: #083344; color: var(--cyan); }
+  .tag.teal { background: #042f2e; color: var(--teal); }
+  .tag.amber { background: #422006; color: var(--amber); }
+  .tag.rose { background: #4c0519; color: var(--rose); }
+  .tag.violet { background: #2e1065; color: var(--violet); }
+  .tag.green { background: #052e1a; color: var(--green); }
+
+  /* Network */
+  #networkView { display: none; height: 100%; }
+  #networkView.active {
+    display: grid; grid-template-columns: 1fr minmax(280px, 320px);
+    min-height: calc(100vh - 130px); height: calc(100vh - 120px);
+  }
+  #networkView.active > div:first-child {
+    display: flex; flex-direction: column; min-height: 0; min-width: 0;
+  }
+  #netCanvasWrap {
+    position: relative; overflow: hidden; background:
+      radial-gradient(circle at 20% 20%, rgba(37,99,235,.08), transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(45,212,191,.06), transparent 35%),
+      var(--bg);
+    cursor: grab;
+    min-height: 620px;
+    height: calc(100vh - 180px);
+    width: 100%;
+  }
+  #netCanvasWrap.dragging { cursor: grabbing; }
+  #netCanvas { display: block; width: 100%; height: 100%; min-height: 620px; }
+  .step-notes {
+    margin: 8px 0 0; padding: 8px 10px; border-radius: 10px;
+    background: #0b1524; border: 1px solid #1e2f4a; color: #8fa3c1; font-size: .78rem; line-height: 1.4;
+  }
+  .step-notes b { color: #fbbf24; }
+  .step-topic { font-size: .72rem; color: #22d3ee; margin: 0 0 4px; }
+  .step-ms { font-size: .68rem; color: #a78bfa; margin: 0 0 6px; font-family: ui-monospace, Consolas, monospace; }
+  .e2e-banner {
+    background: linear-gradient(90deg, #042f2e, #0c1220);
+    border: 1px solid #0f766e; border-radius: 12px; padding: 12px 14px;
+    margin-bottom: 16px; color: #99f6e4; font-size: .82rem; line-height: 1.45;
+  }
+  .e2e-banner code { color: #2dd4bf; }
+  #matrixView .matrix-wrap { min-height: 400px; }
+  #guideRoot:empty::after, #flowList:empty::after, #storyList:empty::after, #glossGrid:empty::after, #timeline:empty::after {
+    content: "Loading… if this stays empty, refresh hard (Ctrl+F5).";
+    color: #fbbf24; display: block; padding: 16px;
+  }
+  .side-panel {
+    border-left: 1px solid var(--border); background: var(--panel);
+    padding: 14px 14px 24px; overflow: auto;
+  }
+  .side-panel h2 { margin: 0 0 4px; font-size: 1rem; }
+  .side-panel .role { color: var(--muted); font-size: .82rem; margin: 0 0 12px; line-height: 1.4; }
+  .side-panel h3 { margin: 14px 0 6px; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+  .side-panel ul { margin: 0; padding-left: 16px; color: var(--muted); font-size: .8rem; line-height: 1.45; }
+  .side-panel code, .file-chip {
+    font-family: ui-monospace, Consolas, monospace; font-size: .72rem;
+    color: var(--cyan); background: #0b1524; border: 1px solid #1e334f;
+    border-radius: 6px; padding: 1px 5px;
+  }
+  .file-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .edge-list li { margin-bottom: 4px; }
+  .empty-hint { color: var(--faint); font-size: .82rem; line-height: 1.45; }
+
+  /* Matrix */
+  #matrixView { padding: 16px; overflow: auto; }
+  .matrix-wrap { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); }
+  table.matrix { border-collapse: collapse; font-size: .68rem; min-width: 100%; }
+  table.matrix th, table.matrix td {
+    border: 1px solid #1a2a40; padding: 6px 5px; text-align: center; min-width: 28px;
+  }
+  table.matrix th {
+    background: #0f1a2c; color: var(--muted); font-weight: 600; position: sticky; top: 0; z-index: 2;
+  }
+  table.matrix th.row-h {
+    position: sticky; left: 0; z-index: 3; text-align: left; white-space: nowrap; min-width: 120px;
+  }
+  table.matrix td.row-h {
+    position: sticky; left: 0; z-index: 1; text-align: left; background: #0f1a2c; color: var(--text); white-space: nowrap;
+  }
+  table.matrix td.s { background: rgba(37,99,235,.45); color: #dbeafe; }
+  table.matrix td.w { background: rgba(71,85,105,.45); color: #cbd5e1; }
+  table.matrix td.p { background: rgba(45,212,191,.5); color: #042f2e; font-weight: 700; }
+  table.matrix td.self { background: #0a101a; }
+
+  /* Milestones */
+  #milestonesView { padding: 18px; max-width: 1100px; margin: 0 auto; }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px;
+  }
+  .stat .n { font-size: 1.4rem; font-weight: 800; }
+  .stat .l { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+  .gap-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 12px;
+  }
+  .gap-card h3 { margin: 0 0 4px; font-size: .95rem; }
+  .gap-card p { margin: 0 0 8px; color: var(--muted); font-size: .82rem; line-height: 1.4; }
+  .gap-ids { display: flex; flex-wrap: wrap; gap: 6px; }
+  .id-chip {
+    font-size: .68rem; font-family: ui-monospace, Consolas, monospace;
+    padding: 3px 7px; border-radius: 6px; border: 1px solid var(--border); color: var(--muted);
+  }
+  .id-chip.partial { border-color: #854d0e; color: var(--amber); background: #1c1405; }
+  .id-chip.planned { border-color: #1e3a5f; color: #93c5fd; background: #0b1a2e; }
+  .track-note {
+    border-left: 3px solid var(--amber); background: #1a1408; padding: 12px 14px;
+    border-radius: 0 10px 10px 0; margin-bottom: 16px; font-size: .84rem; color: #fde68a; line-height: 1.45;
+  }
+  .not-connected {
+    margin-top: 18px; padding: 14px; border: 1px dashed #3f3f46; border-radius: 12px;
+    color: var(--muted); font-size: .82rem; line-height: 1.5;
+  }
+  footer.note {
+    padding: 10px 18px 16px; color: var(--faint); font-size: .72rem; border-top: 1px solid var(--border);
+  }
+  @media (max-width: 900px) {
+    #networkView.active { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    .side-panel { border-left: none; border-top: 1px solid var(--border); max-height: 40vh; }
+  }
+
+  /* Node encyclopedia / guide */
+  #guideView, #storyView, #glossaryView { padding: 18px; max-width: 1100px; margin: 0 auto; }
+  .guide-exec {
+    background: linear-gradient(135deg, #10203a, #0d1524);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; margin-bottom: 14px; box-shadow: var(--shadow);
+    color: var(--muted); font-size: .88rem; line-height: 1.5;
+  }
+  .guide-exec strong { color: var(--text); }
+  .guide-toolbar {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    margin-bottom: 14px; position: sticky; top: 0; z-index: 4;
+    background: rgba(7,11,18,.92); padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .guide-toolbar input[type=search] {
+    flex: 1; min-width: 200px; background: var(--panel); border: 1px solid var(--border);
+    color: var(--text); border-radius: 10px; padding: 9px 12px; font-size: .85rem;
+  }
+  .guide-toolbar select {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 9px 10px; font-size: .82rem;
+  }
+  .guide-count { font-size: .75rem; color: var(--faint); }
+  .kind-group { margin: 22px 0 10px; }
+  .kind-group h2 {
+    margin: 0 0 10px; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--faint); border-bottom: 1px solid var(--border); padding-bottom: 6px;
+  }
+  .node-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 12px; overflow: hidden; box-shadow: var(--shadow);
+  }
+  .node-card > summary {
+    list-style: none; cursor: pointer; padding: 12px 16px; display: flex; flex-wrap: wrap;
+    gap: 8px 12px; align-items: center; justify-content: space-between;
+  }
+  .node-card > summary::-webkit-details-marker { display: none; }
+  .node-card > summary:hover { background: #152238; }
+  .node-card[open] > summary { border-bottom: 1px solid var(--border); }
+  .node-card .title-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+  .node-card h3 { margin: 0; font-size: .95rem; }
+  .node-card .nid { font-family: ui-monospace, Consolas, monospace; font-size: .72rem; color: var(--cyan); }
+  .node-card .blurb { width: 100%; margin: 4px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.4; }
+  .node-body { padding: 12px 16px 16px; }
+  .field-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+  .field-table th {
+    text-align: left; width: 160px; vertical-align: top; padding: 8px 10px 8px 0;
+    color: var(--faint); font-weight: 700; font-size: .72rem; text-transform: uppercase;
+    letter-spacing: .04em; white-space: nowrap;
+  }
+  .field-table td {
+    padding: 8px 0; color: var(--muted); line-height: 1.45; border-bottom: 1px solid #1a2a40;
+  }
+  .field-table tr:last-child td { border-bottom: none; }
+  .field-table td.note { color: #fde68a; }
+  .field-table code { color: var(--cyan); font-size: .75rem; }
+  .story-list, .flow-list { margin: 0; padding-left: 0; list-style: none; counter-reset: step; }
+  .story-list li, .flow-list li {
+    counter-increment: step; position: relative; padding: 12px 14px 12px 48px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    margin-bottom: 10px; color: var(--muted); font-size: .86rem; line-height: 1.45;
+  }
+  .story-list li::before, .flow-list li::before {
+    content: counter(step); position: absolute; left: 12px; top: 12px;
+    width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+    font-size: .72rem; font-weight: 800; background: #0b1220; border: 2px solid var(--teal); color: var(--teal);
+  }
+  .flow-list li strong { color: var(--text); display: block; margin-bottom: 4px; }
+  .gloss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+  .gloss-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+  }
+  .gloss-card dt { color: var(--cyan); font-weight: 700; font-size: .84rem; margin: 0 0 4px; }
+  .gloss-card dd { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.4; }
+
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="brand">
+    <div class="mark">TF</div>
+    <div>
+      <h1>TrendForge — Interactive System Data-Flow Map</h1>
+      <p>All-in-one map: process · network · matrix · milestones · full node encyclopedia · story · glossary</p>
+    </div>
+  </div>
+  <div class="badges">
+    <span class="badge ok">RESEARCH_ONLY</span>
+    <span class="badge warn">sourceActivationReady=false</span>
+    <span class="badge danger">gateAuthorized=0</span>
+    <span class="badge">No broker execution</span>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button type="button" class="active" data-tab="process">1 · Process flow</button>
+  <button type="button" data-tab="network">2 · Engine network</button>
+  <button type="button" data-tab="matrix">3 · Connection matrix</button>
+  <button type="button" data-tab="milestones">4 · Build track &amp; gaps</button>
+  <button type="button" data-tab="guide">5 · Node encyclopedia</button>
+  <button type="button" data-tab="story">6 · Story &amp; data flows</button>
+  <button type="button" data-tab="glossary">7 · Glossary</button>
+</nav>
+
+<main>
+  <!-- TAB 1 -->
+  <section id="processView" class="view active" aria-label="Process flow">
+    <div class="process-intro">
+      <h2>Primary path: scanner run (Start → End)</h2>
+      <p>
+        Ordered from <code>scanner_scheduler.ScannerScheduler._run_once</code>
+        → radar via <code>engine.list_candidates</code>
+        → UI <code>frontend/app.js</code> (<code>GET /api/radar</code>, <code>/api/command-bar</code>).
+        Teal = main data path. Amber = activation / safety ceilings.
+        Violet = side systems (not scan boss).
+        <strong style="color:var(--amber)">State vocabulary:</strong>
+        scanner <code>statusGroup</code> is only <code>wait|reject</code>;
+        causal may emit <code>READY</code>; Stage2 label <code>CONFIRMED</code> is a score label;
+        Q5 fixture states are separate from the scanner payload. The live selection side path is now R1 evidence qualification → R2 attention ordering → R3 family resolution; it stays WAIT-only and cannot change scanner radar state.
+      </p>
+    </div>
+    <div class="e2e-banner" id="e2eBanner"></div>
+    <div class="timeline" id="timeline"></div>
+    <div class="not-connected">
+      <strong style="color:var(--text)">Explicitly not on this boss path</strong><br/>
+      OpenAlgo order placement (disabled / capability assess only) · executable quantity (risk engine always <code>quantity=0</code>, <code>executable=False</code>) ·
+      Options: one package (v9.2 + CIE surface; dual engines rejected) ·
+      product CONFIRMED unlock while <code>sourceActivationReady=false</code> ·
+      broker secrets in parsers/UI · WebSocket live feed (UI is HTTP fetch / manual refresh only).
+    </div>
+  </section>
+
+  <!-- TAB 2 -->
+  <section id="networkView" class="view" aria-label="Engine network">
+    <div style="display:flex;flex-direction:column;min-height:0;">
+      <div class="legend-bar">
+        <span class="legend-item"><span class="swatch strong"></span> Strong (solid)</span>
+        <span class="legend-item"><span class="swatch weak"></span> Weak / side (dashed)</span>
+        <span class="legend-item"><span class="swatch path"></span> Primary data path</span>
+        <label><input type="checkbox" id="filterStrong" /> Strong only</label>
+        <label><input type="checkbox" id="filterPath" /> Data path only</label>
+        <button type="button" class="tool" id="resetView">Reset view</button>
+        <span style="color:var(--faint);font-size:.72rem;">Drag to pan · scroll to zoom · click node for details</span>
+      </div>
+      <div id="netCanvasWrap"><canvas id="netCanvas"></canvas></div>
+    </div>
+    <aside class="side-panel" id="sidePanel">
+      <h2 id="spTitle">Select a node</h2>
+      <p class="role" id="spRole">Click any bubble to see role, files, inbound and outbound edges.</p>
+      <h3>Files / routes</h3>
+      <div class="file-list" id="spFiles"></div>
+      <h3>IN (who → this)</h3>
+      <ul class="edge-list" id="spIn"></ul>
+      <h3>OUT (this → who)</h3>
+      <ul class="edge-list" id="spOut"></ul>
+    </aside>
+  </section>
+
+  <!-- TAB 3 -->
+  <section id="matrixView" class="view" aria-label="Connection matrix">
+    <div class="legend-bar">
+      <span class="legend-item"><span class="swatch path"></span> Path</span>
+      <span class="legend-item"><span class="swatch strong"></span> Strong</span>
+      <span class="legend-item"><span class="swatch weak"></span> Weak</span>
+      <span style="color:var(--faint);font-size:.72rem;">Rows = FROM · Columns = TO</span>
+    </div>
+    <div class="matrix-wrap"><table class="matrix" id="matrixTable"></table></div>
+  </section>
+
+  <!-- TAB 4 -->
+  <section id="milestonesView" class="view" aria-label="Build track">
+    <div class="track-note">
+      <strong>Why this map exists:</strong> Governance (compiler H1A0 6/6 on pin f1abcdce…, 32 overlap groups) is far ahead of live activation. The CROSS-002 129-key living map is not rebuilt (live union 176). Source Health and Live Ops show the read-only maturity ladder.
+      Product still cannot authorize Q5/public CONFIRMED. Residual R0/CROSS/TDG is the real critical path — not dual-engine scanners.
+      <strong>Audit 2026-07-25:</strong> fixed state vocabulary, CRITICAL key list, activation-as-path, wrong edges (ui→safety, gates→ui),
+      OHLCV SQLite vs Parquet split, process order (context before create_run). Node encyclopedia, story, and glossary are Tabs 5–7 in this same HTML file.
+    </div>
+    <div class="stat-row" id="statRow"></div>
+    <div id="gapCards"></div>
+    <div class="not-connected">
+      Authority order: <code>AGENTS.md</code> → File A <code>docs/fable/new_merge_PLAN_2026-07-18.md</code>
+      → <code>BUILD_STATUS</code>/<code>VALIDATION</code> → code/tests → Hybrid File B (formulas only when pointed).
+      Coverage CSV: <code>docs/fable/remaining_build/PLAN_REQUIREMENT_COVERAGE.csv</code> (144 rows).
+    </div>
+  </section>
+
+
+  <!-- TAB 5 GUIDE -->
+  <section id="guideView" class="view" aria-label="Node encyclopedia">
+    <div class="guide-exec" id="guideExec"></div>
+    <div class="guide-toolbar">
+      <input type="search" id="guideSearch" placeholder="Search nodes (id, label, purpose, files…)" autocomplete="off" />
+      <select id="guideKind">
+        <option value="">All kinds</option>
+        <option value="ui">ui</option>
+        <option value="hub">hub</option>
+        <option value="gov">gov</option>
+        <option value="engine">engine</option>
+        <option value="store">store</option>
+        <option value="side">side</option>
+        <option value="external">external</option>
+      </select>
+      <button type="button" class="tool" id="guideExpandAll">Expand all</button>
+      <button type="button" class="tool" id="guideCollapseAll">Collapse all</button>
+      <span class="guide-count" id="guideCount"></span>
+    </div>
+    <div id="guideRoot"></div>
+  </section>
+
+  <section id="storyView" class="view" aria-label="Story and data flows">
+    <div class="process-intro" style="margin-bottom:16px">
+      <h2>How the blocks talk (top flows)</h2>
+      <p>The 10 most important connections for understanding the research scan path.</p>
+    </div>
+    <ol class="flow-list" id="flowList"></ol>
+    <div class="process-intro" style="margin:22px 0 16px">
+      <h2>Step-by-step walkthrough</h2>
+      <p>User journey from opening the app to seeing radar results — research only, no broker orders.</p>
+    </div>
+    <ol class="story-list" id="storyList"></ol>
+  </section>
+
+  <section id="glossaryView" class="view" aria-label="Glossary">
+    <div class="process-intro" style="margin-bottom:16px">
+      <h2>Glossary</h2>
+      <p>Every important acronym and term used in this map. No jargon left unexplained.</p>
+    </div>
+    <div class="gloss-grid" id="glossGrid"></div>
+  </section>
+  <!-- /TAB 7 -->
+
+</main>
+
+<footer class="note">
+  Evidence base: <code>scanner_scheduler.py</code>, <code>gate_readiness.py</code>, <code>engine.py</code>, <code>causal_engine.py</code>, <code>main.py</code>, <code>frontend/app.js</code>,
+  <code>docs/BUILD_STATUS.md</code>, all-in-one · 28 nodes explained · RESEARCH_ONLY · open this single HTML file
+</footer>
+
+<script>
+/* ========== DOMAIN MODEL (code-audited 2026-07-25) ========== */
+const NODES = [
+  { id: "ui", label: "Frontend Panel", kind: "ui", x: 90, y: 320, role: "Single-screen research command room. HTTP fetch only (no WebSocket). loadApiData() pulls radar, command-bar, safety, calendar, source-health. Live Ops mounts maturity ladder + liveDecisionPanel (selection live/refresh). Never decides readiness alone. Frontend acceptance 161/161.", files: ["frontend/index.html", "frontend/app.js", "frontend/q5-contract.js", "GET /api/radar", "GET /api/command-bar", "GET /api/source-health", "GET /api/v1/selection/live"] },
+  { id: "api", label: "FastAPI main", kind: "hub", x: 280, y: 320, role: "Local HTTP contracts on 127.0.0.1:8000. CORS + request audit middleware only (no auth DI). Mounts static frontend.", files: ["backend/trendforge_api/main.py", "backend/run_server.py", "GET /api/health"] },
+  { id: "scanner", label: "Scanner Scheduler", kind: "engine", x: 500, y: 320, role: "Boss orchestration in ScannerScheduler._run_once: critical sources → gates → safety → context → create run → per-symbol structure/evidence/causal → persist. Threading daemon, not asyncio queue.", files: ["scanner_scheduler.py", "POST /api/scanner/run-once", "POST /api/scanner/scheduler/start"] },
+  { id: "monitor", label: "Source Monitor", kind: "engine", x: 500, y: 110, role: "check_sources(CRITICAL_SOURCE_KEYS[9]): fetch state, hashes, raw archive.", files: ["source_monitor.py", "source_resolver.py", "institutional_sources.py", "data/raw_sources/"] },
+  { id: "parser", label: "Source Parser", kind: "engine", x: 680, y: 110, role: "Fail-closed structured normalization. PARSED_STRUCTURED required; HTTP 200 ≠ success.", files: ["source_parser.py", "parsers/*"] },
+  { id: "compiler", label: "Inventory Compiler", kind: "gov", x: 300, y: 70, role: "Immutable workbook (409 rows, pin f1abcdce…) → 387 endpoints, 354 contracts, 32 overlap dispositions, H1A0 6/6. R0-B cohort field-reviewed via r0b-cohort (provenCount=0, canVote=false). sourceActivationReady remains false. Ladder on Source Health and Live Ops.", files: ["source_inventory_compiler.py", "source_key_map_review.py", "source_overlap_resolutions.py", "source_cohort_r0b.py", "GET /api/source-inventory/compiler-report", "GET /api/source-inventory/r0b-cohort"] },
+  { id: "gates", label: "Gate Readiness", kind: "engine", x: 680, y: 230, role: "G03 ASM/GSM · G01 FII/DII regime · G12 smart money · G13 OI/MWPL/ban · MCX context. Global activation + per-contract gatePermission required. Fresh data still WAIT_SOURCE_ACTIVATION.", files: ["gate_readiness.py", "GET /api/gates/readiness"] },
+  { id: "safety", label: "Safety Engine", kind: "engine", x: 680, y: 400, role: "States: GREEN | RISK_REDUCED | COOLDOWN_ACTIVE | WAIT_EMOTIONAL_RISK | LOCKED_NO_TRADE | STOP_TRADING_NOW | BROKER_DATA_TRAUMA. Panic → LOCKED_NO_TRADE. Recovery needs 5 checklist bools. executable always False.", files: ["safety_engine.py", "GET /api/safety/status", "POST /api/safety/panic-lock", "POST /api/safety/unlock"] },
+  { id: "calendar", label: "Exchange Calendar", kind: "engine", x: 300, y: 200, role: "NSE trading-day / canRunScheduledScan. Scheduled trigger only; manual research may still run.", files: ["exchange_calendar.py", "GET /api/calendar/status"] },
+  { id: "context", label: "Market Context", kind: "engine", x: 860, y: 190, role: "Official market + sector RRG snapshots; runtime PASS/WAIT/HARD_FAIL/STALE gates on candidates.", files: ["market_context.py", "market_context_ingestion.py", "nse_eod_ingestion.py"] },
+  { id: "ohlcv", label: "OHLCV SQLite", kind: "store", x: 860, y: 320, role: "Primary scan candle source: list_ohlcv_series(min_candles=40) / list_ohlcv_candles from SQLite lineage.", files: ["storage.py list_ohlcv_*", "ohlcv_adapter.py", "source_adapters.py"] },
+  { id: "parquet", label: "Parquet Store", kind: "store", x: 860, y: 430, role: "Optional analytics mirror: data/parquet/{timeframe}/{source}/{SYMBOL}.parquet — not the scan boss path.", files: ["parquet_store.py", "data/parquet/", "GET /api/parquet/status"] },
+  { id: "corp", label: "Corporate Actions", kind: "engine", x: 1020, y: 210, role: "reconcile + assess_adjustment_integrity before harmonic. FAIL → REJECT_DATA_INTEGRITY analysis path.", files: ["corporate_actions.py", "parsers/corporate_events_parser.py"] },
+  { id: "harmonic", label: "Harmonic Advanced", kind: "engine", x: 1020, y: 320, role: "analyze_harmonic_advanced on candles. Patterns: Gartley, Bat, Butterfly, Crab, Deep Crab, Cypher, Shark, 5-0, ABCD, AB=CD. Scanner boss uses this module.", files: ["harmonic_advanced.py"] },
+  { id: "detector", label: "Harmonic Detector", kind: "side", x: 1020, y: 500, role: "Pivots + optional pyharmonics (license-gated env TRENDFORGE_ENABLE_PYHARMONICS). Supporting detector; advanced is scan boss.", files: ["harmonic_detector.py"] },
+  { id: "lifecycle", label: "Harmonic Lifecycle", kind: "engine", x: 1020, y: 420, role: "track_detected_harmonic: pattern_key identity, chronological transitions, WAIT_*/CONFLICT_* statuses.", files: ["harmonic_lifecycle.py", "harmonic_scan_lifecycle.py"] },
+  { from: "harmonic", to: "lifecycle", label: "pattern identity", strength: "strong" },
+  { from: "api", to: "storage", label: "CRUD lineage", strength: "strong" },
+  { from: "monitor", to: "storage", label: "snapshots / attempts", strength: "strong" },
+  { from: "ext", to: "ohlcv", label: "adapters / EOD ingest", strength: "strong" },
+  { from: "safety", to: "storage", label: "safety_events / alerts", strength: "strong" },
+
+  // Weak / side
+  { from: "api", to: "risk", label: "position-size research", strength: "weak" },
+  { from: "api", to: "q5", label: "fixture contracts remain separate", strength: "weak" },
+  { from: "api", to: "deriv", label: "IV/Greeks calc", strength: "weak" },
+  { from: "api", to: "inst", label: "institutional reports", strength: "weak" },
+  { from: "api", to: "compiler", label: "compiler-report API", strength: "weak" },
+  { from: "api", to: "openalgo", label: "capability assess", strength: "weak" },
+  { from: "api", to: "tradevision", label: "evidence export", strength: "weak" },
+  { from: "api", to: "parquet", label: "parquet status/read", strength: "weak" },
+  { from: "openalgo", to: "ohlcv", label: "optional history adapter", strength: "weak" },
+  { from: "features", to: "q5", label: "registry pin (selection)", strength: "weak" },
+  { from: "api", to: "ui", label: "alerts/journal JSON", strength: "weak" },
+  { from: "detector", to: "harmonic", label: "pivots / optional pyharmonics", strength: "weak" },
+  { from: "ohlcv", to: "parquet", label: "optional write mirror", strength: "weak" },
+];
+
+
+const PROCESS_STEPS = [
+  { n: 0, title: "Start — trigger", topic: "Entry", milestone: "Runtime", note: "Scheduler uses threading daemon (900s default). Manual run-once ignores holiday skip.", what: "Manual UI button, API, or interval scheduler starts a research scan.", path: true, tag: "teal", tagLabel: "entry", files: [
+    { t: "UI", d: "app.js run-once" }, { t: "API", d: "POST /api/scanner/run-once" }, { t: "Host", d: "run_server.py :8000" }, { t: "Class", d: "ScannerScheduler" }
+  ]},
+  { n: 1, title: "Exchange calendar", topic: "Session gate", milestone: "CROSS calendar", note: "Only blocks trigger=scheduler. Manual research may still run on holidays.", what: "If trigger=scheduler and !canRunScheduledScan → return calendar state, no run. Manual may still research.", path: true, tag: "cyan", tagLabel: "gate", files: [
+    { t: "Module", d: "exchange_calendar.py" }, { t: "API", d: "GET /api/calendar/status" }, { t: "Decision", d: "EXCHANGE_CALENDAR" }, { t: "Source", d: "nse_trading_calendar" }
+  ]},
+  { n: 2, title: "Source monitor (9 critical keys)", topic: "Data IN", milestone: "R0 sources", note: "Exact keys: bhavcopy EOD, index close, F&O ban, large deals, participant OI, FII/DII, AMFI portfolio, CFTC COT, MCX bhavcopy. ASM/GSM are G03, not this list.", what: "check_sources(CRITICAL_SOURCE_KEYS) for the 9 critical official keys. Archives under data/raw_sources/.", path: true, tag: "teal", tagLabel: "data IN", files: [
+    { t: "Module", d: "source_monitor.py" }, { t: "Count", d: "9 keys exact" }, { t: "Fetch", d: "fetch flag" }, { t: "Archive", d: "data/raw_sources/" }
+  ]},
+  { n: 3, title: "Parse sources", topic: "Normalize", milestone: "R0 parsers", note: "HTTP 200 is NOT success. Need PARSED_STRUCTURED with usable rows.", what: "parse_sources → structured rows or explicit failure. Then emit_source_health_alerts.", path: true, tag: "teal", tagLabel: "normalize", files: [
+    { t: "Module", d: "source_parser.py" }, { t: "Parsers", d: "parsers/*" }, { t: "Alerts", d: "operational_alerts" }, { t: "Store", d: "parse results SQLite" }
+  ]},
+  { n: 4, title: "Gate readiness + activation ceiling", topic: "Governance ceiling", milestone: "R0 / CROSS-002", note: "CRITICAL: sourceActivationReady=false today → all gates WAIT_SOURCE_ACTIVATION. blocked=true for every later symbol.", what: "gate_readiness() joins compile_default_inventory(). Fresh data still demoted until activation + per-contract permission.", path: true, tag: "amber", tagLabel: "ceiling", files: [
+    { t: "Module", d: "gate_readiness.py" }, { t: "Compiler", d: "sourceActivationReady" }, { t: "G03", d: "ASM/GSM" }, { t: "G01/G12/G13/MCX", d: "full deps" }
+  ]},
+  { n: 5, title: "Trader safety status", topic: "Human safety", milestone: "Safety engine", note: "States: GREEN | RISK_REDUCED | COOLDOWN_ACTIVE | WAIT_EMOTIONAL_RISK | LOCKED_NO_TRADE | STOP_TRADING_NOW | BROKER_DATA_TRAUMA. Not a yellow/orange ladder.", what: "evaluate_safety_status from journal + events + risk settings. executable=False always.", path: true, tag: "amber", tagLabel: "safety", files: [
+    { t: "Module", d: "safety_engine.py" }, { t: "Panic", d: "POST panic-lock" }, { t: "Recovery", d: "5 checklist bools" }, { t: "UI path", d: "ui→api→safety" }
+  ]},
+  { n: 6, title: "Market / sector context", topic: "Regime", milestone: "Context ingestion", note: "Runs BEFORE create_scanner_run. Outcomes PASS/WAIT/HARD_FAIL/STALE feed per-symbol gates.", what: "build_official_market_context + sector contexts; runtime gate evaluation.", path: true, tag: "cyan", tagLabel: "regime", files: [
+    { t: "Ingest", d: "market_context_ingestion" }, { t: "Eval", d: "market_context.py" }, { t: "EOD", d: "nse_eod_ingestion" }, { t: "Gate", d: "MARKET_CONTEXT" }
+  ]},
+  { n: 7, title: "Create scanner run + global gates", topic: "Lineage", milestone: "storage scanner_runs", note: "run_hash=sha256(universe:trigger:now)[:16]. BLOCKED_SOURCE_BROKEN → PAUSED, zero symbols (hard stop).", what: "create_scanner_run RUNNING; save_gate_decision for calendar, each dependency, safety, market.", path: true, tag: "teal", tagLabel: "lineage", files: [
+    { t: "storage", d: "create_scanner_run" }, { t: "hash", d: "sha256[:16]" }, { t: "Branch", d: "PAUSED critical" }, { t: "DB", d: "scanner_runs" }
+  ]},
+  { n: 8, title: "Universe → OHLCV SQLite", topic: "Symbol universe", milestone: "OHLCV primary", note: "Primary path is SQLite list_ohlcv_*. Parquet is optional mirror only. min_candles=40.", what: "list_ohlcv_series(min_candles=40). Limits WATCHLIST 5 / NIFTY50 50 / NIFTY200 25 / NIFTY500 50.", path: true, tag: "teal", tagLabel: "input", files: [
+    { t: "storage", d: "list_ohlcv_series" }, { t: "limits", d: "UNIVERSE_LIMITS" }, { t: "SQLite", d: "primary" }, { t: "Parquet", d: "optional side" }
+  ]},
+  { n: 9, title: "Per symbol: integrity → harmonic → lifecycle", topic: "Structure", milestone: "Harmonic path", note: "Sequential per symbol (not parallel). Integrity FAIL → REJECT_DATA_INTEGRITY analysis still continues with fail gates.", what: "reconcile corporate actions; PASS → analyze_harmonic_advanced + track_detected_harmonic.", path: true, tag: "teal", tagLabel: "structure", files: [
+    { t: "corp", d: "corporate_actions.py" }, { t: "harmonic", d: "harmonic_advanced.py" }, { t: "lifecycle", d: "harmonic_scan_lifecycle" }, { t: "candles", d: "list_ohlcv_candles" }
+  ]},
+  { n: 10, title: "Features + evidence claims", topic: "Claims", milestone: "DAT-010 pin", note: "FEATURE_MANIFEST pins registry/engine versions. Full 39 FTR binding is stronger on Q5 path.", what: "build_point_in_time_features + build_symbol_evidence → save_evidence_claims.", path: true, tag: "teal", tagLabel: "claims", files: [
+    { t: "features", d: "feature_engineering" }, { t: "evidence", d: "evidence_builder" }, { t: "manifest", d: "FEATURE_MANIFEST" }, { t: "API", d: "/api/evidence/{sym}" }
+  ]},
+  { n: 11, title: "Causal candidate + symbol gates", topic: "Assemble", milestone: "scanner_causal", note: "Gates injected: CAUSE_SPONSOR_REQUIRED, OFFICIAL_SOURCE_CONFIRMATION, POINT_IN_TIME_FEATURES, SOURCE_TIMEZONE?, STOCK_SURVEILLANCE, MARKET, SECTOR, TRADER_SAFETY.", what: "build_stored_candle_causal_candidate + multi DecisionGateInput list.", path: true, tag: "teal", tagLabel: "assemble", files: [
+    { t: "bridge", d: "scanner_causal.py" }, { t: "G03", d: "stock_safety_state" }, { t: "sector", d: "sector context" }, { t: "official", d: "source_gates_blocked" }
+  ]},
+  { n: 12, title: "Causal batch evaluate", topic: "Score", milestone: "causal_engine", note: "Layers CAUSE≤6 SPONSOR≤10 STRUCTURE≤6 FLOW≤6. Stage2 label CONFIRMED ≠ product CONFIRMED. executable=False always.", what: "evaluate_causal_batch with independence penalties on shared rawInputKeys.", path: true, tag: "teal", tagLabel: "decide", files: [
+    { t: "engine", d: "causal_engine.py" }, { t: "Stage1", d: "≤28 ELIGIBLE" }, { t: "Stage2", d: "≤16 label" }, { t: "final", d: "READY/WAIT/REJECT…" }
+  ]},
+  { n: 13, title: "Merge precedence → save", topic: "Persist", milestone: "Radar payload", note: "statusGroup ONLY wait|reject from this path. type hardcoded harmonic. Never emits executable READY.", what: "Precedence: locks → integrity → market/sector HARD_FAIL → surveillance → emotional/lifecycle waits. save_scanner_candidate + finish COMPLETE.", path: true, tag: "teal", tagLabel: "persist", files: [
+    { t: "save", d: "save_scanner_candidate" }, { t: "group", d: "wait|reject only" }, { t: "finish", d: "finish_scanner_run" }, { t: "Q5", d: "separate four-state" }
+  ]},
+  { n: 14, title: "Radar materialize → UI", topic: "OUT", milestone: "engine.list_candidates", note: "Latest run = ORDER BY started_at DESC (not COMPLETE-only). Demo only if empty AND TRENDFORGE_DEMO_MODE. No WebSocket.", what: "RadarCandidate[] to frontend; command bar system=RESEARCH_ONLY.", path: true, tag: "teal", tagLabel: "OUT", files: [
+    { t: "engine", d: "list_candidates" }, { t: "API", d: "GET /api/radar" }, { t: "health", d: "GET /api/source-health" }, { t: "bar", d: "GET /api/command-bar" }
+  ]},
+  { n: 15, title: "Side systems (not scan boss)", topic: "Side", milestone: "Deferred paths", note: "Q5, derivatives, institutional, risk qty=0, OpenAlgo capability, TradeVision export — none drive final_state.", what: "Exist for research panels and fixtures; do not drive scanner final_state.", path: false, side: true, tag: "violet", tagLabel: "side", files: [
+    { t: "Q5", d: "selection/* fixtures" }, { t: "Deriv", d: "derivatives_engine" }, { t: "Inst", d: "institutional_*" }, { t: "Risk", d: "qty always 0" }, { t: "OpenAlgo", d: "read-only only" }, { t: "TradeVision", d: "HMAC evidence" }
+  ]},
+];
+
+
+const MILESTONES = {
+  stats: [
+    { n: "144", l: "Coverage rows", c: "var(--text)" },
+    { n: "35", l: "IMPLEMENTED", c: "var(--green)" },
+    { n: "66", l: "PARTIAL", c: "var(--amber)" },
+    { n: "26", l: "PLANNED", c: "var(--blue)" },
+    { n: "37", l: "Open P0", c: "var(--rose)" },
+    { n: "0", l: "Gate-authorized sources", c: "var(--rose)" },
+  ],
+  cards: [
+    {
+      title: "CRITICAL — State vocabulary (do not conflate)",
+      body: "Three different 'confirm' languages exist: (1) Scanner statusGroup = wait|reject only (models.StatusGroup also has ready but _run_once never emits ready/confirmed). (2) Causal final_state uses READY/WAIT/REJECT/… Stage2 label CONFIRMED is a score ≥12/16 label only. (3) Q5 public WATCH|WAIT|CONFIRMED|REJECT is a parallel selection contract (q5-contract.js). Product CONFIRMED remains unauthorized while sourceActivationReady=false.",
+      ids: [
+        { id: "statusGroup wait|reject", s: "partial" }, { id: "causal READY", s: "partial" },
+        { id: "stage2 CONFIRMED label", s: "partial" }, { id: "Q5 four-state", s: "partial" }
+      ]
+    },
+    {
+      title: "Done at governance ceiling (do not re-do)",
+      body: "Q5-R0…R7 research/fixture ceilings · CROSS-001 32 overlap dispositions on pin f1abcdce… · H1A0 acceptance 6/6 (checks H1A0-01…06; 11 defect classes separate) · CROSS-002 129-key review left in place (live union 176, drifted) · DAT-010/011 feature registry pin · fail-closed activation in gate_readiness · Source Health + Live Ops read-only ladder.",
+      ids: [
+        { id: "Q5-R0…R7", s: "ok" }, { id: "CROSS-001", s: "ok" }, { id: "CROSS-002", s: "ok" },
+        { id: "DAT-010/011", s: "ok" }, { id: "H1A0 6/6", s: "ok" }
+      ]
+    },
+    {
+      title: "Critical path now — R0 residuals (activation still false)",
+      body: "CROSS-002 living-map drift (176 vs 129), persisted maturity history, remaining UNSPECIFIED mirror/resolver proof, genuine per-source extended fields, raw vs adjusted series. Source Health ladder is read-only. Nothing unlocks product CONFIRMED until activation milestones authorize sources.",
+      ids: [
+        { id: "R0", s: "partial" }, { id: "CROSS-006", s: "partial" }, { id: "CROSS-007", s: "partial" },
+        { id: "TDG-GAP-011", s: "partial" }, { id: "TDG-GAP-001", s: "partial" }, { id: "TDG-GAP-024", s: "partial" },
+        { id: "HYBRID-16-2", s: "partial" }, { id: "CROSS-020", s: "partial" }
+      ]
+    },
+    {
+      title: "Next product verticals after R0 (still research-only)",
+      body: "Live S0–S3 cheap pipeline, PRF named sources, tradability fields, durable selection storage only with explicit migration approval.",
+      ids: [
+        { id: "R1", s: "partial" }, { id: "R2", s: "partial" }, { id: "CROSS-004", s: "planned" },
+        { id: "CROSS-015", s: "partial" }, { id: "TDG-GAP-014", s: "planned" }, { id: "HYBRID-6-1", s: "partial" }
+      ]
+    },
+    {
+      title: "Explicitly deferred / rejected (do not build as product)",
+      body: "ShadowFlow + CIE dual-engine score bibles · React/Redis rewrite · OMS / order placement · autonomous portfolio · probability product claims · executable quantity UI (POSTPONED under File A).",
+      ids: [
+        { id: "ShadowFlow", s: "planned" }, { id: "CIE", s: "planned" }, { id: "OMS", s: "planned" },
+        { id: "quantity UI", s: "planned" }
+      ]
+    },
+  ]
+};
+
+/* ========== RENDER PROCESS ========== */
+function renderProcess() {
+  const root = document.getElementById("timeline");
+  root.innerHTML = PROCESS_STEPS.map(s => `
+    <article class="step ${s.path ? "path-step" : ""} ${s.side ? "side-step" : ""}" data-n="${s.n}">
+      <div class="step-head">
+        <h3>${s.title}</h3>
+        <span class="tag ${s.tag}">${s.tagLabel}</span>
+      </div>
+      <p class="step-what">${s.what}</p>
+      <div class="subgrid">
+        ${s.files.map(f => `<div class="subbox"><strong>${f.t}</strong>${f.d}</div>`).join("")}
+      </div>
+    </article>
+  `).join("");
+}
+
+/* ========== RENDER MILESTONES ========== */
+function renderMilestones() {
+  const statRow = document.getElementById("statRow");
+  const gapCards = document.getElementById("gapCards");
+  if (!statRow || !gapCards) return;
+  statRow.innerHTML = MILESTONES.stats.map(s => `
+    <div class="stat"><div class="n" style="color:${s.c}">${s.n}</div><div class="l">${s.l}</div></div>
+  `).join("");
+  gapCards.innerHTML = MILESTONES.cards.map(c => `
+    <div class="gap-card">
+      <h3>${c.title}</h3>
+      <p>${c.body}</p>
+      <div class="gap-ids">${c.ids.map(i => {
+        const cls = i.s === "partial" ? "partial" : i.s === "planned" ? "planned" : "";
+        return `<span class="id-chip ${cls}">${i.id}</span>`;
+      }).join("")}</div>
+    </div>
+  `).join("");
+}
+
+/* ========== MATRIX ========== */
+function renderMatrix() {
+  const table = document.getElementById("matrixTable");
+  if (!table || !NODES.length) return;
+  const ids = NODES.map(n => n.id);
+  const label = Object.fromEntries(NODES.map(n => [n.id, n.label]));
+  const map = new Map();
+  EDGES.forEach(e => { map.set(e.from + "→" + e.to, e); });
+  let html = "<thead><tr><th class='row-h'>FROM \\ TO</th>" +
+    ids.map(id => `<th title="${label[id]}">${label[id].split(" ")[0]}</th>`).join("") +
+    "</tr></thead><tbody>";
+  ids.forEach(r => {
+    html += `<tr><td class="row-h">${label[r]}</td>`;
+    ids.forEach(c => {
+      if (r === c) { html += `<td class="self">·</td>`; return; }
+      const e = map.get(r + "→" + c);
+      if (!e) { html += "<td></td>"; return; }
+      const cls = e.strength === "path" ? "p" : e.strength === "strong" ? "s" : "w";
+      html += `<td class="${cls}" title="${e.label}">${e.strength === "path" ? "P" : e.strength === "strong" ? "S" : "w"}</td>`;
+    });
+    html += "</tr>";
+  });
+  html += "</tbody>";
+  table.innerHTML = html;
+}
+
+/* ========== NETWORK CANVAS ========== */
+const canvas = document.getElementById("netCanvas");
+const ctx = canvas.getContext("2d");
+const wrap = document.getElementById("netCanvasWrap");
+let transform = { x: 40, y: 20, k: 0.78 };
+let dragging = false, last = { x: 0, y: 0 };
+let selected = null;
+let hover = null;
+let filterStrong = false, filterPath = false;
+
+const KIND_COLOR = {
+  ui: "#22d3ee", hub: "#60a5fa", engine: "#818cf8", store: "#34d399",
+  gov: "#fbbf24", external: "#fb923c", side: "#a78bfa"
+};
+
+function nodeById(id) { return NODES.find(n => n.id === id); }
+
+function visibleEdges() {
+  return EDGES.filter(e => {
+    if (filterPath) return e.strength === "path";
+    if (filterStrong) return e.strength === "path" || e.strength === "strong";
+    return true;
+  });
+}
+
+function resizeCanvas() {
+  if (!wrap || !canvas || !ctx) return;
+  const r = wrap.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(320, r.width || wrap.clientWidth || 900);
+  const h = Math.max(560, r.height || wrap.clientHeight || 620);
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+
+function worldFromEvent(ev) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (ev.clientX - rect.left - transform.x) / transform.k,
+    y: (ev.clientY - rect.top - transform.y) / transform.k
+  };
+}
+
+function hitNode(wx, wy) {
+  for (let i = NODES.length - 1; i >= 0; i--) {
+    const n = NODES[i];
+    const dx = wx - n.x, dy = wy - n.y;
+    if (dx * dx + dy * dy <= 28 * 28) return n;
+  }
+  return null;
+}
+
+function drawArrow(x1, y1, x2, y2, color, dashed, width) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  // stop short of node radius
+  const pad = 30;
+  const sx = x1 + ux * pad, sy = y1 + uy * pad;
+  const ex = x2 - ux * pad, ey = y2 - uy * pad;
+  ctx.beginPath();
+  ctx.setLineDash(dashed ? [6, 5] : []);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  // slight curve
+  const mx = (sx + ex) / 2 - uy * 18;
+  const my = (sy + ey) / 2 + ux * 18;
+  ctx.moveTo(sx, sy);
+  ctx.quadraticCurveTo(mx, my, ex, ey);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // arrow tip toward target (ex,ey)
+  const t = 0.98;
+  // approximate tangent at end of quadratic
+  const tx = 2 * (1 - t) * (mx - sx) + 2 * t * (ex - mx);
+  const ty = 2 * (1 - t) * (my - sy) + 2 * t * (ey - my);
+  const tl = Math.hypot(tx, ty) || 1;
+  const ax = tx / tl, ay = ty / tl;
+  const size = 9;
+  ctx.beginPath();
+  ctx.fillStyle = color;
+  ctx.moveTo(ex, ey);
+  ctx.lineTo(ex - ax * size - ay * size * 0.55, ey - ay * size + ax * size * 0.55);
+  ctx.lineTo(ex - ax * size + ay * size * 0.55, ey - ay * size - ax * size * 0.55);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function draw() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.translate(transform.x, transform.y);
+  ctx.scale(transform.k, transform.k);
+
+  // grid
+  ctx.strokeStyle = "rgba(36,54,82,.35)";
+  ctx.lineWidth = 1;
+  for (let x = 0; x < 1600; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 620); ctx.stroke(); }
+  for (let y = 0; y < 620; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1600, y); ctx.stroke(); }
+
+  const edges = visibleEdges();
+  edges.forEach(e => {
+    const a = nodeById(e.from), b = nodeById(e.to);
+    if (!a || !b) return;
+    let color = "#334155", width = 1.5, dashed = true;
+    if (e.strength === "strong") { color = "#2563eb"; width = 2.2; dashed = false; }
+    if (e.strength === "path") { color = "#2dd4bf"; width = 3; dashed = false; }
+    if (selected && (e.from === selected.id || e.to === selected.id)) {
+      width += 1.2;
+      if (e.strength !== "path") color = e.strength === "strong" ? "#60a5fa" : "#94a3b8";
+    }
+    drawArrow(a.x, a.y, b.x, b.y, color, dashed, width);
+  });
+
+  NODES.forEach(n => {
+    const active = selected && selected.id === n.id;
+    const hov = hover && hover.id === n.id;
+    const r = active || hov ? 30 : 26;
+    const col = KIND_COLOR[n.kind] || "#94a3b8";
+    // glow
+    if (active) {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r + 8, 0, Math.PI * 2);
+      ctx.fillStyle = col + "33";
+      ctx.fill();
+    }
+    // bubble
+    const grd = ctx.createRadialGradient(n.x - 6, n.y - 8, 4, n.x, n.y, r);
+    grd.addColorStop(0, "#1e293b");
+    grd.addColorStop(1, "#0f172a");
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = grd;
+    ctx.fill();
+    ctx.lineWidth = active ? 3 : 2;
+    ctx.strokeStyle = col;
+    ctx.stroke();
+    // label
+    ctx.fillStyle = "#e2e8f0";
+    ctx.font = "600 11px Segoe UI, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const parts = n.label.split(" ");
+    if (parts.length > 2) {
+      ctx.fillText(parts.slice(0, 2).join(" "), n.x, n.y - 5);
+      ctx.fillText(parts.slice(2).join(" "), n.x, n.y + 9);
+    } else if (parts.length === 2) {
+      ctx.fillText(parts[0], n.x, n.y - 5);
+      ctx.fillText(parts[1], n.x, n.y + 9);
+    } else {
+      ctx.fillText(n.label, n.x, n.y);
+    }
+  });
+
+  // path caption
+  ctx.fillStyle = "#2dd4bf";
+  ctx.font = "700 12px Segoe UI, system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText("PRIMARY  External → Monitor → Parser → Compiler/Gates (activation) → OHLCV SQLite → Corp → Harmonic → Features/Evidence → Causal → Storage → Radar → UI", 20, 40);
+
+  ctx.restore();
+}
+
+function showNode(n) {
+  selected = n;
+  document.getElementById("spTitle").textContent = n ? n.label : "Select a node";
+  document.getElementById("spRole").textContent = n ? n.role : "Click any bubble to see role, files, inbound and outbound edges.";
+  const files = document.getElementById("spFiles");
+  const inn = document.getElementById("spIn");
+  const out = document.getElementById("spOut");
+  if (!n) {
+    files.innerHTML = "";
+    inn.innerHTML = "<li class='empty-hint'>—</li>";
+    out.innerHTML = "<li class='empty-hint'>—</li>";
+    draw();
+    return;
+  }
+  files.innerHTML = n.files.map(f => `<span class="file-chip">${f}</span>`).join("");
+  const ins = EDGES.filter(e => e.to === n.id);
+  const outs = EDGES.filter(e => e.from === n.id);
+  inn.innerHTML = ins.length
+    ? ins.map(e => `<li><strong>${nodeById(e.from).label}</strong> → here · <em>${e.label}</em> · ${e.strength}</li>`).join("")
+    : "<li class='empty-hint'>No inbound edges in model</li>";
+  out.innerHTML = outs.length
+    ? outs.map(e => `<li>here → <strong>${nodeById(e.to).label}</strong> · <em>${e.label}</em> · ${e.strength}</li>`).join("")
+    : "<li class='empty-hint'>No outbound edges in model</li>";
+  // Link to full encyclopedia entry when present
+  const prev = document.getElementById("encycExtra");
+  if (prev) prev.remove();
+  if (typeof NODE_GUIDE !== "undefined" && NODE_GUIDE && Array.isArray(NODE_GUIDE.nodes)) {
+    const guide = NODE_GUIDE.nodes.find(g => g.id === n.id);
+    if (guide) {
+      const more = document.createElement("div");
+      more.id = "encycExtra";
+      more.style.marginTop = "12px";
+      more.innerHTML = `<button type="button" class="tool" id="openEncycBtn">Open full encyclopedia</button>
+        <p class="empty-hint" style="margin-top:8px"></p>`;
+      more.querySelector("p").textContent = guide.what || "";
+      document.getElementById("sidePanel").appendChild(more);
+      document.getElementById("openEncycBtn").onclick = () => openGuideNode(n.id);
+    }
+  }
+  draw();
+}
+
+wrap.addEventListener("mousedown", e => {
+  dragging = true; last = { x: e.clientX, y: e.clientY }; wrap.classList.add("dragging");
+});
+window.addEventListener("mouseup", () => { dragging = false; wrap.classList.remove("dragging"); });
+window.addEventListener("mousemove", e => {
+  if (dragging) {
+    transform.x += e.clientX - last.x;
+    transform.y += e.clientY - last.y;
+    last = { x: e.clientX, y: e.clientY };
+    draw();
+  } else if (document.getElementById("networkView").classList.contains("active")) {
+    const w = worldFromEvent(e);
+    const n = hitNode(w.x, w.y);
+    if ((n && (!hover || hover.id !== n.id)) || (!n && hover)) {
+      hover = n;
+      canvas.style.cursor = n ? "pointer" : "grab";
+      draw();
+    }
+  }
+});
+wrap.addEventListener("wheel", e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  const nk = Math.min(2.2, Math.max(0.35, transform.k * factor));
+  const wx = (mx - transform.x) / transform.k;
+  const wy = (my - transform.y) / transform.k;
+  transform.k = nk;
+  transform.x = mx - wx * nk;
+  transform.y = my - wy * nk;
+  draw();
+}, { passive: false });
+canvas.addEventListener("click", e => {
+  if (Math.abs(e.clientX - last.x) > 4) return;
+  const w = worldFromEvent(e);
+  showNode(hitNode(w.x, w.y));
+});
+
+document.getElementById("filterStrong").addEventListener("change", e => {
+  filterStrong = e.target.checked; if (filterStrong) { filterPath = false; document.getElementById("filterPath").checked = false; }
+  draw();
+});
+document.getElementById("filterPath").addEventListener("change", e => {
+  filterPath = e.target.checked; if (filterPath) { filterStrong = false; document.getElementById("filterStrong").checked = false; }
+  draw();
+});
+document.getElementById("resetView").addEventListener("click", () => {
+  transform = { x: 40, y: 20, k: 0.78 };
+  filterStrong = filterPath = false;
+  document.getElementById("filterStrong").checked = false;
+  document.getElementById("filterPath").checked = false;
+  showNode(null);
+});
+
+/* ========== TABS ========== */
+document.querySelectorAll("nav.tabs button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("nav.tabs button").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll("main .view").forEach(v => v.classList.remove("active"));
+    btn.classList.add("active");
+    const id = btn.dataset.tab + "View";
+    const el = document.getElementById(id);
+    if (el) el.classList.add("active");
+    const tab = btn.dataset.tab;
+    if (tab === "network") {
+      requestAnimationFrame(() => requestAnimationFrame(() => resizeCanvas()));
+    }
+    if (tab === "matrix") renderMatrix();
+    if (tab === "guide" && typeof renderGuide === "function") renderGuide();
+    if (tab === "story" && typeof renderStory === "function") renderStory();
+    if (tab === "glossary" && typeof renderGlossary === "function") renderGlossary();
+    if (tab === "process") renderProcess();
+    if (tab === "milestones") renderMilestones();
+  });
+});
+
+window.addEventListener("resize", () => {
+  if (document.getElementById("networkView").classList.contains("active")) resizeCanvas();
+});
+
+
+
+// NODE_GUIDE data (must exist before showNode encyclopedia link)
+const NODE_GUIDE = {
+  "executive": "TrendForge is a **localhost research command room** that pulls official and licensed market files, stores them with full lineage, runs a **scanner** (a manual or scheduled pass over a stock universe), and shows results as a **radar** of symbols with states like wait or reject. Hard **gates** (pass/fail checks), a **compiler** (governance over which data sources are mature enough to use), and a **safety engine** (personal risk locks) sit above the scoring engines so bad data and unsafe conditions cannot pretend to be “confirmed trades.” Nothing places broker orders; quantity is always zero; source activation is currently off (`sourceActivationReady=false`). Think of it as a careful detective room that files evidence and scores setups, not a brokerage keyboard.",
+  "nodes": [
+    {
+      "id": "ui",
+      "label": "Frontend Panel",
+      "kind": "ui",
+      "what": "The screen you open in the browser — the control room dashboard with lists, filters, and status lights.",
+      "purpose": "Give a single human a place to watch research results, source health, calendar, and safety without running Python by hand.",
+      "does": "1. Loads HTML/CSS/JS. 2. Calls several HTTP APIs at once (`loadApiData`): radar list, command bar, safety status, market context, calendar, source health. 3. Renders a priority queue of symbols and an inspector for the selected row. 4. Lets you filter by mode/timeframe and trigger actions (scan, panic lock, refresh sources). 5. Does **not** open a live socket; it uses plain request/response.",
+      "when": "When you open the page; again on manual refresh / button clicks.",
+      "who": "The single local researcher (you). Talks only to **FastAPI main** (`api`).",
+      "files": "`frontend/index.html`, `frontend/app.js`, `frontend/q5-contract.js`, `GET /api/radar`, `GET /api/command-bar`, `GET /api/source-health`",
+      "why": "A full React/app-store UI is overkill for one user on localhost; a single-panel vanilla app keeps the product runnable and inspectable.",
+      "analogy": "Like an air-traffic control tower screen: it shows planes and weather lights, but does not fly the planes.",
+      "note": "Display and requests only. It never decides readiness by itself and never places trades."
+    },
+    {
+      "id": "api",
+      "label": "FastAPI main",
+      "kind": "hub",
+      "what": "The local web server that answers every dashboard request and runs backend code.",
+      "purpose": "One front door so the browser, tools, and tests all speak the same HTTP language.",
+      "does": "1. Starts on `127.0.0.1:8000` (or Docker port 8000). 2. Serves the static frontend files. 3. Exposes routes for radar, scanner, sources, gates, safety, harmonic tools, selection fixtures, etc. 4. Validates many bodies with Pydantic models. 5. Logs each request with an ID (audit middleware). 6. Has CORS open for local use; **no multi-user login**.",
+      "when": "Whenever you start `run_server.py` / uvicorn; stays up until you stop it.",
+      "who": "**Frontend Panel**, scripts, tests. It calls engines and storage inside the process.",
+      "files": "`backend/trendforge_api/main.py`, `backend/run_server.py`, `GET /api/health`",
+      "why": "Typed, fast local API with automatic docs-friendly models beats ad-hoc scripts scattered across folders.",
+      "analogy": "Like a hotel front desk: every room service order goes through one desk.",
+      "note": "Local research service. No broker auth, no order routes, no global rate-limit product layer."
+    },
+    {
+      "id": "compiler",
+      "label": "Inventory Compiler",
+      "kind": "gov",
+      "what": "A rules engine that reads the master list of market data sources and says how mature each one is.",
+      "purpose": "Stop the app from treating a random URL or half-built parser as “good enough to confirm” a setup.",
+      "does": "1. Loads an immutable inventory workbook. 2. Normalizes endpoints and source contracts. 3. Scores maturity ladder stages and overlap resolutions. 4. Sets global `sourceActivationReady` and per-source `gatePermission`. 5. Exposes compiler report + R0-B cohort APIs. 6. Today activation is **false**, gate-authorized count is **0**, R0-B provenCount is **0**.",
+      "when": "On demand when gate readiness / source-health / compiler-report code runs (cached by workbook file signature).",
+      "who": "**Gate Readiness**, **Radar Engine** (maturity fields on source-health). Not called by the user directly.",
+      "files": "`source_inventory_compiler.py`, `source_key_map_review.py`, `source_overlap_resolutions.py`, `source_cohort_r0b.py`, `source_extended_field_proofs.py`, `GET /api/source-inventory/compiler-report`, `GET /api/source-inventory/r0b-cohort`",
+      "why": "Spreadsheets of hundreds of endpoints drift; a compiler turns inventory into fail-closed, testable contracts (H1A0 acceptance checks).",
+      "analogy": "Like a building inspector who stamps which elevators are licensed for passengers — even if the elevator looks shiny.",
+      "note": "Governance only. It does **not** fetch market prices and does **not** unlock product CONFIRMED by itself. H1A0 “6/6” means six acceptance checks passed, not “all data live.” Current pin f1abcdce… is 6/6 with 32 overlap groups. R0-B is field-reviewed with named waivers (provenCount=0). The ladder on Source Health and Live Ops is read-only."
+    },
+    {
+      "id": "scanner",
+      "label": "Scanner Scheduler",
+      "kind": "engine",
+      "what": "The boss workflow that runs one full research scan of a stock universe from start to finish.",
+      "purpose": "Orchestrate many small engines in the right order so a scan is repeatable and auditable.",
+      "does": "1. Optionally checks the exchange calendar (scheduled runs). 2. Monitors and parses critical sources. 3. Runs gate readiness + safety + market/sector context. 4. Opens a scanner run row in the database. 5. If critical sources are broken, **pauses** with zero candidates. 6. Loads candle series (≥40 bars). 7. For each symbol (one after another): corporate integrity → harmonic → lifecycle → features → evidence → causal candidate. 8. Runs causal scoring in a batch. 9. Merges hard overrides and saves candidates with `statusGroup` **wait** or **reject** only. 10. Marks the run complete. Uses a **background thread** for scheduled loops, not a cloud queue.",
+      "when": "On `POST /api/scanner/run-once`, UI button, or scheduler interval (default 900 seconds) if started.",
+      "who": "Triggered via **api**. Calls almost every other engine. Output lands in **storage** then **engine_radar**.",
+      "files": "`scanner_scheduler.py`, `POST /api/scanner/run-once`, `POST /api/scanner/scheduler/start`",
+      "why": "Scanning is multi-step and easy to do inconsistently by hand; one orchestrator keeps lineage and fail-closed rules together.",
+      "analogy": "Like a head chef running the kitchen line: many stations, one ticket, one plate.",
+      "note": "Research scan only. Does not place orders. Hardcodes candidate `type` to harmonic for this path. Never emits executable READY."
+    },
+    {
+      "id": "monitor",
+      "label": "Source Monitor",
+      "kind": "engine",
+      "what": "The fetcher that tries to download/check important official data files and records whether they worked.",
+      "purpose": "Know if today’s critical market files are present, fresh, or broken before trusting any score.",
+      "does": "1. Takes the nine **CRITICAL_SOURCE_KEYS** (bhavcopy EOD, index close, F&O ban, large deals, participant OI, FII/DII, AMFI portfolio, CFTC COT, MCX bhavcopy). 2. Attempts checks/fetches with timeouts. 3. Saves snapshots (state, hash, path under `data/raw_sources/`). 4. Returns a monitor summary for the scanner.",
+      "when": "Every scanner run (`check_sources`); also via source scheduler/smoke routes.",
+      "who": "**Scanner Scheduler**; results go to **storage** and then **parser**.",
+      "files": "`source_monitor.py`, `source_resolver.py`, `institutional_sources.py`, `data/raw_sources/`",
+      "why": "Indian market data lives in many official endpoints; without a monitor, parsers guess in the dark.",
+      "analogy": "Like a mailroom that stamps each package “arrived / missing / damaged.”",
+      "note": "A successful HTTP download is not proof the content is usable. ASM/GSM lists are **not** in this nine-key list (they are separate gate sources)."
+    },
+    {
+      "id": "parser",
+      "label": "Source Parser",
+      "kind": "engine",
+      "what": "The translator that turns raw downloaded files into clean structured rows the rest of the app can trust.",
+      "purpose": "Fail closed: if the file is empty, wrong shape, or metadata-only, say so instead of inventing numbers.",
+      "does": "1. Reads latest snapshot for a source key. 2. Runs a dedicated parser module. 3. Emits states like `PARSED_STRUCTURED`, wait-for-schema, stale, empty, broken. 4. Stores parse outputs and domain rows.",
+      "when": "During scanner (`parse_sources`) and when you manually run a parser from the UI/API.",
+      "who": "**Scanner**; **gates** later read parse results from **storage**.",
+      "files": "`source_parser.py`, `parsers/*`",
+      "why": "Official files change formats; one fail-closed parser layer protects every score that depends on structured evidence.",
+      "analogy": "Like a lab tech who only accepts samples that pass the checklist.",
+      "note": "HTTP 200 ≠ “parsed successfully.” Metadata-only parses cannot pass READY gates."
+    },
+    {
+      "id": "gates",
+      "label": "Gate Readiness",
+      "kind": "engine",
+      "what": "A hard checklist that answers: “Are the required official sources good enough for this kind of confirmation?”",
+      "purpose": "Block confirmation when surveillance lists, bans, institutional flows, or commodity context are missing, stale, or not activation-approved.",
+      "does": "1. For each gate family (G03 stock safety ASM/GSM, G01 institutional regime, G12 smart money, G13 OI/MWPL/ban, MCX context), loads latest snapshots/parses. 2. Applies freshness and structure rules. 3. **Then** applies compiler ceiling: if activation is off, even fresh data becomes `WAIT_SOURCE_ACTIVATION`. 4. Returns per-gate state and `tradeGateEffect` CAN_CONFIRM vs DO_NOT_PASS_READY.",
+      "when": "Each scanner run; also `GET /api/gates/readiness`.",
+      "who": "**Scanner** (sets `blocked` for all symbols). **Compiler** feeds activation. UI can inspect via **api**.",
+      "files": "`gate_readiness.py`, `GET /api/gates/readiness`",
+      "why": "Score engines must not outrun data truth; gates are the hard stop.",
+      "analogy": "Like airport security lanes: pretty boarding pass still fails if the system isn’t authorized.",
+      "note": "With current activation=false, positive “PASS for confirm” is effectively disabled. This is intentional governance, not a random bug."
+    },
+    {
+      "id": "safety",
+      "label": "Safety Engine",
+      "kind": "engine",
+      "what": "Your personal “stop trading / cool down” system based on journal losses and panic locks.",
+      "purpose": "Protect the human from emotional overtrading even when market data looks fine.",
+      "does": "1. Reads journal PnL, consecutive losses, max trades/day, soft/hard loss %. 2. Checks active safety events (panic lock). 3. Returns a state among: GREEN, RISK_REDUCED, COOLDOWN_ACTIVE, WAIT_EMOTIONAL_RISK, LOCKED_NO_TRADE, STOP_TRADING_NOW, BROKER_DATA_TRAUMA. 4. Panic lock creates a locking event + critical alert. 5. Unlock requires all five recovery checklist items true. 6. Always sets `executable=False`.",
+      "when": "Each scanner run; command bar; panic button / unlock form.",
+      "who": "**Scanner** (overrides candidate state); **ui** via **api** only.",
+      "files": "`safety_engine.py`, `GET /api/safety/status`, `POST /api/safety/panic-lock`, `POST /api/safety/unlock`",
+      "why": "Research tools still need human-risk rails; this is behavioral safety, not market-data safety.",
+      "analogy": "Like a car that locks the ignition after too many hard stops, even if the road looks clear.",
+      "note": "Not GREEN→YELLOW→ORANGE→RED traffic lights. Localhost has no multi-user admin — anyone who can hit the API can panic-lock. Still **never** executes trades."
+    },
+    {
+      "id": "calendar",
+      "label": "Exchange Calendar",
+      "kind": "engine",
+      "what": "A calendar that knows whether NSE is open for a normal trading day.",
+      "purpose": "Stop scheduled scanners from running on holidays/weekends as if it were a session.",
+      "does": "1. Evaluates trading day / session state. 2. Exposes `canRunScheduledScan` and human reason text. 3. Scanner scheduled trigger respects this; **manual** runs may still proceed for research.",
+      "when": "Scanner start; command bar / `GET /api/calendar/status`.",
+      "who": "**Scanner**, **ui** status pill via **api**.",
+      "files": "`exchange_calendar.py`, `GET /api/calendar/status`",
+      "why": "EOD and session logic break if “today” is a holiday.",
+      "analogy": "Like a shop “Open / Closed” sign for automatic deliveries.",
+      "note": "Manual research is intentionally allowed when the schedule would skip."
+    },
+    {
+      "id": "context",
+      "label": "Market Context",
+      "kind": "engine",
+      "what": "A market-mood and sector-mood snapshot (indices, VIX-style fields, sector RRG-style state).",
+      "purpose": "Downrank or block symbols when the broad market or sector regime is hostile or data is stale.",
+      "does": "1. Rebuilds official market and sector context from ingested EOD inputs. 2. Saves snapshots. 3. Scanner measures outcomes: PASS / WAIT / HARD_FAIL / STALE. 4. HARD_FAIL on market can force NO_TRADE-style outcomes later.",
+      "when": "Mid-scan **before** `create_scanner_run` finishes setup path (context rebuild then run row); also rebuild APIs.",
+      "who": "**Scanner** attaches MARKET_CONTEXT and SECTOR_CONTEXT gates per symbol.",
+      "files": "`market_context.py`, `market_context_ingestion.py`, `nse_eod_ingestion.py`",
+      "why": "Single-stock patterns without regime context create false confidence.",
+      "analogy": "Like checking weather and wind before launching a small boat.",
+      "note": "Research regime only; not a prediction product."
+    },
+    {
+      "id": "corp",
+      "label": "Corporate Actions",
+      "kind": "engine",
+      "what": "A checker that makes sure price history is not lying because of splits, bonuses, or similar adjustments.",
+      "purpose": "Harmonic geometry on unadjusted bars can be nonsense after corporate events.",
+      "does": "1. Loads corporate event observations for the symbol. 2. Reconciles actions as-of the last candle time. 3. Assesses adjustment integrity vs candles. 4. PASS continues to harmonic; FAIL builds a fail analysis with `REJECT_DATA_INTEGRITY`.",
+      "when": "Per symbol inside each scanner run.",
+      "who": "**Scanner** before **Harmonic Advanced**.",
+      "files": "`corporate_actions.py`, `parsers/corporate_events_parser.py`",
+      "why": "Pattern math needs honest series; “pretty chart” without adjustment integrity is unsafe research.",
+      "analogy": "Like verifying a map’s scale after a road was renamed and rebuilt.",
+      "note": "Fail does not crash the run; it rejects that symbol’s structure path."
+    },
+    {
+      "id": "harmonic",
+      "label": "Harmonic Advanced",
+      "kind": "engine",
+      "what": "A chart-pattern engine that looks for classic harmonic shapes (Gartley, Bat, Butterfly, Crab, etc.) on candle history.",
+      "purpose": "Propose **structure** evidence: “this symbol’s price path matches a known geometric setup.”",
+      "does": "1. Takes OHLCV candles (Open/High/Low/Close/Volume bars). 2. Finds pivots and validates Fibonacci-style ratios from a ratio table. 3. Scores gates and hybrid quality. 4. Emits pattern name, levels, final harmonic state string. Patterns include Gartley, Bat, Butterfly, Crab, Deep Crab, Cypher, Shark, 5-0, ABCD, AB=CD.",
+      "when": "Per symbol in scanner when integrity PASS; also dedicated harmonic API endpoints for interactive scans.",
+      "who": "**Scanner**; feeds **lifecycle**, **causal** (via scanner_causal).",
+      "files": "`harmonic_advanced.py`",
+      "why": "Harmonics are a first-class research setup in TrendForge’s product design; custom validation beats opaque vendor scores.",
+      "analogy": "Like a geometry teacher checking whether a sketch is a valid triangle with the right side ratios.",
+      "note": "Structure alone cannot become product CONFIRMED. Scanner still requires cause/sponsor/official gates."
+    },
+    {
+      "id": "lifecycle",
+      "label": "Harmonic Lifecycle",
+      "kind": "engine",
+      "what": "The memory that tracks the **same** harmonic pattern over time so it doesn’t get a new random identity each scan.",
+      "purpose": "Detect when a pattern is still forming, confirmed in harmonic terms, invalidated, or in conflict (e.g. data revised).",
+      "does": "1. Builds a stable `pattern_key` from symbol/timeframe/pattern/points. 2. Records transitions. 3. Returns tracking status (TRACKED, WAIT_*, CONFLICT_DATA_REVISION, etc.). 4. Weak lifecycle statuses can force the scanner to `WAIT_DATA_WEAK`.",
+      "when": "Right after harmonic analysis per symbol in the scanner.",
+      "who": "**Scanner**; metrics appear on candidate payload.",
+      "files": "`harmonic_lifecycle.py`, `harmonic_scan_lifecycle.py`",
+      "why": "Without identity, you cannot journal “this pattern died” vs “new pattern appeared.”",
+      "analogy": "Like giving each weather system a name so you can track the storm, not reinvent it hourly.",
+      "note": "Lifecycle WAIT is research uncertainty — not a trade signal."
+    },
+    {
+      "id": "features",
+      "label": "Feature Engineering",
+      "kind": "engine",
+      "what": "A calculator of point-in-time technical features from candles (e.g. relative volume style inputs).",
+      "purpose": "Feed **flow/structure** numbers into causal scoring without peeking into the future.",
+      "does": "1. Checks indicator engine identity/version (runtime pin). 2. Validates warm-up (enough complete bars, ordered, same symbol/tf/source). 3. Computes feature dict with version + registry manifest fields. 4. Returns `state=OK` or error states like ENGINE_MISMATCH / insufficient warm-up.",
+      "when": "Per symbol in scanner after harmonic.",
+      "who": "**Scanner** → **causal** (via scanner_causal). Registry also ties to **Q5** selection contracts.",
+      "files": "`feature_engineering.py`, `feature_registry.py`, `indicator_engine.py`",
+      "why": "Features must be reproducible (PIT — point-in-time) and versioned so old scans stay explainable.",
+      "analogy": "Like measuring ingredients with a dated kitchen scale so recipes stay consistent.",
+      "note": "Scanner pins a **manifest**; the full **39 FTR contracts** governance is strongest on the Q5/selection path, not every scanner field."
+    },
+    {
+      "id": "evidence",
+      "label": "Evidence Builder",
+      "kind": "engine",
+      "what": "The collector of “why might money be moving?” stories from official filings and deals — not just chart shape.",
+      "purpose": "Supply **CAUSE** (catalyst) and **SPONSOR** (who is buying/selling) evidence layers for causal scoring.",
+      "does": "1. For a symbol and as-of time, pulls structured deals, AMFI-related context, SEBI-style disclosures, corporate events. 2. Emits typed claims with trust levels and dates. 3. Persists claims. 4. Scanner_causal attaches them; missing layers get explicit “unavailable” placeholders with zero contribution.",
+      "when": "Per symbol in scanner; also `GET /api/evidence/{symbol}`.",
+      "who": "**Scanner** → **causal**.",
+      "files": "`evidence_builder.py`, `GET /api/evidence/{symbol}`",
+      "why": "Chart patterns without cause/sponsor produce hollow “confirmed” feelings the product forbids.",
+      "analogy": "Like attaching news clippings and ownership filings to a crime board, not just a photo of the street.",
+      "note": "Unofficial evidence cannot unlock production READY alone."
+    },
+    {
+      "id": "causal",
+      "label": "Causal Engine",
+      "kind": "engine",
+      "what": "The scoring brain that combines cause, sponsor, structure, and flow into a research decision state.",
+      "purpose": "Turn messy multi-source evidence into an explicit final state and reasons you can audit.",
+      "does": "1. Scores four layers (CAUSE max 6, SPONSOR max 10, STRUCTURE max 6, FLOW max 6) with minimums (2/4/2/2). 2. Applies **independence penalties** when the same raw input is counted twice across layers. 3. Computes Stage 1 score (out of 28) and eligibility. 4. Stage 2 is an optional execution-score path (label CONFIRMED if score ≥ 12/16) — usually blocked/not-run on stored scanner path. 5. Merges gate outcomes and overrides. 6. Emits `final_state` such as READY, WAIT, WAIT_DATA_WEAK, REJECT, NO_TRADE, lock states. 7. Always `executable=False`.",
+      "when": "Once per scan batch after all symbol candidates are prepared.",
+      "who": "**Scanner**; results stored on each candidate; radar shows reasons.",
+      "files": "`causal_engine.py`, `scanner_causal.py`",
+      "why": "Need a deterministic, testable scorer instead of opaque “AI confidence %.”",
+      "analogy": "Like a debate judge scoring four categories and deducting points if both teams quote the same weak source.",
+      "note": "**Three different “CONFIRMED” languages exist.** Causal Stage2 label `CONFIRMED` ≠ causal `READY` ≠ Q5 public `CONFIRMED`. Scanner radar groups stay **wait|reject**. Product CONFIRMED is not authorized while sources are not activated."
+    },
+    {
+      "id": "engine_radar",
+      "label": "Radar Engine",
+      "kind": "engine",
+      "what": "The waiter that picks the latest scan results out of the database and serves them to the UI.",
+      "purpose": "Materialize a clean radar list without forcing the UI to know SQL.",
+      "does": "1. Reads latest `scanner_runs` by `started_at` descending (not “only COMPLETE”). 2. Loads candidates, validates as `RadarCandidate`. 3. Filters by mode/status/timeframe/search. 4. If empty and `TRENDFORGE_DEMO_MODE` on, returns demo rows. 5. Also builds source-health rows with compiler maturity fields. 6. Builds command-bar fields with `system=RESEARCH_ONLY`.",
+      "when": "On UI load and radar API calls.",
+      "who": "**Frontend** via **api**.",
+      "files": "`engine.py`, `GET /api/radar`, `GET /api/source-health`, `GET /api/command-bar`",
+      "why": "Separate “decision run” storage from “display materialization” so the panel stays simple.",
+      "analogy": "Like a scoreboard that only shows the latest match report.",
+      "note": "Demo data is explicit and env-gated — not production evidence."
+    },
+    {
+      "id": "ohlcv",
+      "label": "OHLCV SQLite",
+      "kind": "store",
+      "what": "The main database-backed history of price bars used by the scanner.",
+      "purpose": "Provide enough complete bars (≥40) for structure and features without re-downloading every run.",
+      "does": "1. Stores candle series by symbol/timeframe/source. 2. Scanner lists series and loads up to thousands of bars. 3. Adapters/ingestion paths write bars from external/official feeds.",
+      "when": "Read every scan; write when ingest/adapters/API write candles.",
+      "who": "**Scanner**, **corp**, **harmonic**, **features**.",
+      "files": "`storage.py` `list_ohlcv_*`, `ohlcv_adapter.py`, `source_adapters.py`",
+      "why": "Local reproducible research needs a primary candle store with lineage, not only vendor APIs at click time.",
+      "analogy": "Like a filing cabinet of past game tapes.",
+      "note": "Primary scan path. **Parquet** is a separate optional mirror."
+    },
+    {
+      "id": "parquet",
+      "label": "Parquet Store",
+      "kind": "store",
+      "what": "Optional on-disk column files for analytics-style candle dumps.",
+      "purpose": "Efficient bulk history for analysis tools without making the scanner depend on it.",
+      "does": "Writes/reads `data/parquet/{timeframe}/{source}/{SYMBOL}.parquet` via pyarrow/pandas.",
+      "when": "Explicit write/read APIs or tooling — **not** the boss scan path.",
+      "who": "Analytics / optional APIs; **api** exposes status.",
+      "files": "`parquet_store.py`, `data/parquet/`, `GET /api/parquet/status`",
+      "why": "Parquet is efficient for large history queries; SQLite stays operational lineage store.",
+      "analogy": "Like a warehouse archive while the office desk has the active files.",
+      "note": "Not required for a scanner run to complete."
+    },
+    {
+      "id": "storage",
+      "label": "SQLite Storage",
+      "kind": "store",
+      "what": "The research database that remembers everything important about runs, gates, claims, and safety.",
+      "purpose": "Point-in-time lineage so you can answer “what did we know when we decided wait?”",
+      "does": "Tables for scanner_runs (`run_hash` = first 16 hex chars of sha256 of universe:trigger:timestamp), scanner_candidates (full JSON payload), gate_decisions, evidence_claims, source snapshots, journal, alerts, safety_events, context snapshots, and more. Migrations live in `storage.py`.",
+      "when": "Continuous on every write/read path.",
+      "who": "Nearly all engines; **engine_radar** reads; **ui** indirectly.",
+      "files": "`storage.py`, `data/trendforge.db`, `records.py`",
+      "why": "One-user research needs simple ACID history without operating a separate database cluster.",
+      "analogy": "Like a ship’s logbook: every decision and weather note is written down.",
+      "note": "Local state — not a multi-tenant production DB. Do not commit secrets into it."
+    },
+    {
+      "id": "detector",
+      "label": "Harmonic Detector",
+      "kind": "side",
+      "what": "A lower-level pivot/pattern helper, including optional external pyharmonics library.",
+      "purpose": "Support harmonic research without being the scanner’s main advanced analyzer.",
+      "does": "Finds pivots; optional pyharmonics search only if env `TRENDFORGE_ENABLE_PYHARMONICS` is on (license caution). Advanced module owns scanner boss path.",
+      "when": "When harmonic detector APIs/tools call it; optional under advanced.",
+      "who": "Harmonic tooling; weak link into advanced.",
+      "files": "`harmonic_detector.py`",
+      "why": "Separate raw detection from full gate-scored advanced analysis.",
+      "analogy": "Like a junior scout spotting hills; the senior cartographer draws the full map.",
+      "note": "Not the scan boss. License/env may disable vendor path."
+    },
+    {
+      "id": "risk",
+      "label": "Risk Engine",
+      "kind": "side",
+      "what": "A calculator that *looks like* position sizing but always returns zero size.",
+      "purpose": "Keep research geometry (entry/stop/target risk distance) without shipping executable quantity (File A postponed product sizing).",
+      "does": "Accepts entry/stop/account inputs; always returns `quantity=0`, `lot_count=0`, `executable=False`, often `POSTPONED_NO_QUANTITY`.",
+      "when": "On `POST /api/risk/position-size` if called.",
+      "who": "Optional UI/tools via **api** — **not** scanner boss.",
+      "files": "`risk_engine.py`, `POST /api/risk/position-size`",
+      "why": "Preserve DTO shape for future work without allowing live size recommendations now.",
+      "analogy": "Like a measuring tape that refuses to cut fabric — measure only.",
+      "note": "**Never** treat quantity as a trade size. Scores/sizes are forced non-executable."
+    },
+    {
+      "id": "q5",
+      "label": "Live Selection R1-R5",
+      "kind": "side",
+      "what": "Two separate selection paths: Q5 fixtures remain test-only, while live saved-data selection now runs R1 through R5 after the cash post-commit and EOD history boundaries.",
+      "purpose": "Check whether evidence is usable, order research attention, stop correlated data from being counted twice, and detect closed-bar structures (breakout, RVOL, NR7/NR4) with strict multi-gate validation.",
+      "does": "R1 qualifies saved source facts by lineage, validity and source-specific cadence. R2 creates an immutable BASELINE WATCH/WAIT attention order. R3 uses exact A1/A2 lineage and FUS-009 to select or suppress claims by correlation group. R4 enforces point-in-time identity and corporate-action adjustments. R5 computes closed-bar structure, relative volume, and narrow range setups over verified 20+ session history and index context, emitting CONFIRMED only when all gates pass with zero blocking codes.",
+      "when": "After a saved current cash post-commit run; read-only APIs return matching persisted artifacts (evidence, attention, resolution, structure). Q5 fixture routes remain separate.",
+      "who": "Cash post-commit and R5 builders persist the artifacts. Future R15 UI displays them. Inventory Workbench and legacy panel do not become selection authority.",
+      "files": "`selection/inventory_source_bundle.py`, `selection/attention_order.py`, `selection/r3_claim_adapter.py`, `selection/r3_live.py`, `selection/r5_live.py`, `selection/structure.py`, `GET /api/v1/selection/evidence`, `GET /api/v1/selection/attention`, `GET /api/v1/selection/resolution`, `GET /api/v1/selection/structure`",
+      "why": "A fresh link is not a second confirmation. The run must show what was used, what was suppressed, what is missing, and cleanly separate confirmed structural setups from incomplete history.",
+      "analogy": "R1 checks each report card, R2 makes the reading queue, R3 stops duplicate stamps, R4 verifies student identity, and R5 awards the confirmed structure badge only when test scores, history, and class averages are 100% verified.",
+      "note": "R5 CONFIRMED requires all gate checks (index context, 20+ historical bars, clean corporate actions, direction resolved) and at least one active setup. Incomplete or failing data strictly stays WAIT/REJECT."
+    },
+    {
+      "id": "deriv",
+      "label": "Derivatives Engine",
+      "kind": "side",
+      "what": "A math utility for option price, implied volatility, and Greeks.",
+      "purpose": "Research option numbers without making options the scan boss.",
+      "does": "Black-Scholes style calculations from inputs you POST.",
+      "when": "On demand via derivatives API routes.",
+      "who": "Optional research UI/tools.",
+      "files": "`derivatives_engine.py`, `POST /api/derivatives/*`",
+      "why": "Deterministic local calc beats opaque screenshots for research notes.",
+      "analogy": "Like a scientific calculator in the desk drawer.",
+      "note": "Not used as the scanner’s final decision engine."
+    },
+    {
+      "id": "inst",
+      "label": "Institutional Stack",
+      "kind": "side",
+      "what": "A bundle of institutional research modules (features, models, reports, backtests).",
+      "purpose": "Deeper institutional analytics without owning the main scanner state machine.",
+      "does": "Config/sources/models/reports APIs for institutional research workflows.",
+      "when": "On demand via institutional routes.",
+      "who": "Research tooling; not `_run_once` boss.",
+      "files": "`institutional_*.py`, `GET /api/institutional/*`",
+      "why": "Institutional context is large enough to need its own package boundary.",
+      "analogy": "Like a specialist research lab next door to the main ER.",
+      "note": "Research only; cannot authorize product CONFIRMED alone."
+    },
+    {
+      "id": "tradevision",
+      "label": "TradeVision Export",
+      "kind": "side",
+      "what": "An exporter that packages the latest completed scan into a signed evidence JSON blob.",
+      "purpose": "Hand research evidence to another tool (TradeVision integration) without OMS coupling.",
+      "does": "Finds latest COMPLETE run, packs candidates + source lineage + command bar context, hashes and HMAC-signs payload (schema `trendforge-tradevision-evidence.v1`).",
+      "when": "When export API is called.",
+      "who": "Integration consumers via **api**.",
+      "files": "`trade_vision_export.py`, `GET /api/integrations/trade-vision/evidence/latest`",
+      "why": "Evidence portability with integrity checks.",
+      "analogy": "Like sealing a certified copy of the case file for another court.",
+      "note": "**Not** an order management system. Export ≠ execution."
+    },
+    {
+      "id": "ext",
+      "label": "External Markets",
+      "kind": "external",
+      "what": "The outside world of exchanges and official data publishers.",
+      "purpose": "Ultimate origin of market truth TrendForge tries to archive and parse.",
+      "does": "Hosts endpoints for NSE, BSE, MCX, AMFI, NSDL, SEBI, CFTC, FRED, EIA, WGC, etc. TrendForge downloads into raw archives; registry documents meaning and authority.",
+      "when": "Continuously outside TrendForge; TrendForge pulls on monitor/ingest jobs.",
+      "who": "**Source Monitor**, candle adapters, context ingestion.",
+      "files": "`data/raw_sources/`, `TREND_FORGE_SOURCE_REGISTRY.md`",
+      "why": "(Not “created” by TrendForge — integrated.) Official preferred over unofficial wrappers.",
+      "analogy": "Like weather stations in the real world feeding your home display.",
+      "note": "Unofficial sources must not independently unlock production READY / CONFIRMED."
+    },
+    {
+      "id": "openalgo",
+      "label": "OpenAlgo",
+      "kind": "external",
+      "what": "An optional local bridge to OpenAlgo for **read-only** market history and option data.",
+      "purpose": "Assess capability and optionally fetch history without enabling order placement.",
+      "does": "Capability report; allowed read routes (history, option chain, greeks); **forbids** placeorder, account, funds, positions, etc.",
+      "when": "When capability/history adapters are invoked.",
+      "who": "Optional OHLCV path; **api** capability endpoints.",
+      "files": "`openalgo_client.py`, `assess_openalgo_capability`",
+      "why": "Future intraday source option under a hard non-execution boundary.",
+      "analogy": "Like a library card that cannot swipe a credit terminal.",
+      "note": "No broker secrets in parsers/UI. No write/order path."
+    }
+  ],
+  "flows": [
+    {
+      "title": "External markets → Source Monitor → Source Parser → SQLite",
+      "detail": "Download raw files, parse to structured rows, keep lineage."
+    },
+    {
+      "title": "Inventory Compiler → Gate Readiness → Scanner",
+      "detail": "Compiler says activation is off; gates force wait; scanner marks all symbols “source gates blocked.”"
+    },
+    {
+      "title": "Saved cash facts → R1 evidence → R2 attention → R3 resolution",
+      "detail": "R1 validates saved data and source-specific freshness; R2 orders WATCH/WAIT attention; R3 removes correlated duplicate claims using exact lineage. The live ceiling is WAIT: FTR-040 is the only approved directional source contract, and it cannot unlock CONFIRMED."
+    },
+    {
+      "title": "Scanner → Safety Engine → Scanner",
+      "detail": "Personal lock states can hard-override every candidate."
+    },
+    {
+      "title": "Scanner → Market Context → Scanner",
+      "detail": "Regime/sector outcomes become per-symbol gates."
+    },
+    {
+      "title": "OHLCV SQLite → Corporate Actions → Harmonic Advanced → Lifecycle",
+      "detail": "Price history must pass integrity, then pattern + identity tracking."
+    },
+    {
+      "title": "OHLCV + Evidence Builder + Features → Causal Engine",
+      "detail": "Structure/flow/cause/sponsor scored together with independence penalties."
+    },
+    {
+      "title": "Causal Engine → SQLite Storage → Radar Engine → Frontend",
+      "detail": "Save candidates; serve latest run; paint radar."
+    },
+    {
+      "title": "Frontend → FastAPI → Scanner",
+      "detail": "User click or schedule starts a run through the hub."
+    },
+    {
+      "title": "Frontend → FastAPI → Safety",
+      "detail": "Panic lock and unlock always go through the API (never UI→safety direct)."
+    },
+    {
+      "title": "Side paths (Q5, Risk, Derivatives, Institutional, TradeVision, OpenAlgo)",
+      "detail": "Reachable via API for research, but they do **not** drive `_run_once` final_state."
+    }
+  ],
+  "walk": [
+    "You start the backend (`python backend/run_server.py`) and open the **Frontend Panel**.",
+    "The panel calls **FastAPI** for command bar (shows **RESEARCH_ONLY**), radar, safety, calendar, and source health.",
+    "You click a scan action (or a scheduler wakes up). **Scanner Scheduler** becomes boss.",
+    "If this is a **scheduled** run and the **Exchange Calendar** says the market is closed, the schedule stops; a **manual** research run may still continue.",
+    "**Source Monitor** checks nine critical official keys; **Source Parser** turns good files into structured data (or records failure).",
+    "**Gate Readiness**, powered by the **Inventory Compiler**, reports that sources are not activation-authorized — so confirmation is blocked even if files look fresh.",
+    "**Safety Engine** reports whether you are GREEN or locked/cooldown.",
+    "**Market Context** rebuilds market and sector mood.",
+    "Scanner opens a **SQLite** run record (`run_hash` lineage). If critical sources are broken, the run **pauses** with no symbols.",
+    "For each symbol with enough **OHLCV SQLite** bars: check **Corporate Actions**, run **Harmonic Advanced**, track **Lifecycle**, compute **Features**, build **Evidence**, assemble causal inputs.",
+    "**Causal Engine** scores the batch and returns research states; hard gates override soft scores.",
+    "Candidates are saved with radar group **wait** or **reject** only, always non-executable.",
+    "**Radar Engine** reloads the latest run for the panel; you read reasons and proof chips.",
+    "Optional: export via **TradeVision**, explore **Q5** fixtures, compute **Derivatives**, or check **OpenAlgo** capability — none of these place trades."
+  ],
+  "glossary": [
+    {
+      "term": "NSE / BSE / MCX",
+      "meaning": "India’s stock exchanges (equity) and multi-commodity exchange."
+    },
+    {
+      "term": "Scanner",
+      "meaning": "One research pass over a universe of symbols with a full pipeline and saved results."
+    },
+    {
+      "term": "Gate",
+      "meaning": "A hard pass/fail check on required data or safety conditions."
+    },
+    {
+      "term": "Compiler",
+      "meaning": "Governance program that grades source inventory maturity and activation readiness."
+    },
+    {
+      "term": "sourceActivationReady",
+      "meaning": "Global flag from the compiler; currently false — blocks confirm-style gate passes."
+    },
+    {
+      "term": "gatePermission",
+      "meaning": "Per-source compiler flag; currently none authorize gates."
+    },
+    {
+      "term": "H1A0",
+      "meaning": "Hybrid inventory acceptance suite; “6/6” means six named checks passed (separate from 11 defect class codes)."
+    },
+    {
+      "term": "File A / File B",
+      "meaning": "File A = build order & product ceilings; File B = detailed formulas when pointed. Authority below AGENTS.md."
+    },
+    {
+      "term": "OHLCV",
+      "meaning": "Open, High, Low, Close, Volume — a candle bar."
+    },
+    {
+      "term": "PIT (point-in-time)",
+      "meaning": "Only use information known at the decision timestamp — no future leak."
+    },
+    {
+      "term": "Harmonic",
+      "meaning": "Geometric chart pattern family (Gartley, Bat, etc.) based on price swing ratios."
+    },
+    {
+      "term": "Causal",
+      "meaning": "Four-layer scoring (CAUSE / SPONSOR / STRUCTURE / FLOW) for research states."
+    },
+    {
+      "term": "CAUSE",
+      "meaning": "Catalyst-type evidence (why price might move)."
+    },
+    {
+      "term": "SPONSOR",
+      "meaning": "Actor-type evidence (who is supporting the move)."
+    },
+    {
+      "term": "STRUCTURE",
+      "meaning": "Chart/setup quality (often harmonics)."
+    },
+    {
+      "term": "FLOW",
+      "meaning": "Participation/volume-style evidence."
+    },
+    {
+      "term": "Independence penalty",
+      "meaning": "Score cut when two layers share the same raw input (no double counting)."
+    },
+    {
+      "term": "Stage1 / Stage2",
+      "meaning": "Causal eligibility score (Stage1) vs optional execution-score path (Stage2)."
+    },
+    {
+      "term": "READY (causal)",
+      "meaning": "Internal causal final_state meaning “eligible research ready” — still non-executable; scanner may still map UI group to wait."
+    },
+    {
+      "term": "CONFIRMED (three meanings)",
+      "meaning": "(1) Q5 public state, (2) Stage2 score label, (3) product confirmation — **not interchangeable**."
+    },
+    {
+      "term": "statusGroup",
+      "meaning": "Radar bucket: models allow ready\\|wait\\|reject; live scanner path writes **wait\\|reject** only."
+    },
+    {
+      "term": "WATCH / WAIT / REJECT",
+      "meaning": "Research attention states; WATCH is Q5/public language more than scanner statusGroup."
+    },
+    {
+      "term": "ASM / GSM",
+      "meaning": "NSE surveillance measures (Additional / Graded Surveillance) that can hard-block a stock."
+    },
+    {
+      "term": "F&O ban / MWPL",
+      "meaning": "Futures & options ban list / market-wide position limit risk."
+    },
+    {
+      "term": "FII / DII",
+      "meaning": "Foreign / Domestic institutional investor cash flow context."
+    },
+    {
+      "term": "AMFI",
+      "meaning": "Mutual fund association data (holdings context; delayed)."
+    },
+    {
+      "term": "CFTC COT",
+      "meaning": "US Commitment of Traders positioning (commodity context; delayed)."
+    },
+    {
+      "term": "RRG",
+      "meaning": "Relative Rotation Graph style sector regime labels in sector context."
+    },
+    {
+      "term": "run_hash",
+      "meaning": "Short hash identifying a scanner run for lineage."
+    },
+    {
+      "term": "PARSED_STRUCTURED",
+      "meaning": "Parser success state meaning real structured rows, not metadata fluff."
+    },
+    {
+      "term": "Fail-closed",
+      "meaning": "When unsure, block or wait — never invent confirmation."
+    },
+    {
+      "term": "executable=False",
+      "meaning": "Hard flag: system must not emit trade-executable intent."
+    },
+    {
+      "term": "RESEARCH_ONLY",
+      "meaning": "Command-bar system mode: not a live trading terminal."
+    },
+    {
+      "term": "OpenAlgo",
+      "meaning": "Optional local broker/data bridge; TrendForge uses **read-only** routes only."
+    },
+    {
+      "term": "TradeVision",
+      "meaning": "External consumer of signed research evidence exports."
+    },
+    {
+      "term": "Q5",
+      "meaning": "Q5 fixture milestone family with four public states; live R1/R2/R3 are separate saved-data selection stages capped at WAIT."
+    },
+    {
+      "term": "FTR",
+      "meaning": "Feature registry contract IDs. Registry 1.1.0 has 40 features; FTR-040 is the sole live R3 directional binding and remains WAIT-only."
+    },
+    {
+      "term": "Parquet",
+      "meaning": "Columnar file format for bulk analytics history."
+    },
+    {
+      "term": "SQLite",
+      "meaning": "Single-file local database for operational research lineage."
+    }
+  ]
+};
+
+/* ========== NODE ENCYCLOPEDIA (merged from NODE_GUIDE) ========== */
+function esc(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+function formatRich(s) {
+  // light markdown: `code` and **bold**
+  let t = esc(s);
+  t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+  t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  return t;
+}
+function kindOrder(k) {
+  const order = ["ui", "hub", "gov", "engine", "store", "side", "external"];
+  const i = order.indexOf(k);
+  return i < 0 ? 99 : i;
+}
+function filteredGuideNodes() {
+  const q = (document.getElementById("guideSearch")?.value || "").trim().toLowerCase();
+  const kind = document.getElementById("guideKind")?.value || "";
+  return NODE_GUIDE.nodes.filter((n) => {
+    if (kind && n.kind !== kind) return false;
+    if (!q) return true;
+    const blob = [n.id, n.label, n.kind, n.what, n.purpose, n.does, n.when, n.who, n.files, n.why, n.analogy, n.note]
+      .join(" ")
+      .toLowerCase();
+    return blob.includes(q);
+  });
+}
+function renderGuide() {
+  const exec = document.getElementById("guideExec");
+  if (exec) exec.innerHTML = "<strong>What TrendForge is (60-second version)</strong><br/>" + formatRich(NODE_GUIDE.executive);
+  const root = document.getElementById("guideRoot");
+  if (!root) return;
+  const nodes = filteredGuideNodes();
+  const count = document.getElementById("guideCount");
+  if (count) count.textContent = nodes.length + " / " + NODE_GUIDE.nodes.length + " nodes";
+  const byKind = {};
+  nodes.forEach((n) => {
+    (byKind[n.kind] = byKind[n.kind] || []).push(n);
+  });
+  const kinds = Object.keys(byKind).sort((a, b) => kindOrder(a) - kindOrder(b));
+  root.innerHTML = kinds
+    .map((k) => {
+      const cards = byKind[k]
+        .map((n) => {
+          const rows = [
+            ["What is it?", n.what, ""],
+            ["Purpose", n.purpose, ""],
+            ["What it actually does", n.does, ""],
+            ["When does it run?", n.when, ""],
+            ["Who uses it?", n.who, ""],
+            ["Key files / APIs", n.files, ""],
+            ["Why was it created?", n.why, ""],
+            ["Simple analogy", n.analogy, ""],
+            ["Important note", n.note, "note"],
+          ]
+            .map(
+              ([lab, val, cls]) =>
+                `<tr><th>${esc(lab)}</th><td class="${cls}">${formatRich(val)}</td></tr>`
+            )
+            .join("");
+          return `<details class="node-card" data-id="${esc(n.id)}" data-kind="${esc(n.kind)}">
+  <summary>
+    <div class="title-row">
+      <h3>${esc(n.label)}</h3>
+      <span class="nid">\`${esc(n.id)}\`</span>
+      <span class="tag ${k === "engine" ? "cyan" : k === "store" ? "green" : k === "gov" ? "amber" : k === "side" ? "violet" : k === "external" ? "amber" : "teal"}">${esc(n.kind)}</span>
+    </div>
+    <p class="blurb">${formatRich(n.what)}</p>
+  </summary>
+  <div class="node-body"><table class="field-table">${rows}</table></div>
+</details>`;
+        })
+        .join("");
+      return `<div class="kind-group"><h2>${esc(k)} · ${byKind[k].length}</h2>${cards}</div>`;
+    })
+    .join("");
+}
+function renderStory() {
+  const fl = document.getElementById("flowList");
+  if (fl) {
+    fl.innerHTML = NODE_GUIDE.flows
+      .map(
+        (f) =>
+          `<li>${f.title ? `<strong>${formatRich(f.title)}</strong>` : ""}${formatRich(f.detail)}</li>`
+      )
+      .join("");
+  }
+  const sl = document.getElementById("storyList");
+  if (sl) {
+    sl.innerHTML = NODE_GUIDE.walk.map((s) => `<li>${formatRich(s)}</li>`).join("");
+  }
+}
+function renderGlossary() {
+  const g = document.getElementById("glossGrid");
+  if (!g) return;
+  g.innerHTML = NODE_GUIDE.glossary
+    .map(
+      (x) =>
+        `<div class="gloss-card"><dt>${formatRich(x.term)}</dt><dd>${formatRich(x.meaning)}</dd></div>`
+    )
+    .join("");
+}
+function openGuideNode(id) {
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.classList.remove("active"));
+  document.querySelectorAll("main .view").forEach((v) => v.classList.remove("active"));
+  const btn = document.querySelector('nav.tabs button[data-tab="guide"]');
+  if (btn) btn.classList.add("active");
+  const view = document.getElementById("guideView");
+  if (view) view.classList.add("active");
+  renderGuide();
+  const card = document.querySelector(`.node-card[data-id="${id}"]`);
+  if (card) {
+    card.open = true;
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+// Guide UI wiring
+document.getElementById("guideSearch")?.addEventListener("input", renderGuide);
+document.getElementById("guideKind")?.addEventListener("change", renderGuide);
+document.getElementById("guideExpandAll")?.addEventListener("click", () => {
+  document.querySelectorAll("#guideRoot details.node-card").forEach((d) => (d.open = true));
+});
+document.getElementById("guideCollapseAll")?.addEventListener("click", () => {
+  document.querySelectorAll("#guideRoot details.node-card").forEach((d) => (d.open = false));
+});
+
+// CRITICAL BOOT: previously missing — process/matrix/milestones never painted
+function bootAll() {
+  try { renderProcess(); } catch (e) { console.error("renderProcess", e); }
+  try { renderMilestones(); } catch (e) { console.error("renderMilestones", e); }
+  try { renderMatrix(); } catch (e) { console.error("renderMatrix", e); }
+  try { renderGuide(); } catch (e) { console.error("renderGuide", e); }
+  try { renderStory(); } catch (e) { console.error("renderStory", e); }
+  try { renderGlossary(); } catch (e) { console.error("renderGlossary", e); }
+  try { showNode(nodeById("scanner")); } catch (e) { console.error("showNode", e); }
+  // Pre-size canvas even while hidden so first open is not blank
+  try { resizeCanvas(); } catch (e) { console.error("resizeCanvas", e); }
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootAll);
+} else {
+  bootAll();
+}
+
+</script>
+</body>
+</html>

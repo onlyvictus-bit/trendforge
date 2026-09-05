@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_most_active_futures","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_most_active_futures"},"rawContentHashes":["044638f17ea4a116461b98b22aec31ca604d4cbd2a45f92e7378056de4e64c88"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_MOST_ACTIVE_FUTURES"}],"sourceKey":"nse_most_active_futures"}

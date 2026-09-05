@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_market_variations","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_variations_loosers"},"rawContentHashes":["8837da51396fdec287bc9891fb91f864228fb38908b45cdfa8d794b02b3a7b6b"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_VARIATIONS_LOOSERS"}],"sourceKey":"nse_variations_loosers"}

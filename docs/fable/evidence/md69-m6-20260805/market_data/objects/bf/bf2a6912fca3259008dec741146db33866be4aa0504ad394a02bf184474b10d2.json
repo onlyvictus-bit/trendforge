@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_preopen_fo","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_preopen_fo"},"rawContentHashes":["59d6baeeb98317224916fa424dcd2c74dcc6c1f2643384e6b2e253a02bfabbbd"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_PREOPEN_FO"}],"sourceKey":"nse_preopen_fo"}

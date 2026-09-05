@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_most_active_options","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_most_active_options"},"rawContentHashes":["372bff81f923114ca2ceccac577ed7f86f9788fea0cc76d0da4f52bd995864ff"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_MOST_ACTIVE_OPTIONS"}],"sourceKey":"nse_most_active_options"}

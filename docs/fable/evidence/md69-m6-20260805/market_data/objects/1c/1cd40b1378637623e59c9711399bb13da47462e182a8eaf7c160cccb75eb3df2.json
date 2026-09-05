@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_oi_spurts","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_oi_spurts"},"rawContentHashes":["93058b1590887beb2271a4ae084bad243e49fac51112f9630f50f83d6c18da45"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_OI_SPURTS"}],"sourceKey":"nse_oi_spurts"}

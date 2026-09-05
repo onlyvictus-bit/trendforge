@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"nse_sector_constituents","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"nse_sector_constituents"},"rawContentHashes":["c5be5fb5a33bceef95e329226f87153cf3af86727b54b4d12982fcc6446f80a5"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"NSE_SECTOR_CONSTITUENTS"}],"sourceKey":"nse_sector_constituents"}

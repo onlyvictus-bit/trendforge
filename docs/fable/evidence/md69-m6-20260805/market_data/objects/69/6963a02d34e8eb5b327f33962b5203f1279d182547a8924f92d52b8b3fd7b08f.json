@@ -1,0 +1,1 @@
+{"dataDate":"2026-08-05","normalizedSourceKey":"bse_bulk_deals","parserState":"PARSED_ADAPTER","payload":{"fixture":true,"sourceKey":"bse_bulk_deals"},"rawContentHashes":["08a776022443ace494dbf2f6d883063c4dd30c0c32e7ace5bfb7c8b5c140caf3"],"records":[{"acquisitionCount":1,"fixture":true,"symbol":"BSE_BULK_DEALS"}],"sourceKey":"bse_bulk_deals"}
