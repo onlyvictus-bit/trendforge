@@ -198,7 +198,10 @@ def test_r2_persists_without_changing_state_authority(tmp_path, monkeypatch) -> 
 def test_r2_shadow_is_hash_pinned_deterministic_and_non_authoritative() -> None:
     bundle = _bundle()
     results = [run_shadow_screener(bundle) for _ in range(3)]
-    assert all(result.status == "COMPLETED" for result in results)
+    assert all(result.status == "COMPLETED" for result in results), (
+        "shadow runs: "
+        + str([(result.status, result.error) for result in results])
+    )
     assert len({result.output_hash for result in results}) == 1
     assert all(not result.can_vote and not result.can_change_baseline for result in results)
     baseline = build_attention_order(bundle, built_at=NOW)
