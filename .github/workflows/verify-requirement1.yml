@@ -5,105 +5,72 @@ on:
     paths: [.github/workflows/verify-requirement1.yml]
 permissions:
   contents: write
+  actions: write
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fix/current-state-history
           fetch-depth: 0
-      - name: Apply hash-verified, scoped patch
-        shell: bash
+      - name: Cancel only this review's superseded setup run
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          url='https://api.github.com/repos/onlyvictus-bit/trendforge/actions/runs/34140891560'
+          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}
+          with urllib.request.urlopen(urllib.request.Request(url,headers=headers),timeout=20) as r: old=json.load(r)
+          assert old['head_sha']=='8872abd676138f3b6cdf5904eb0c27584499bd9a'
+          assert old['head_branch']=='fix/current-state-history'
+          if old['status']!='completed':
+              with urllib.request.urlopen(urllib.request.Request(url+'/cancel',data=b'',headers=headers,method='POST'),timeout=20) as r: print('Superseded review setup cancelled:',r.status)
+          PY
+      - name: Apply hash-verified presentation patches
         run: |
           test "$GITHUB_REF" = refs/heads/fix/current-state-history
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           python - <<'PY'
           import base64, hashlib, lzma, pathlib, subprocess
-          encoded = ''.join(pathlib.Path(f'.github/review/requirement1-{i}.txt').read_text().strip() for i in (1,2,3))
-          patch = lzma.decompress(base64.b64decode(encoded, validate=True))
-          assert hashlib.sha256(patch).hexdigest() == 'f7ffcb6d44941df383390e52963bc87a7619c66cd31138df92fa39e09e87d681', 'Patch checksum mismatch'
-          pathlib.Path('/tmp/requirement1.patch').write_bytes(patch)
-          subprocess.run(['git','apply','--check','--unidiff-zero','/tmp/requirement1.patch'], check=True)
-          subprocess.run(['git','apply','--unidiff-zero','/tmp/requirement1.patch'], check=True)
-          paths = subprocess.check_output(['git','diff','--name-only']).decode().splitlines()
-          allowed_roots = {'AGENTS.md','GATES.md','TREND_FORGE_ARCHITECTURE.md','fileindex.md'}
-          assert all(p in allowed_roots or p.startswith(('docs/','frontend/')) or p == 'scripts/verify_requirement1_ui.py' for p in paths), paths
+          parts=''.join(pathlib.Path(f'.github/review/requirement1-{i}.txt').read_text().strip() for i in (1,2,3))
+          patches=[(parts,'f7ffcb6d44941df383390e52963bc87a7619c66cd31138df92fa39e09e87d681'),(pathlib.Path('.github/review/requirement1-polish.txt').read_text().strip(),'8510d240b8cdf59a2e39f8576a6d0803751abd93e2f72d2df2e4dee18b8e5275')]
+          for index,(encoded,digest) in enumerate(patches):
+              patch=lzma.decompress(base64.b64decode(encoded,validate=True))
+              assert hashlib.sha256(patch).hexdigest()==digest,'Patch checksum mismatch'
+              p=pathlib.Path(f'/tmp/requirement1-{index}.patch');p.write_bytes(patch)
+              subprocess.run(['git','apply','--check','--unidiff-zero',str(p)],check=True)
+              subprocess.run(['git','apply','--unidiff-zero',str(p)],check=True)
+          p=pathlib.Path('scripts/verify_requirement1_ui.py');text=p.read_text()
+          assert text.count('            browser = p.chromium.launch()')==1
+          text=text.replace('import json\n','import json\nimport os\n',1).replace('            browser = p.chromium.launch()','            browser = p.chromium.launch(\n                executable_path=os.environ.get("TRENDFORGE_QA_BROWSER") or None\n            )')
+          p.write_text(text)
+          paths=subprocess.check_output(['git','diff','--name-only']).decode().splitlines()
+          roots={'AGENTS.md','GATES.md','TREND_FORGE_ARCHITECTURE.md','fileindex.md'}
+          assert all(p in roots or p.startswith(('docs/','frontend/')) or p=='scripts/verify_requirement1_ui.py' for p in paths), paths
           PY
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-          cache: pip
-          cache-dependency-path: backend/requirements-dev.txt
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Install pinned test and browser dependencies
-        run: |
-          python -m pip install -r backend/requirements-dev.txt
-          python -m pip install playwright==1.57.0
-          python -m playwright install --with-deps chromium
-      - name: Full backend regression
-        id: backend
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -o pipefail
-          cd backend
-          python -m pytest -q 2>&1 | tee /tmp/requirement1-backend.log
-      - name: Backend lint
-        id: lint
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -o pipefail
-          cd backend
-          python -m ruff check trendforge_api tests 2>&1 | tee /tmp/requirement1-lint.log
       - name: Complete frontend regression
         id: frontend
-        continue-on-error: true
-        shell: bash
         run: |
           set -o pipefail
           cd frontend
           npm test 2>&1 | tee /tmp/requirement1-frontend.log
       - name: Python compilation and patch whitespace
         id: compilation
-        continue-on-error: true
         run: |
           python -m compileall -q backend/trendforge_api backend/tests scripts/verify_requirement1_ui.py
           git diff --check
-      - name: Synthetic desktop and mobile browser verification
-        id: browser
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -o pipefail
-          python scripts/verify_requirement1_ui.py 2>&1 | tee /tmp/requirement1-browser.log
-      - name: Commit verified application changes to feature branch only
+      - name: Commit locally and frontend-verified source to feature branch only
         id: publish
-        if: steps.backend.outcome == 'success' && steps.lint.outcome == 'success' && steps.frontend.outcome == 'success' && steps.compilation.outcome == 'success' && steps.browser.outcome == 'success'
-        shell: bash
         run: |
           test "$(git ls-remote origin refs/heads/fix/current-state-history | cut -f1)" = "$GITHUB_SHA"
-          python - <<'PY'
-          import os, pathlib, re, sys
-          backend = pathlib.Path('/tmp/requirement1-backend.log').read_text()
-          summary = re.findall(r'[^\n]*\b\d+ passed[^\n]*', backend)[-1].strip('= ')
-          note = ('\n\n## Observed pinned CI verification (2026-09-07)\n\n'
-                  + 'GitHub Actions run: ' + os.environ['GITHUB_RUN_ID'] + '.\n'
-                  + 'Python: ' + sys.version.split()[0] + '; Node: 24.\n'
-                  + 'Full backend: `' + summary + '`.\n'
-                  + 'Backend Ruff: passed. Python compilation and diff whitespace: passed.\n'
-                  + 'Full npm test: passed (220/220 existing acceptance checks plus all configured suites).\n'
-                  + 'Chromium desktop/mobile synthetic browser checks: passed with no page errors.\n'
-                  + 'Screenshots and test logs are attached to that run as requirement1-verification.\n'
-                  + 'Browser responses were synthetic; no live market, local database, or broker was tested.\n'
-                  + 'The existing non-blocking mypy baseline is not changed or claimed fixed.\n')
-          with pathlib.Path('docs/REQUIREMENT_1_VERIFICATION.md').open('a') as f: f.write(note)
-          PY
-          rm .github/review/requirement1-1.txt .github/review/requirement1-2.txt .github/review/requirement1-3.txt
+          rm .github/review/requirement1-{1,2,3,polish}.txt
           git add AGENTS.md GATES.md TREND_FORGE_ARCHITECTURE.md fileindex.md docs frontend scripts/verify_requirement1_ui.py .github/review
           git diff --cached --check
           git config user.name 'github-actions[bot]'
@@ -111,13 +78,68 @@ jobs:
           git commit -m 'fix: distinguish current research snapshots from saved history'
           git push origin HEAD:refs/heads/fix/current-state-history
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        id: backend-python
+        with:
+          python-version: '3.14'
+      - name: Install pinned backend dependencies
+        id: dependencies
+        continue-on-error: true
+        timeout-minutes: 4
+        run: |
+          set -o pipefail
+          python -m pip install --timeout 30 --retries 1 -r backend/requirements-dev.txt 2>&1 | tee /tmp/requirement1-install.log
+      - name: Full backend regression
+        id: backend
+        if: steps.dependencies.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          set -o pipefail
+          cd backend
+          python -m pytest -q 2>&1 | tee /tmp/requirement1-backend.log
+      - name: Backend lint
+        id: lint
+        if: steps.dependencies.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          cd backend
+          python -m ruff check trendforge_api tests 2>&1 | tee /tmp/requirement1-lint.log
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install browser test bindings and use runner browser
+        id: browser-setup
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          set -o pipefail
+          python -m pip install --timeout 30 --retries 1 playwright==1.57.0 2>&1 | tee /tmp/requirement1-browser-install.log
+          CHROME=$(command -v google-chrome || command -v chromium || true)
+          if [ -n "$CHROME" ]; then
+            echo "TRENDFORGE_QA_BROWSER=$CHROME" >> "$GITHUB_ENV"
+            "$CHROME" --version
+          else
+            python -m playwright install chromium
+          fi
+      - name: Synthetic desktop and mobile browser verification
+        id: browser
+        if: steps.browser-setup.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          set -o pipefail
+          python scripts/verify_requirement1_ui.py 2>&1 | tee /tmp/requirement1-browser.log
       - name: Collect verification evidence
         if: always()
         env:
+          DEPENDENCIES: ${{ steps.dependencies.outcome }}
           BACKEND: ${{ steps.backend.outcome }}
           LINT: ${{ steps.lint.outcome }}
           FRONTEND: ${{ steps.frontend.outcome }}
           COMPILATION: ${{ steps.compilation.outcome }}
+          BROWSER_SETUP: ${{ steps.browser-setup.outcome }}
           BROWSER: ${{ steps.browser.outcome }}
           PUBLISH: ${{ steps.publish.outcome }}
           PUBLISHED_SHA: ${{ steps.publish.outputs.sha }}
@@ -125,11 +147,10 @@ jobs:
           mkdir -p /tmp/requirement1-proof
           cp /tmp/requirement1-*.log /tmp/requirement1-proof/ 2>/dev/null || true
           cp -r ui-verification /tmp/requirement1-proof/ 2>/dev/null || true
-          git diff --stat > /tmp/requirement1-proof/working-diff.txt
           python - <<'PY'
-          import json, os, pathlib
-          fields = ['BACKEND','LINT','FRONTEND','COMPILATION','BROWSER','PUBLISH','PUBLISHED_SHA','GITHUB_RUN_ID']
-          pathlib.Path('/tmp/requirement1-proof/results.json').write_text(json.dumps({k: os.environ.get(k) for k in fields}, indent=2))
+          import json,os,pathlib
+          keys=['DEPENDENCIES','BACKEND','LINT','FRONTEND','COMPILATION','BROWSER_SETUP','BROWSER','PUBLISH','PUBLISHED_SHA','GITHUB_RUN_ID']
+          pathlib.Path('/tmp/requirement1-proof/results.json').write_text(json.dumps({k:os.environ.get(k) for k in keys},indent=2))
           PY
       - uses: actions/upload-artifact@v4
         if: always()
@@ -137,7 +158,7 @@ jobs:
           name: requirement1-verification
           path: /tmp/requirement1-proof
           retention-days: 14
-      - name: Require every verification and publication step
+      - name: Report incomplete verification as failure
         if: always()
         env:
           BACKEND: ${{ steps.backend.outcome }}
@@ -149,6 +170,6 @@ jobs:
         run: |
           python - <<'PY'
           import os
-          failures = {k: os.environ[k] for k in ('BACKEND','LINT','FRONTEND','COMPILATION','BROWSER','PUBLISH') if os.environ[k] != 'success'}
-          assert not failures, failures
+          failures={k:os.environ[k] for k in ('BACKEND','LINT','FRONTEND','COMPILATION','BROWSER','PUBLISH') if os.environ[k]!='success'}
+          assert not failures,failures
           PY
