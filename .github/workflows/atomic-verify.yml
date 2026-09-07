@@ -17,7 +17,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
-      - name: Apply reviewed patch after checksum and path checks
+      - name: Apply reviewed patches after checksum and path checks
         run: |
           test "$GITHUB_REF" = refs/heads/fix/atomic-research-snapshot
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
@@ -36,6 +36,14 @@ jobs:
           pathlib.Path('/tmp/atomic-paths.txt').write_text('\n'.join(paths))
           subprocess.run(['git','apply','--check','--unidiff-zero',str(path)], check=True)
           subprocess.run(['git','apply','--unidiff-zero',str(path)], check=True)
+          fixes = lzma.decompress(base64.b64decode(pathlib.Path('.github/review/atomic-verification-fixes.txt').read_text().strip(), validate=True))
+          assert hashlib.sha256(fixes).hexdigest() == '27cd24608c958b6a8b630b573497d82e740fab000c47430695d603273986ec2d'
+          fix_path = pathlib.Path('/tmp/atomic-verification-fixes.patch')
+          fix_path.write_bytes(fixes)
+          fix_stats = subprocess.check_output(['git','apply','--numstat',str(fix_path)]).decode().splitlines()
+          assert {line.split('\t',2)[2] for line in fix_stats}.issubset(paths)
+          subprocess.run(['git','apply','--check','--unidiff-zero',str(fix_path)], check=True)
+          subprocess.run(['git','apply','--unidiff-zero',str(fix_path)], check=True)
           PY
       - uses: actions/setup-python@v5
         with:
@@ -109,7 +117,7 @@ jobs:
           paths = pathlib.Path('/tmp/atomic-paths.txt').read_text().splitlines()
           subprocess.run(['git','add','--',*paths], check=True)
           PY
-          git rm .github/review/atomic-change-1.txt .github/review/atomic-change-2.txt .github/review/atomic-change-3.txt .github/workflows/atomic-review-workspace.yml .github/workflows/atomic-verify.yml
+          git rm .github/review/atomic-change-1.txt .github/review/atomic-change-2.txt .github/review/atomic-change-3.txt .github/review/atomic-verification-fixes.txt .github/workflows/atomic-review-workspace.yml .github/workflows/atomic-verify.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git diff --cached --check
