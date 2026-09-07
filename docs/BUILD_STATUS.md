@@ -1,3 +1,20 @@
+<!-- CURRENT_STATE_HISTORY_BOUNDARY: requirement-1 -->
+> **Current code/readiness summary (reviewed 2026-09-07): [CURRENT_STATE.md](CURRENT_STATE.md).**
+> This file retains dated technical notes and historical observations below.
+> Older phrases such as "current", "not implemented", "next" or "passed" describe
+> their recorded checkpoint, not today's code, database, freshness or permissions.
+> File A remains plan authority. Historical counts never grant runtime activation.
+
+## 2026-09-07 - Requirement 1: current state versus history
+
+Added the current-state summary, separate UI provenance axes and isolated saved
+S8 history viewer. R5 v2 is accepted by the existing display adapter. Missing S7/S8
+responses clear old panels; failures, original snapshot times and UNKNOWN statuses
+remain visible. No backend gate, model approval, migration or execution change.
+Observed commands and limitations: [REQUIREMENT_1_VERIFICATION.md](REQUIREMENT_1_VERIFICATION.md).
+
+## Historical checkpoints (preserved)
+
 ## 2026-09-02 - CROSS-004 / TDG-GAP-014 named strategy-source contracts
 
 `selection/profile_source_contracts.py` now owns one canonical, read-only

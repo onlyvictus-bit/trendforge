@@ -1,3 +1,12 @@
+<!-- CURRENT_STATE_HISTORY_BOUNDARY: requirement-1 -->
+> **Current code/readiness summary (reviewed 2026-09-07): [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md).**
+> This file retains dated technical notes and historical observations below.
+> Older phrases such as "current", "not implemented", "next" or "passed" describe
+> their recorded checkpoint, not today's code, database, freshness or permissions.
+> File A remains plan authority. Historical counts never grant runtime activation.
+
+<!-- HISTORICAL_CHECKPOINTS_START: original content preserved below -->
+
 # Gates: S4 structure pack + S5 shortlist enrichment + S6 family resolution
 
 OWNS: backend/trendforge_api/selection/s4_structure_pack.py, backend/trendforge_api/selection/s5_shortlist_enrichment.py, backend/trendforge_api/selection/s6_family_resolution.py, backend/tests/test_s4_structure_pack.py, backend/tests/test_s5_shortlist_enrichment.py, backend/tests/test_s6_family_resolution.py, backend/trendforge_api/main.py (S4/S5/S6 route additions only), frontend/s4-structure.js, frontend/s5-enrichment.js, frontend/s6-resolution.js, frontend/index.html (mount additions), frontend/styles.css (additions), frontend/selection-live-adapter.js (fetch additions), frontend/product-fixture.js (tag paint additions), frontend/tests/acceptance-check.js (check additions)

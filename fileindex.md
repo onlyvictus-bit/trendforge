@@ -1,3 +1,12 @@
+<!-- CURRENT_STATE_HISTORY_BOUNDARY: requirement-1 -->
+> **Current code/readiness summary (reviewed 2026-09-07): [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md).**
+> This file retains dated technical notes and historical observations below.
+> Older phrases such as "current", "not implemented", "next" or "passed" describe
+> their recorded checkpoint, not today's code, database, freshness or permissions.
+> File A remains plan authority. Historical counts never grant runtime activation.
+
+<!-- HISTORICAL_CHECKPOINTS_START: original content preserved below -->
+
 ## Price-band + technical-zones build plan (2026-09-04, PLAN only)
 
 - Plan: `docs/fable/remaining_build/PRICE_BAND_TECHNICAL_ZONES_BUILD_PLAN_2026-09-04.md`

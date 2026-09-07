@@ -53,14 +53,14 @@ const checks = [
   ["R18 model governance stays locked and read-only", () => {
     const r18 = read(files.r18Model);
     assertIncludes(html, 'id="r18ModelGovernancePanel"', "HTML");
-    assertIncludes(html, "r18-model-governance.js?v=20260901-r18-1", "HTML");
+    assertIncludes(html, "r18-model-governance.js?v=20260907-provenance-1", "HTML");
     assertIncludes(r18, "/api/research/ml/governance", "R18JS");
     assertIncludes(r18, "MODEL_NOT_APPROVED", "R18JS");
     assertIncludes(r18, "Probability: HIDDEN", "R18JS");
     assert(!/placeorder|place_order|winRateVisible\s*:\s*true/i.test(r18), "R18 UI must not trade or expose win rate");
   }],
   ["S7 state panel exists", () => assertIncludes(html, "s7StatePanel", "HTML")],
-  ["S7 state script mounted with cache-bust", () => assertIncludes(html, "s7-state.js?v=20260903-tradability-1", "HTML")],
+  ["S7 state script mounted with cache-bust", () => assertIncludes(html, "s7-state.js?v=20260907-provenance-1", "HTML")],
   ["Guidance OMS panel + arm switch mounted default-off", () => {
     assertIncludes(html, 'id="guidanceOmsPanel"', "HTML");
     assertIncludes(html, 'id="guidanceOmsList"', "HTML");
@@ -104,7 +104,7 @@ const checks = [
     assert(!/tradability.*confidence|win probability/i.test(s7), "tradability must not be confidence/probability");
   }],
   ["S8 history panel exists", () => assertIncludes(html, "s8HistoryPanel", "HTML")],
-  ["S8 script mounted with cache-bust", () => assertIncludes(html, "s8-persist.js?v=20260825-s8-1", "HTML")],
+  ["S8 script mounted with cache-bust", () => assertIncludes(html, "s8-persist.js?v=20260907-provenance-1", "HTML")],
   ["S8 latest route referenced by adapter", () => {
     const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
     assertIncludes(adapter, "/api/v1/selection/scans/latest", "ADAPTER");
@@ -147,7 +147,7 @@ const checks = [
   }],
   ["R16 PIT validation panel exists", () => assertIncludes(html, "s9PitHomeworkPanel", "HTML")],
   ["R16 PIT owner and compatibility shim mounted in order", () => {
-    const r16Index = html.indexOf("r16-pit-validation.js?v=20260828-r16-2");
+    const r16Index = html.indexOf("r16-pit-validation.js?v=20260907-provenance-1");
     const shimIndex = html.indexOf("s9-pit-homework.js?v=20260828-r16-compat-1");
     const adapterIndex = html.indexOf("selection-live-adapter.js");
     assert(r16Index >= 0 && shimIndex > r16Index && adapterIndex > shimIndex,
