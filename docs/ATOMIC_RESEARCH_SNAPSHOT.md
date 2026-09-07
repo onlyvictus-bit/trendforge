@@ -63,8 +63,19 @@ Local isolated checkout (Python 3.13.5 / Node 22):
 - `git diff --check`: passed.
 - Local Chromium: navigation blocked by environment policy (`ERR_BLOCKED_BY_ADMINISTRATOR`); not claimed passed.
 
-Pinned Python 3.14 full regression, Ruff and hosted desktop/mobile browser checks
-are pending observation. Repository-wide mypy debt is not claimed fixed by this
-requirement. Acceptance results will be recorded with their exact CI revision.
+Hosted verification is now observed for application revision
+`fdfafdd3601f2366741a4b217cf33edc00dde599`: full backend regression, Ruff,
+frontend regression and synthetic desktop/mobile browser checks passed.
+CI run `34149674933` still reports a failed, non-blocking type-check job;
+repository-wide typing errors are not claimed fixed.
+
+The browser report from run `34149674928` recorded two selection snapshot
+requests (initial load plus one refresh), zero legacy selection requests, and
+zero page errors. Other independent contextual tools still make their own
+requests; this is not a claim that the entire page makes only one request.
+
+See [ATOMIC_SNAPSHOT_VERIFICATION.md](ATOMIC_SNAPSHOT_VERIFICATION.md) for the
+dated evidence and remaining boundaries. Earlier pending notes in BUILD_STATUS
+and VALIDATION describe the pre-CI checkpoint and are superseded by this record.
 No real broker, live source freshness, production database or live order was
-validated by the synthetic fixtures.
+validated by the synthetic fixtures. PR #2 is unmerged; main is unchanged.
