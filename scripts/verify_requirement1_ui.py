@@ -94,9 +94,24 @@ def main() -> None:
             assert page.locator("#confirmedModeChip").inner_text() == "CONFIRMED STATUS UNAVAILABLE"
             page.screenshot(path=str(OUTPUT / "stale-snapshot.png"), full_page=True)
             page.set_viewport_size({"width": 390, "height": 844})
+            layout = page.evaluate("""() => ({
+                width: document.documentElement.scrollWidth,
+                viewport: innerWidth,
+                controlsBottom: document.querySelector('.top-row').getBoundingClientRect().bottom,
+                metricsTop: document.querySelector('.ops-metrics').getBoundingClientRect().top,
+                historyHeight: document.getElementById('historySnapshot').getBoundingClientRect().height,
+                drawerHidden: getComputedStyle(document.getElementById('inventoryDrawer')).display === 'none'
+            })""")
+            assert layout["width"] <= layout["viewport"], layout
+            assert layout["metricsTop"] >= layout["controlsBottom"], layout
+            assert layout["historyHeight"] < 844, layout
+            assert layout["drawerHidden"], layout
             page.screenshot(path=str(OUTPUT / "mobile-history.png"), full_page=True)
             browser.close()
-            (OUTPUT / "browser-report.json").write_text(json.dumps({"pageErrors": errors, "requestCount": len(requests), "source": "SYNTHETIC_ONLY"}, indent=2))
+            (OUTPUT / "browser-report.json").write_text(json.dumps({
+                "pageErrors": errors, "requestCount": len(requests),
+                "mobileLayout": layout, "source": "SYNTHETIC_ONLY"
+            }, indent=2))
             assert not errors, errors
     finally:
         server.shutdown()

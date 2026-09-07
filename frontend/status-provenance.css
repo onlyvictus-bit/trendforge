@@ -10,10 +10,24 @@
 .status-table-wrap table { width: 100%; border-collapse: collapse; }
 .status-table-wrap th, .status-table-wrap td { padding: 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line, #475569); }
 .status-table-wrap td { overflow-wrap: anywhere; }
-#historySnapshot { padding: 14px; }
+#historySnapshot { padding: 14px; min-height: 0; }
 #historySnapshot p { margin: 10px 0; overflow-wrap: anywhere; }
 #historySnapshot pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .history-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 14px; }
 .history-controls select { max-width: 100%; min-height: 38px; }
 .snapshot-request-status { padding: 10px; border: 1px dashed currentColor; margin: 8px; font-weight: 600; }
 @media (max-width: 600px) { .status-provenance dl { grid-template-columns: 1fr; } }
+
+/* Closed inventory glass must not extend the visible document. */
+.final-shell .inventory-drawer[aria-hidden="true"] { display: none; }
+@media (max-width: 760px) {
+  .final-shell .top { position: relative; height: auto; min-height: 0; padding: 12px; }
+  .final-shell .top-row { height: auto; flex-direction: column; align-items: stretch; }
+  .final-shell .header-right { width: 100%; align-items: stretch; }
+  .final-shell .header-controls { flex-wrap: wrap; justify-content: flex-start; overflow: visible; white-space: normal; }
+  .final-shell .ops-metrics { height: auto; grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-columns: auto; overflow: visible; margin: 12px 0; }
+  .final-shell .ops-alert-row { height: auto; grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .final-shell .newer-data { min-width: 0; overflow-wrap: anywhere; }
+  .final-shell .lightning { min-width: 0; }
+  .final-shell .notice { flex-wrap: wrap; align-items: flex-start; }
+}
