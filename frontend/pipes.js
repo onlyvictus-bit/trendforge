@@ -55,7 +55,8 @@
         )
         .join("") +
       '<div class="pl-copy">Pipes &mdash; guidance lens, zero claims.</div>';
-    defs.forEach((d) => void loadRun(d.pipeId));
+    if (!window.TrendForgeResearchSnapshot) defs.forEach((d) => void loadRun(d.pipeId));
+    else ops.querySelectorAll('.pl-runbox').forEach(box => { box.textContent = 'WAIT_SNAPSHOT_PIPE'; });
   }
 
   async function loadRun(pipeId) {
@@ -116,6 +117,7 @@
   };
 
   function bind() {
+    if (window.TrendForgeResearchSnapshot) return;
     if (!$("pipeLabPanel")) return;
     void load();
     window.addEventListener("trendforge:selection-ready", () => {

@@ -172,6 +172,8 @@
   function renderRooms(weather) {
     latestPayload = weather;
     window.TrendForgeS2WeatherPayload = weather;
+    const host = document.getElementById('toolContent');
+    if (host) delete host.dataset.s2Room;
     window.dispatchEvent(new CustomEvent("trendforge:s2-weather-ready", { detail: { contract: CONTRACT } }));
     paintOpenRoom();
   }
@@ -182,6 +184,7 @@
   }
 
   async function load() {
+    if (window.TrendForgeResearchSnapshot) return null;
     const generation = ++requestGeneration;
     try {
       const weather = await fetchOptionalJson("/api/v1/selection/market-weather");
@@ -199,7 +202,20 @@
     }
   }
 
-  window.TrendForgeS2MarketWeather = { contract: CONTRACT, load };
+  window.TrendForgeS2MarketWeather = { contract: CONTRACT, load, apply(payload) {
+    if (!payload) {
+      latestPayload = null;
+      window.TrendForgeS2WeatherPayload = null;
+      const host = document.getElementById('toolContent');
+      if (host?.dataset.s2Room) {
+        delete host.dataset.s2Room;
+        host.replaceChildren(el('p', 's2-wait-copy', 'WAIT_SNAPSHOT_WEATHER'));
+      }
+      renderWait('WAIT_SNAPSHOT_WEATHER');
+      return;
+    }
+    renderStrip(payload); renderRooms(payload);
+  } };
 
   void load();
   const refresh = document.getElementById("previewRefresh");

@@ -46,6 +46,7 @@ from .r14_live import build_r14_ca_join, persist_r14_ca_join
 from .r3_live import build_r3_resolution, persist_r3_resolution
 from .r4_live import build_r4_identity_pin, persist_r4_identity_pin
 from .r5_live import build_r5_structure_batch, persist_r5_structure_batch
+from .r2b_live import build_r2b_named_activation, persist_r2b_named_activation
 from .r16_service import run_incremental as run_r16_incremental
 from .r16_store import r16_schema_status
 from .s8_service import build_and_persist_current_s8
@@ -59,7 +60,7 @@ from .use_matrix_c0 import (
 
 
 PIPELINE_CONTRACT = "trendforge.cashPostCommit.v1"
-PIPELINE_VERSION = "a1-c1-r1-r2-r3-r4-r14-r5-s8-r16-orchestrator-9"
+PIPELINE_VERSION = "a1-c1-r1-r2-r3-r4-r14-r5-r2b-s8-r16-orchestrator-10"
 CASH_SOURCE = "nse_bhavcopy_eod"
 BAN_SOURCE = "nse_fno_ban"
 MWPL_SOURCE = "nse_mwpl_percentages"
@@ -558,6 +559,29 @@ def run_existing_cash_pipeline(context: CashPipelineRunContext) -> CashPipelineE
                 )
             )
 
+    # Persist the existing named-source observation on the WRITE path, not
+    # from the browser's GET. No permission is inferred from pipeline success.
+    activation_ready = False
+    try:
+        activation = build_r2b_named_activation()
+        if (
+            activation.r1_bundle_hash != r1_bundle.bundle_hash
+            or activation.r2_run_hash != r2_order.run_hash
+            or activation.permission_fingerprint != permission_fp
+        ):
+            raise ValueError("WAIT_R2B_POST_COMMIT_LINEAGE")
+        activation = persist_r2b_named_activation(activation)
+        activation_ready = activation.source_activation_ready
+        stages.append(CashPipelineStage(
+            stage_id="R2-B", state="COMPLETED", output_id=activation.run_id,
+            detail="Existing named-source proof assessed and recorded; no execution authority.",
+        ))
+    except Exception as exc:
+        stages.append(CashPipelineStage(
+            stage_id="R2-B", state="BLOCKED",
+            detail=f"WAIT_R2B_POST_COMMIT:{type(exc).__name__}",
+        ))
+
     s8_run_id = None
     if r5_structure is None:
         stages.append(
@@ -573,6 +597,7 @@ def run_existing_cash_pipeline(context: CashPipelineRunContext) -> CashPipelineE
                 r5_batch=r5_structure,
                 discovery=discovery,
                 attention=r2_order,
+                activation_ready=activation_ready,
                 built_at=context.observed_at,
             )
             s8_run_id = s8.run_id

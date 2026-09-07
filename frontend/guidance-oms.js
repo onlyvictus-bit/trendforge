@@ -51,6 +51,16 @@
       list.textContent = `Guidance OMS failed: ${error.message}`;
       return;
     }
+    apply(batch);
+  }
+
+  function apply(batch) {
+    const list = $("guidanceOmsList");
+    if (!list) return;
+    if (!batch) {
+      list.textContent = 'Guidance unavailable for this snapshot. No retained ticket is current.';
+      return;
+    }
     const rows = (batch.rows || []).filter(
       (row) =>
         row.publicState === "CONFIRMED" ||
@@ -133,13 +143,15 @@
     });
   }
 
+  window.TrendForgeGuidanceOMS = {apply};
+
   function bind() {
     const panel = $("guidanceOmsPanel");
     if (!panel) return;
-    void render();
-    window.addEventListener("trendforge:selection-ready", () => {
+    if (!window.TrendForgeResearchSnapshot) {
       void render();
-    });
+      window.addEventListener("trendforge:selection-ready", () => { void render(); });
+    }
     panel.addEventListener("click", (event) => {
       const target = event.target.closest("button");
       if (!target) return;

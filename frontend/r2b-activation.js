@@ -18,6 +18,12 @@
     const counts = $("r2bActivationCounts");
     const meta = $("r2bActivationMeta");
     if (!list) return;
+    if (!batch) {
+      list.textContent = 'ACTIVATION STATUS UNAVAILABLE for this snapshot.';
+      if (counts) counts.textContent = 'UNKNOWN';
+      if (meta) meta.textContent = 'No activation inferred from a missing response.';
+      return;
+    }
     if (counts) {
       counts.textContent =
         `named ${batch.namedSourceCount} · authorized ${batch.authorizedCount} · ` +
@@ -60,7 +66,10 @@
     }
   }
 
+  window.TrendForgeR2BActivation = {apply: render};
+
   function bind() {
+    if (window.TrendForgeResearchSnapshot) return;
     if (!$("r2bActivationPanel")) return;
     void load();
     window.addEventListener("trendforge:selection-ready", () => {

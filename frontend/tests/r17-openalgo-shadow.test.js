@@ -11,7 +11,7 @@ const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "u
 assert(index.includes('id="openAlgoShadowPanel"'), "Live Ops must contain the R17 shadow panel");
 assert(index.indexOf("openalgo-shadow.js") < index.indexOf("selection-live-adapter.js"),
   "R17 renderer must load before the live adapter");
-assert(adapter.includes("/api/v1/integrations/openalgo/shadow"),
+assert(adapter.includes("openalgoShadow"),
   "live adapter must load the read-only R17 endpoint");
 
 const nodes = new Map([

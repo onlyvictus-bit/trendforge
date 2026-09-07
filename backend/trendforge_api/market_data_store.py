@@ -15,6 +15,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .read_snapshot import borrow_connection
+
 
 STORE_MIGRATION_VERSION = "0020_market_data_69_store"
 MANIFEST_SCHEMA_VERSION = "trendforge.marketDataManifest.v1"
@@ -198,6 +200,9 @@ class MarketDataStore:
         self.objects_root = self.root / "objects"
 
     def _connect(self) -> sqlite3.Connection:
+        borrowed = borrow_connection(self.db_path)
+        if borrowed is not None:
+            return borrowed
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         connection = sqlite3.connect(self.db_path, timeout=10)
         connection.row_factory = sqlite3.Row
@@ -208,6 +213,8 @@ class MarketDataStore:
         return connection
 
     def initialize_schema(self) -> None:
+        if borrow_connection(self.db_path) is not None:
+            return  # Existing schema only; snapshot reads never run migrations.
         self.root.mkdir(parents=True, exist_ok=True)
         self.objects_root.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:

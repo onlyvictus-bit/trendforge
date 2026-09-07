@@ -24,7 +24,7 @@
     const missing = lineage.missingStages || [];
 
     panel.innerHTML = `
-      <strong>Latest saved research snapshot - not a live quote</strong>
+      <strong>${batch.persisted === false ? 'Current research projection - NOT saved; use History for persisted runs' : 'Latest saved research snapshot - not a live quote'}</strong>
       <div class="s8-meta">
         runId: ${escapeHtml(batch.runId || "")} ·
         asOf: ${escapeHtml(batch.asOf || "")} ·

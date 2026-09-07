@@ -34,6 +34,9 @@
     text('snapshotMode', labels[mode]);
     text('runtimeSelectionMode', mode === 'SNAPSHOT' ? 'STORED SNAPSHOT' : mode);
     text('snapshotRunId', a?.runId || 'NONE');
+    text('snapshotBundleId', snapshot?.snapshotId || 'NONE');
+    text('snapshotCapturedAt', stamp(snapshot?.capturedAt));
+    text('snapshotEvaluatedAt', stamp(snapshot?.evaluatedAt));
     text('snapshotAsOf', stamp(snapshot?.structure?.decisionAt || a?.builtAt));
     text('snapshotReceivedAt', receivedAt || 'NOT RECEIVED');
     text('sourceActivationStatus', 'Activation: ' + activation);

@@ -4,6 +4,7 @@
   const CONTRACT = "trendforge.evidence-radar.v1";
   let requestGeneration = 0;
   let currentHorizon = "ALL";
+  let snapshotPayload = null;
 
   async function fetchOptionalJson(path) {
     const response = await fetch(path, { cache: "no-store", headers: { Accept: "application/json" } });
@@ -144,6 +145,10 @@
   }
 
   async function load() {
+    if (window.TrendForgeResearchSnapshot) {
+      if (snapshotPayload) render(snapshotPayload);
+      return snapshotPayload;
+    }
     const generation = ++requestGeneration;
     try {
       const query = currentHorizon === "ALL" ? "" : `?horizon=${currentHorizon}`;
@@ -162,7 +167,7 @@
     }
   }
 
-  window.TrendForgeEvidenceRadar = { contract: CONTRACT, load };
+  window.TrendForgeEvidenceRadar = { contract: CONTRACT, load, apply(payload) { snapshotPayload = payload; if (!payload) { renderWait('WAIT_SNAPSHOT_RADAR'); return; } render(payload); } };
 
   void load();
   const refresh = document.getElementById("previewRefresh");

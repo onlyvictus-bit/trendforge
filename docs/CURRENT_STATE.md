@@ -1,10 +1,27 @@
 # Current code and readiness snapshot
 
-**Reviewed:** 2026-09-07. **Code baseline:** `e2d501b793c6f329d91c65399255dace5b9acc8a`, plus requirement 1's presentation changes.
+**Reviewed:** 2026-09-07. **Code baseline:** `e2d501b793c6f329d91c65399255dace5b9acc8a`, plus the current/history presentation changes and the atomic-snapshot stage.
 **Role:** current navigation and evidence summary, not a new plan, source registry,
 activation authority, or production certification. File A retains build order,
 public-state definitions and acceptance ceilings. Read this page before dated
 entries in BUILD_STATUS, VALIDATION, architecture notes or remaining-build guides.
+
+## Current refresh contract
+
+The primary refresh uses one **atomic research snapshot** endpoint with 26
+panel payloads (the original 22 plus dependent weather/radar/top-10/comparison
+rooms). It is a single SQLite view, not a guarantee of live prices or a
+historical backtest cutoff. All current gates share the response capture time;
+original R1/R2/R5 timestamps remain visible separately. Mismatched core lineage
+fails closed, and absent optional panels carry explicit reasons.
+
+The response's S8 object is an unpersisted projection. Existing post-commit and
+explicit persistence paths still own saved history. The named-source R2-B
+observation write occurs on the post-commit path so refreshing a screen cannot
+write a ledger. Trading rules, source-proof requirements and execution controls
+are not replaced by this transport contract. See
+[ATOMIC_RESEARCH_SNAPSHOT.md](ATOMIC_RESEARCH_SNAPSHOT.md) for implementation and
+verification. Unrelated legacy typing and individual-route defects remain open.
 
 ## Eight independent questions
 

@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .read_snapshot import borrow_connection
+
 from .models import (
     CommandBar,
     DataTrust,
@@ -67,6 +69,9 @@ def _lastrowid(cursor: sqlite3.Cursor) -> int:
 
 
 def connect() -> sqlite3.Connection:
+    borrowed = borrow_connection(DB_PATH)
+    if borrowed is not None:
+        return borrowed
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
@@ -2162,6 +2167,8 @@ def _initialize_db() -> None:
 
 
 def init_db() -> None:
+    if borrow_connection(DB_PATH) is not None:
+        return  # A read-only request must never initialize or migrate storage.
     db_key = DB_PATH.expanduser().resolve()
     with _INIT_LOCK:
         if db_key in _INITIALIZED_DB_PATHS and db_key.exists():

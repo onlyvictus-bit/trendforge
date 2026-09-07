@@ -3,13 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 import asyncio
 import os
+import sqlite3
 from contextlib import asynccontextmanager, suppress
 from datetime import date, datetime, timezone
 from time import perf_counter
 from typing import Any, Literal
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -218,6 +219,8 @@ from .selection.s8_service import (
     build_and_persist_current_s8,
     latest_or_build_current_s8,
 )
+from .selection.snapshot_service import ResearchSnapshotV1, build_research_snapshot
+from .read_snapshot import SnapshotExpired
 from .selection.r16_service import (
     approval_payload as r16_approval_payload,
     legacy_gate_payload as r16_legacy_gate_payload,
@@ -1063,6 +1066,20 @@ def r1_inventory_source_evidence() -> InventorySourceBundleV1:
             },
         )
     return bundle
+
+
+@app.get("/api/v1/selection/snapshot", response_model=ResearchSnapshotV1, response_model_by_alias=True)
+def research_snapshot(response: Response) -> ResearchSnapshotV1:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        snapshot = build_research_snapshot(lane_factory=_data_lane_state)
+    except (ValueError, sqlite3.DatabaseError, SnapshotExpired) as exc:
+        code = str(exc) if isinstance(exc, (ValueError, SnapshotExpired)) else "WAIT_RESEARCH_SNAPSHOT_STORAGE"
+        if not code.startswith("WAIT_") or len(code) > 100:
+            code = "WAIT_RESEARCH_SNAPSHOT_INVALID"
+        raise HTTPException(status_code=503, detail={"code": code}, headers={"Cache-Control": "no-store"}) from exc
+    response.headers["X-Research-Snapshot-ID"] = snapshot.snapshot_id
+    return snapshot
 
 
 @app.get(

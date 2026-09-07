@@ -4,6 +4,6 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test": "node tests/q5-contract.test.js && node tests/acceptance-check.js && node tests/selection-live-adapter.test.js && node tests/r17-openalgo-shadow.test.js && node tests/s3-cheap-discovery.test.js && node tests/inventory-workbench.test.js && node tests/status-provenance.test.js && node tests/scan-history.test.js && node tests/selection-provenance-integration.test.js && node tests/current-state-docs.test.js && node tests/readiness-fallback.test.js"
+    "test": "node tests/q5-contract.test.js && node tests/acceptance-check.js && node tests/selection-live-adapter.test.js && node tests/r17-openalgo-shadow.test.js && node tests/s3-cheap-discovery.test.js && node tests/inventory-workbench.test.js && node tests/status-provenance.test.js && node tests/scan-history.test.js && node tests/selection-provenance-integration.test.js && node tests/current-state-docs.test.js && node tests/readiness-fallback.test.js && node tests/atomic-snapshot.test.js"
   }
 }

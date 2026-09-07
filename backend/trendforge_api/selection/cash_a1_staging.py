@@ -65,7 +65,7 @@ def default_market_data_store() -> MarketDataStore:
     root = _project_root()
     return MarketDataStore(
         root=root / "data" / "market_data",
-        db_path=root / "data" / "trendforge_research.db",
+        db_path=storage.DB_PATH,
     )
 
 

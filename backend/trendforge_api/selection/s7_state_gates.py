@@ -335,6 +335,7 @@ def build_s7_state(
     activation_ready: bool | None = None,
     lane: Any = None,
     tradability: TradabilityBatchV1 | None = None,
+    allow_enrichment_fallback: bool = True,
 ) -> S7StateBatchV1:
     """Assemble hash-matched R5→S4→S5→S6 and project the public states.
 
@@ -347,7 +348,8 @@ def build_s7_state(
     pack = s4 if s4 is not None else build_s4_structure_pack(r5=batch5)
     s5_batch = s5 if s5 is not None else None
     try:
-        s5_batch = s5_batch or build_s5_enrichment(s4=pack)
+        if s5_batch is None and allow_enrichment_fallback:
+            s5_batch = build_s5_enrichment(s4=pack)
     except ValueError:
         s5_batch = None
 

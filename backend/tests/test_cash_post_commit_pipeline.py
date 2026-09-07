@@ -358,7 +358,7 @@ def test_real_executor_reuses_existing_a1_c1_stages_on_normalized_last_good(
 
     assert [stage.stage_id for stage in execution.stages] == [
         "A1", "A2", "A3", "A4", "A5", "A6", "C0", "B", "C1",
-        "R1", "R2", "R3", "R4", "R14", "R5", "S8", "R16",
+        "R1", "R2", "R3", "R4", "R14", "R5", "R2-B", "S8", "R16",
     ]
     assert execution.permission_fingerprint == "permission-fixture"
     assert execution.rank_batch_id
@@ -368,6 +368,11 @@ def test_real_executor_reuses_existing_a1_c1_stages_on_normalized_last_good(
     assert execution.r4_pin_id
     assert execution.r14_join_id
     assert execution.r5_structure_id
+    from trendforge_api.selection.r2b_live import latest_r2b_named_activation
+    activation = latest_r2b_named_activation()
+    assert activation is not None
+    assert activation.r2_run_id == execution.r2_order_id
+    assert activation.can_unlock_confirmed is False
     assert execution.s8_run_id
     assert execution.r16_dataset_run_id is None
     assert execution.stages[-1].state == "BLOCKED"

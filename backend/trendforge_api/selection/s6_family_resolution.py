@@ -277,6 +277,7 @@ def build_s6_resolution(
     bound_to_shortlist: bool = True,
     native_claims: Any = (),
     built_at: datetime | None = None,
+    allow_enrichment_fallback: bool = True,
 ) -> S6ResolutionBatchV1:
     """Resolve S4+S5-era claims per family using the canonical resolver.
 
@@ -360,7 +361,9 @@ def build_s6_resolution(
         dict(adapter.suppressions_by_symbol) if adapter is not None else {}
     )
 
-    s5_notes = _s5_notes(s5 if s5 is not None else _try_build_s5(pack))
+    s5_notes = _s5_notes(
+        s5 if s5 is not None or not allow_enrichment_fallback else _try_build_s5(pack)
+    )
     now = built_at or batch5.decision_at
     shortlist = (
         set(shortlist_symbols(pack)) if bound_to_shortlist else None

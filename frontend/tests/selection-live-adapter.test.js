@@ -4,6 +4,7 @@ const path = require("path");
 const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
+const {snapshotFixture} = require("./snapshot-fixture.js");
 const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
 const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
@@ -15,11 +16,11 @@ const appIndex = index.indexOf("app.js");
 assert(fixtureIndex >= 0 && adapterIndex > fixtureIndex && appIndex > adapterIndex,
   "product renderer, R1/R2 adapter and legacy app must load in ownership order");
 
-assert(adapter.includes("/api/v1/selection/attention"), "adapter must load persisted R2 attention");
-assert(adapter.includes("/api/v1/selection/evidence"), "adapter must load persisted R1 evidence");
-assert(adapter.includes("/api/v1/selection/structure"), "adapter must optionally load persisted R5 structure");
-assert(adapter.includes("/api/v1/selection/identity-pin"), "adapter must optionally load persisted R4 identity pin");
-assert(adapter.includes("/api/v1/selection/cheap-discovery/watch?limit=50"), "adapter must optionally load S3 watch queue");
+assert(adapter.includes("attention"), "adapter must load persisted R2 attention");
+assert(adapter.includes("evidence"), "adapter must load persisted R1 evidence");
+assert(adapter.includes("structure"), "adapter must optionally load persisted R5 structure");
+assert(adapter.includes("identityPin"), "adapter must optionally load persisted R4 identity pin");
+assert(adapter.includes("s3Watch"), "adapter must optionally load S3 watch queue");
 assert(!adapter.includes("/api/radar"), "adapter must not use the legacy radar");
 assert(!adapter.includes("/api/v1/selection/live"), "adapter must not use the legacy live projection");
 assert(fixture.includes("trendforge.inventory-source-bundle.v1"), "renderer must validate the R1 schema");
@@ -69,6 +70,7 @@ async function executeAdapter(responses) {
     clearTimeout
   };
   vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(root, "research-snapshot.js"), "utf8"), sandbox);
   vm.runInContext(adapter, sandbox);
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
@@ -76,55 +78,26 @@ async function executeAdapter(responses) {
 }
 
 (async () => {
-  const attention = {
-    schemaVersion: "trendforge.inventory-discovery.v1",
-    runId: "r2-1",
-    rows: [{ symbol: "TATASTEEL", publicState: "WATCH" }]
-  };
-  const evidence = {
-    schemaVersion: "trendforge.inventory-source-bundle.v1",
-    bundleId: "r1-1",
-    stockRecords: []
-  };
+  const core = snapshotFixture({withStructure: false});
   const success = await executeAdapter({
-    "/api/v1/selection/attention": { ok: true, status: 200, payload: attention },
-    "/api/v1/selection/evidence": { ok: true, status: 200, payload: evidence },
-    "/api/v1/selection/structure": { ok: false, status: 503, payload: { detail: { code: "R5_STRUCTURE_NOT_READY" } } },
-    "/api/v1/selection/identity-pin": { ok: false, status: 503, payload: { detail: { code: "R4_IDENTITY_PIN_NOT_READY" } } }
+    '/api/v1/selection/snapshot': {ok: true, status: 200, payload: core}
   });
-  assert.strictEqual(success.applied.attention, attention);
-  assert.strictEqual(success.applied.evidence, evidence);
+  assert.strictEqual(success.applied.attention, core.panels.attention);
+  assert.strictEqual(success.applied.evidence, core.panels.evidence);
   assert.strictEqual(success.applied.structure, null);
-
-  const structure = {
-    schemaVersion: "trendforge.structure-batch.v1",
-    runId: "r5-1",
-    waitCount: 1,
-    rejectCount: 0,
-    rows: [{ symbol: "TATASTEEL", structureState: "WAIT", whyWait: ["WAIT_INDEX_CONTEXT_MISSING"] }]
-  };
+  const complete = snapshotFixture();
   const withR5 = await executeAdapter({
-    "/api/v1/selection/attention": { ok: true, status: 200, payload: attention },
-    "/api/v1/selection/evidence": { ok: true, status: 200, payload: evidence },
-    "/api/v1/selection/structure": { ok: true, status: 200, payload: structure },
-    "/api/v1/selection/identity-pin": { ok: false, status: 503, payload: { detail: { code: "R4_IDENTITY_PIN_NOT_READY" } } }
+    '/api/v1/selection/snapshot': {ok: true, status: 200, payload: complete}
   });
-  assert.strictEqual(withR5.applied.structure, structure);
-  assert(success.events.some((event) => event.type === "trendforge:selection-ready"));
-  assert.strictEqual(success.body.dataset.selectionMode, undefined);
-
+  assert.strictEqual(withR5.applied.structure, complete.panels.structure);
+  assert(success.events.some(event => event.type === 'trendforge:selection-ready'));
+  assert.strictEqual(success.body.dataset.researchSnapshotId, core.snapshotId);
   const failure = await executeAdapter({
-    "/api/v1/selection/attention": { ok: false, status: 503, payload: { detail: { code: "R2_NOT_AVAILABLE" } } },
-    "/api/v1/selection/evidence": { ok: false, status: 503, payload: { detail: { code: "R1_NOT_AVAILABLE" } } },
-    "/api/v1/selection/structure": { ok: false, status: 503, payload: { detail: { code: "R5_STRUCTURE_NOT_READY" } } },
-    "/api/v1/selection/identity-pin": { ok: false, status: 503, payload: { detail: { code: "R4_IDENTITY_PIN_NOT_READY" } } }
+    '/api/v1/selection/snapshot': {ok: false, status: 503, payload: {detail: {code: 'R2_NOT_AVAILABLE'}}}
   });
   assert.strictEqual(failure.applied, null);
-  assert.strictEqual(failure.body.dataset.selectionMode, "FIXTURE_FALLBACK");
-  assert(failure.statuses[0].includes("R2_NOT_AVAILABLE"));
-  assert(failure.events.some((event) => event.type === "trendforge:selection-error"));
-  console.log("R1/R2 exclusive live adapter checks passed.");
-})().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+  assert.strictEqual(failure.body.dataset.selectionMode, 'FIXTURE_FALLBACK');
+  assert(failure.statuses[0].includes('R2_NOT_AVAILABLE'));
+  assert(failure.events.some(event => event.type === 'trendforge:selection-error'));
+  console.log('Atomic adapter preserves R1/R2 ownership, optional R5 and fail-closed fallback.');
+})().catch(error => {console.error(error); process.exitCode = 1;});
