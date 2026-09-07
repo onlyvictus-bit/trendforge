@@ -2,6 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "trendforge.s4s5.view";
+  let currentBatch = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -110,6 +111,7 @@
   }
 
   async function load() {
+    if (window.TrendForgeResearchSnapshot) return;
     const list = $("s4s5CompareList");
     if (!list) return;
     try {
@@ -131,6 +133,18 @@
     }
   }
 
+  window.TrendForgeS4S5Compare = {apply(batch) {
+    currentBatch = batch;
+    if (batch) render(batch);
+    else {
+      const list = $("s4s5CompareList");
+      if (list) list.textContent = 'WAIT_SNAPSHOT_COMPARE';
+      for (const id of ['s4s5CompareCounts', 's4s5CompareMeta', 's4s5FormulaStrip']) {
+        const element = $(id); if (element) element.textContent = '';
+      }
+    }
+  }};
+
   function bind() {
     const withBox = $("s4s5With");
     if (!withBox) return;
@@ -143,7 +157,11 @@
     applyView(stored);
     const onChange = (event) => {
       applyView(viewFromEvent(event.target.id));
-      void load();
+      if (window.TrendForgeResearchSnapshot) {
+        if (currentBatch) render(currentBatch);
+      } else {
+        void load();
+      }
     };
     withBox.addEventListener("change", onChange);
     $("s4s5Without").addEventListener("change", onChange);

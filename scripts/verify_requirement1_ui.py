@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import subprocess
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -26,13 +27,9 @@ def main() -> None:
     threading.Thread(target=server.serve_forever, daemon=True).start()
     requests: list[tuple[str, str]] = []
     fail_core = False
-    attention = {
-        "schemaVersion": "trendforge.inventory-discovery.v1", "runId": "r2-current",
-        "runHash": "current", "r1BundleHash": "evidence", "universeCount": 1,
-        "builtAt": "2026-09-04T12:00:00Z", "tradingDate": "2026-09-04",
-        "rows": [{"symbol": "ABC", "publicState": "WATCH", "freshness": "CURRENT",
-                  "evidenceDirection": "BULLISH", "attentionBand": "WATCH", "attentionPriority": 0.4}]
-    }
+    envelope = json.loads(subprocess.check_output([
+        "node", "-e", "process.stdout.write(JSON.stringify(require('./frontend/tests/snapshot-fixture.js').snapshotFixture()))"
+    ], cwd=ROOT))
     history = {
         "schemaVersion": "trendforge.s8-scan.v1", "runId": "s8-old",
         "asOf": "2026-09-01T10:00:00Z", "builtAt": "2026-09-01T11:00:00Z",
@@ -41,10 +38,7 @@ def main() -> None:
         "lineage": {"r2RunHash": "old"}
     }
     responses = {
-        "/api/v1/selection/attention": attention,
-        "/api/v1/selection/evidence": {"schemaVersion": "trendforge.inventory-source-bundle.v1", "bundleId": "r1", "bundleHash": "evidence", "sourceRecords": [], "stockRecords": []},
-        "/api/v1/selection/structure": {"schemaVersion": "trendforge.structure-batch.v2", "runHash": "r5", "decisionAt": "2026-09-04T10:00:00Z", "rows": [], "waitCount": 1, "rejectCount": 0},
-        "/api/v1/selection/s7-state": {"r2RunHash": "current", "rows": [], "sourceActivationReady": False},
+        "/api/v1/selection/snapshot": envelope,
         "/api/v1/selection/scans?limit=100": {"runs": [{"runId": "s8-old", "asOf": history["asOf"]}]},
         "/api/v1/selection/scans/s8-old": history
     }
@@ -54,7 +48,7 @@ def main() -> None:
         url = request.url.split(str(server.server_port), 1)[-1]
         requests.append((request.method, url))
         payload = responses.get(url)
-        if fail_core and url.endswith(("/attention", "/evidence")):
+        if fail_core and url == "/api/v1/selection/snapshot":
             payload = None
         route.fulfill(status=200 if payload is not None else 503,
                       content_type="application/json",
@@ -70,10 +64,28 @@ def main() -> None:
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.route("**/api/**", respond)
             page.goto(f"http://127.0.0.1:{server.server_port}/", wait_until="networkidle")
+            # Preserve bootstrap evidence even if the readiness assertion fails.
+            (OUTPUT / "initial-diagnostics.json").write_text(json.dumps({
+                "pageErrors": errors, "requests": requests,
+                "mode": page.locator("#snapshotMode").inner_text(),
+                "failures": page.locator("#snapshotFailures").inner_text(),
+                "source": "SYNTHETIC_ONLY",
+            }, indent=2))
+            page.screenshot(path=str(OUTPUT / "initial-snapshot.png"), full_page=True)
             page.wait_for_function("document.getElementById('snapshotMode').textContent.includes('STORED RESEARCH SNAPSHOT')")
             assert page.locator("#headerRowCount").inner_text() == "1"
             assert page.locator("#snapshotAsOf").inner_text() == "2026-09-04T10:00:00Z"
             assert page.locator("#researchDate").is_disabled()
+            assert page.locator("#snapshotBundleId").inner_text() == envelope["snapshotId"]
+            assert "NOT saved" in page.locator("#s8HistoryPanel").inner_text()
+            forbidden = {"/api/v1/selection/attention", "/api/v1/selection/evidence",
+                         "/api/v1/selection/structure", "/api/v1/selection/s7-state",
+                         "/api/v1/selection/named-activation", "/api/v1/selection/scans/latest",
+                         "/api/v1/scanners/native-core", "/api/v1/scanners/lab-bundle",
+                         "/api/v1/selection/market-weather", "/api/v1/selection/top10",
+                         "/api/v1/selection/evidence-radar"}
+            assert sum(url == "/api/v1/selection/snapshot" for _, url in requests) == 1, requests
+            assert not any(url in forbidden for _, url in requests), requests
             assert "PIT STATUS UNKNOWN" in page.locator("#q5ValidationLock").inner_text()
             assert page.locator(".lightning > strong").inner_text() == "Fixture examples"
             assert "UNKNOWN" in page.locator("#r18ModelGovernancePanel").inner_text()
@@ -83,7 +95,7 @@ def main() -> None:
             before = len(requests)
             page.locator("#historyRunSelect").select_option("s8-old")
             page.wait_for_function("document.getElementById('historySnapshot').textContent.includes('HISTORICAL SNAPSHOT - NOT CURRENT')")
-            assert page.locator("#snapshotRunId").inner_text() == "r2-current"
+            assert page.locator("#snapshotRunId").inner_text() == envelope["panels"]["attention"]["runId"]
             assert page.locator("#historySnapshot").inner_text().find("OLD") >= 0
             assert all(method == "GET" for method, _ in requests[before:])
             page.screenshot(path=str(OUTPUT / "saved-history.png"), full_page=True)
@@ -92,6 +104,8 @@ def main() -> None:
             assert page.locator("#snapshotMode").inner_text().startswith("STALE")
             assert page.locator("#snapshotAsOf").inner_text() == "2026-09-04T10:00:00Z"
             assert page.locator("#confirmedModeChip").inner_text() == "CONFIRMED STATUS UNAVAILABLE"
+            assert sum(url == "/api/v1/selection/snapshot" for _, url in requests) == 2, requests
+            assert not any(url in forbidden for _, url in requests), requests
             page.screenshot(path=str(OUTPUT / "stale-snapshot.png"), full_page=True)
             page.set_viewport_size({"width": 390, "height": 844})
             layout = page.evaluate("""() => ({
@@ -110,7 +124,9 @@ def main() -> None:
             browser.close()
             (OUTPUT / "browser-report.json").write_text(json.dumps({
                 "pageErrors": errors, "requestCount": len(requests),
-                "mobileLayout": layout, "source": "SYNTHETIC_ONLY"
+                "mobileLayout": layout, "source": "SYNTHETIC_ONLY",
+                "snapshotRequests": sum(url == "/api/v1/selection/snapshot" for _, url in requests),
+                "legacySelectionRequests": [url for _, url in requests if url in forbidden]
             }, indent=2))
             assert not errors, errors
     finally:

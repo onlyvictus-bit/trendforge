@@ -87,7 +87,7 @@ const checks = [
   }],
   ["S7 route referenced by live adapter", () => {
     const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
-    assertIncludes(adapter, "/api/v1/selection/s7-state", "ADAPTER");
+    assertIncludes(adapter, "s7State", "ADAPTER");
   }],
   ["S7 script exposes contract and never assigns CONFIRMED", () => {
     const s7 = fs.readFileSync(files.s7, "utf8");
@@ -107,7 +107,7 @@ const checks = [
   ["S8 script mounted with cache-bust", () => assertIncludes(html, "s8-persist.js?v=20260907-provenance-1", "HTML")],
   ["S8 latest route referenced by adapter", () => {
     const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
-    assertIncludes(adapter, "/api/v1/selection/scans/latest", "ADAPTER");
+    assertIncludes(adapter, "s8Latest", "ADAPTER");
   }],
   ["S8 script exposes contract, never CONFIRMED or winRate", () => {
     const s8 = fs.readFileSync(files.s8, "utf8");
@@ -130,8 +130,8 @@ const checks = [
   }],
   ["adapter fetches data-lane and research-quantity", () => {
     const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
-    assertIncludes(adapter, "/api/v1/settings/data-lane", "ADAPTER");
-    assertIncludes(adapter, "/api/v1/selection/research-quantity", "ADAPTER");
+    assertIncludes(adapter, "dataLane", "ADAPTER");
+    assertIncludes(adapter, "researchQty", "ADAPTER");
     assertIncludes(adapter, "TrendForgeDataLane", "ADAPTER");
     assertIncludes(adapter, "TrendForgeResearchQty", "ADAPTER");
   }],
@@ -155,8 +155,8 @@ const checks = [
   }],
   ["R16 read-only routes referenced by adapter", () => {
     const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
-    assertIncludes(adapter, "/api/v1/selection/pit/status", "ADAPTER");
-    assertIncludes(adapter, "/api/v1/selection/pit/metrics", "ADAPTER");
+    assertIncludes(adapter, "r16Status", "ADAPTER");
+    assertIncludes(adapter, "r16Metrics", "ADAPTER");
     assert(!adapter.includes("/api/v1/selection/pit/observations"), "initial adapter load must not fetch observations");
     assertIncludes(adapter, "TrendForgeR16PitValidation", "ADAPTER");
     const r16 = fs.readFileSync(files.r16Pit, "utf8");
@@ -430,8 +430,8 @@ const checks = [
   }],
   ["Hybrid V2 adapter wiring stays optional", () => {
     const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
-    assertIncludes(adapter, "/api/v1/hybrid-v2/overlay?limit=40", "selection-live-adapter.js");
-    assertIncludes(adapter, "/api/v1/selection/ca-join", "selection-live-adapter.js");
+    assertIncludes(adapter, "overlay", "selection-live-adapter.js");
+    assertIncludes(adapter, "caJoin", "selection-live-adapter.js");
     assertIncludes(adapter, "applyHybridOverlay", "selection-live-adapter.js");
   }],
   ["R8 native core panel + script mounted", () => {
@@ -445,13 +445,13 @@ const checks = [
     assertIncludes(nc, "not an order", "native-core.js copy");
     assert(!nc.includes("place_order"), "native-core.js must never reference an order path");
     const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
-    assertIncludes(adapter, "/api/v1/scanners/native-core", "selection-live-adapter.js");
+    assertIncludes(adapter, "nativeCore", "selection-live-adapter.js");
     assertIncludes(adapter, "TrendForgeNativeCore", "selection-live-adapter.js");
   }],
   ["R8 adapter fetch count matches renderer names", () => {
     const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
-    const fetches = (adapter.match(/fetch(Optional)?Json\("\/api/g) || []).length;
-    assert(fetches >= 17, `adapter should fetch at least 17 live sources, found ${fetches}`);
+    const fetches = (adapter.match(/await fetchJson\(/g) || []).length;
+    assert(fetches === 1, `adapter must fetch one atomic snapshot, found ${fetches}`);
   }],
   ["R10 pipe recipes panel + script mounted", () => {
     assertIncludes(html, 'id="pipeLabPanel"', "HTML");
@@ -464,7 +464,7 @@ const checks = [
     assertIncludes(pipes, "zero claims", "pipes.js copy");
     assert(!pipes.includes("place_order"), "pipes.js must never reference an order path");
     const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
-    assertIncludes(adapter, "/api/v1/pipes/definitions", "selection-live-adapter.js");
+    assertIncludes(adapter, "pipeDefs", "selection-live-adapter.js");
   }],
   ["R11 MCX master panel live, not fixture gold", () => {
     assertIncludes(html, 'id="mcxMasterPanel"', "HTML");
@@ -477,7 +477,7 @@ const checks = [
     assertIncludes(mm, 'data-mode="mcx"', "mcx-master.js segment binding");
     assert(!mm.includes("place_order"), "mcx-master.js must never reference an order path");
     const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
-    assertIncludes(adapter, "/api/v1/selection/mcx-master", "selection-live-adapter.js");
+    assertIncludes(adapter, "mcxMaster", "selection-live-adapter.js");
   }],
   ["R15 Scanner Lab inside inspector, no radar inflation", () => {
     assertIncludes(html, 'id="scannerLabPanel"', "HTML");
@@ -562,7 +562,7 @@ const checks = [
     const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "utf8");
     assertIncludes(html, 'id="s3WatchQueue"', "HTML");
     assertIncludes(html, 'id="s3WatchQueueOps"', "HTML");
-    assertIncludes(adapter, "/api/v1/selection/cheap-discovery/watch?limit=50", "selection-live-adapter.js");
+    assertIncludes(adapter, "s3Watch", "selection-live-adapter.js");
     assertIncludes(s3, "WATCH_QUEUE_READY", "s3-cheap-discovery.js");
     assert(!s3.includes("winProbability") && !s3.includes("deliveryPct"), "S3 must not show probability or delivery");
   }],
@@ -578,7 +578,7 @@ const checks = [
     assertIncludes(s4, "LIVE_S4_WAIT_REJECT_ONLY", "s4-structure.js");
     assertIncludes(s4, "labels are not trade geometry", "s4-structure.js");
     assert(!/\bCONFIRMED\b/.test(s4.replace(/confirmedCount/g, "").replace(/Confirmed/g, "")), "S4 must not present CONFIRMED as a live state");
-    assertIncludes(adapter, "/api/v1/selection/s4-structure", "selection-live-adapter.js");
+    assertIncludes(adapter, "s4Pack", "selection-live-adapter.js");
     assertIncludes(adapter, "TrendForgeS4Structure.apply", "selection-live-adapter.js");
   }],
   ["All Stocks paints S4 tags + next trigger without trade geometry", () => {
@@ -600,15 +600,13 @@ const checks = [
     assertIncludes(s5, "LIVE_S5_ENRICH_WAIT_ONLY", "s5-enrichment.js");
     assertIncludes(s5, "MARKET_WIDE_NOT_PER_STOCK", "s5-enrichment.js");
     assert(!s5.includes("fiiBought"), "S5 must never show per-stock FII buying");
-    const fetchNames = [...adapter.matchAll(/(?:fetchJson|fetchOptionalJson)\("([^"]+)"/g)].length;
-    const [allBlock] = [...adapter.matchAll(/const \[([^\]]+)\] = await Promise\.all\(\[([^\]]*)\]\);/g)];
-    assert(allBlock, "adapter Promise.all block must exist");
-    const names = allBlock[1].split(",").map((s) => s.trim()).filter(Boolean);
-    const fetches = allBlock[2].split("fetchOptionalJson").length + allBlock[2].split("fetchJson").length - 2;
-    assert(names.length === fetches && names.length >= 10, `adapter name count must equal fetch count (got ${names.length}/${fetches})`);
-    assertIncludes(adapter, "/api/v1/selection/s5-enrichment", "selection-live-adapter.js");
+    const protocol = require('../research-snapshot.js');
+    assert(protocol.PANEL_KEYS.includes('s5Enrich'), 'atomic envelope must retain S5');
+    assertIncludes(adapter, '/api/v1/selection/snapshot', 'ADAPTER');
+    assert(!adapter.includes('Promise.all'), 'selection must not scatter latest reads');
+    assertIncludes(adapter, "s5Enrich", "selection-live-adapter.js");
     assertIncludes(adapter, "TrendForgeS5Enrichment.apply", "selection-live-adapter.js");
-    assert(fetchNames >= 10, "adapter must keep all live fetches");
+    assert(protocol.PANEL_KEYS.length >= 22, "snapshot retains every previous panel");
   }],
   ["S6 family resolution inspector mount exists", () => {
     assertIncludes(html, 'id="s6InspectorMount"', "HTML");
@@ -623,12 +621,11 @@ const checks = [
     assertIncludes(s6, "not win probability", "s6-resolution.js");
     assertIncludes(s6, "never a buy stamp", "s6-resolution.js");
     assert(!/\bCONFIRMED\b/.test(s6.replace(/canUnlockConfirmed/g, "").replace(/Confirmed/g, "")), "S6 must not present CONFIRMED as a live state");
-    assertIncludes(adapter, "/api/v1/selection/s6-resolution", "selection-live-adapter.js");
+    assertIncludes(adapter, "s6Resolve", "selection-live-adapter.js");
     assertIncludes(adapter, "TrendForgeS6Resolution.apply", "selection-live-adapter.js");
-    const [allBlock] = [...adapter.matchAll(/const \[([^\]]+)\] = await Promise\.all\(\[([^\]]*)\]\);/g)];
-    const names = allBlock[1].split(",").map((s) => s.trim()).filter(Boolean);
-    const fetches = allBlock[2].split("fetchOptionalJson").length + allBlock[2].split("fetchJson").length - 2;
-    assert(names.length === fetches && names.length >= 10, `adapter name count must equal fetch count (got ${names.length}/${fetches})`);
+    assertIncludes(adapter, 'TrendForgeResearchSnapshot.validate(raw)', 'ADAPTER');
+    assert(adapter.indexOf('validate(raw)') < adapter.indexOf('const count = renderer.applyLiveSelection'),
+      'all panel relationships must validate before the first renderer changes the page');
   }],
   ["OI fixture click reloads the live owner", () => {
     const fixture = fs.readFileSync(path.join(root, "product-fixture.js"), "utf8");

@@ -131,6 +131,7 @@
   };
 
   window.addEventListener("trendforge:selection-ready", () => {
+    if (window.TrendForgeResearchSnapshot) return;
     void (async () => {
       try {
         const response = await fetch("/api/v1/hybrid-v2/overlay?limit=40", {

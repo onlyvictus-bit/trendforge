@@ -120,7 +120,7 @@
   }
 
   function viewDefinitions() {
-    const natives = state.nativeCore?.definitions || [];
+    const natives = state.nativeCore?.definitions || state.bundle?.nativeDefinitions || [];
     const pipes = state.pipeDefs?.definitions || [];
     const natRows = natives
       .map(
@@ -281,13 +281,20 @@
 
   function apply(parts) {
     if (!parts) return;
-    if (parts.nativeCore) state.nativeCore = parts.nativeCore;
-    if (parts.pipeDefs) state.pipeDefs = parts.pipeDefs;
-    if (parts.bundle) state.bundle = parts.bundle;
+    if (window.TrendForgeResearchSnapshot) {
+      state.nativeCore = parts.nativeCore || null;
+      state.pipeDefs = parts.pipeDefs || null;
+      state.bundle = parts.bundle || null;
+    } else {
+      if (parts.nativeCore) state.nativeCore = parts.nativeCore;
+      if (parts.pipeDefs) state.pipeDefs = parts.pipeDefs;
+      if (parts.bundle) state.bundle = parts.bundle;
+    }
     render();
   }
 
   async function refresh() {
+    if (window.TrendForgeResearchSnapshot) return window.TrendForgeSelectionAdapter?.load();
     try {
       const response = await fetch(BUNDLE_ENDPOINT, { cache: "no-store" });
       if (!response.ok) {
@@ -317,7 +324,7 @@
     if (!$("scannerLabPanel")) return;
     watchInspectorTabs();
     bindRunButton();
-    void refresh();
+    if (!window.TrendForgeResearchSnapshot) void refresh();
   }
 
   if (document.readyState === "loading") {

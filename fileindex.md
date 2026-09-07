@@ -5,6 +5,16 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## Atomic snapshot ownership (2026-09-07)
+
+`backend/trendforge_api/read_snapshot.py` owns the request-scoped read transaction;
+`selection/snapshot_service.py` owns the single read-only response;
+`selection/s8_service.py` owns shared one-time stage assembly;
+`frontend/research-snapshot.js` validates the contract before the existing
+renderers receive it. The post-commit pipeline owns R2-B ledger observations and
+S8 persistence. See [the contract](docs/ATOMIC_RESEARCH_SNAPSHOT.md). This is not
+another strategy, state resolver, source registry, or execution owner.
+
 <!-- HISTORICAL_CHECKPOINTS_START: original content preserved below -->
 
 ## Price-band + technical-zones build plan (2026-09-04, PLAN only)

@@ -84,6 +84,7 @@
   };
 
   function bind() {
+    if (window.TrendForgeResearchSnapshot) return;
     if (!$("mcxMasterPanel")) return;
     void load();
     window.addEventListener("trendforge:selection-ready", () => {

@@ -241,6 +241,10 @@ def build_macro_event_context_snapshot(
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
+    from .read_snapshot import borrow_connection
+    borrowed = borrow_connection(db_path)
+    if borrowed is not None:
+        return borrowed
     db_path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(db_path, timeout=10)
     connection.row_factory = sqlite3.Row
@@ -293,14 +297,19 @@ def save_macro_event_context_snapshot(
 def latest_macro_event_context_snapshot(
     db_path: Path = DEFAULT_DB,
 ) -> MacroEventContextSnapshot:
+    from .read_snapshot import borrow_connection
     with _connect(db_path) as connection:
-        _initialize(connection)
+        if borrow_connection(db_path) is None:
+            _initialize(connection)
+        exists = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='macro_event_context_runs'"
+        ).fetchone()
         row = connection.execute(
             """
             SELECT payload_json FROM macro_event_context_runs
             ORDER BY fetched_at DESC LIMIT 1
             """
-        ).fetchone()
+        ).fetchone() if exists else None
     if row is None:
         return MacroEventContextSnapshot(
             run_id="NO_SNAPSHOT",

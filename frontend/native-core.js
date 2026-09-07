@@ -87,6 +87,7 @@
   }
 
   function bind() {
+    if (window.TrendForgeResearchSnapshot) return;
     if (!$("nativeCorePanel")) return;
     void load();
     window.addEventListener("trendforge:selection-ready", () => {

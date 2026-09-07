@@ -12,8 +12,9 @@ const node = id => {
 let failCore = false;
 let failS7 = false;
 let mismatch = false;
-const a = {schemaVersion: 'trendforge.inventory-discovery.v1', runId: 'run-a', runHash: 'a',
-  builtAt: '2026-09-04T12:00:00Z', rows: []};
+const {snapshotFixture, unavailable} = require('./snapshot-fixture.js');
+const base = snapshotFixture();
+const a = base.panels.attention;
 const sandbox = {
   console, Date, Promise, setTimeout, clearTimeout,
   CustomEvent: function(type, init) {this.type = type; this.detail = init.detail;},
@@ -22,18 +23,16 @@ const sandbox = {
     applyLiveSelection() {return 0;}, setSelectionAdapterStatus() {}
   }},
   fetch: async url => {
-    if (failCore || (failS7 && url.endsWith('/s7-state'))) return {ok: false, status: 503, json: async () => ({detail: {code: 'WAIT_INPUT'}})};
-    let payload;
-    if (url.endsWith('/attention')) payload = a;
-    else if (url.endsWith('/evidence')) payload = {bundleHash: 'b'};
-    else if (url.endsWith('/s7-state')) payload = {r2RunHash: mismatch ? 'other' : 'a', rows: [], sourceActivationReady: false};
-    else if (url.endsWith('/scans/latest')) payload = {runId: 's8', asOf: a.builtAt, lineage: {r2RunHash: 'a'}, rows: []};
-    else return {ok: false, status: 503, json: async () => ({detail: {code: 'WAIT_OPTIONAL'}})};
+    assert.equal(url, '/api/v1/selection/snapshot');
+    if (failCore) return {ok: false, status: 503, json: async () => ({detail: {code: 'WAIT_INPUT'}})};
+    const payload = snapshotFixture();
+    if (failS7) { unavailable(payload, 's7State'); unavailable(payload, 's8Latest'); }
+    if (mismatch) payload.panels.s7State.r2RunHash = 'other';
     return {ok: true, json: async () => payload};
   }
 };
 vm.createContext(sandbox);
-for (const file of ['status-provenance.js', 's7-state.js', 's8-persist.js', 'r16-pit-validation.js', 'selection-live-adapter.js']) {
+for (const file of ['research-snapshot.js', 'status-provenance.js', 's7-state.js', 's8-persist.js', 'r16-pit-validation.js', 'selection-live-adapter.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), sandbox);
 }
 (async () => {
@@ -58,7 +57,7 @@ for (const file of ['status-provenance.js', 's7-state.js', 's8-persist.js', 'r16
   assert.equal(provenance.inspect().mode, 'STALE');
   assert(node('q5ValidationLock').textContent.includes('PIT STATUS UNKNOWN'));
   assert(node('s8HistoryPanel').innerHTML.includes('previous metadata cleared'));
-  assert.equal(node('snapshotAsOf').textContent, a.builtAt);
+  assert.equal(node('snapshotAsOf').textContent, base.panels.structure.decisionAt);
   failCore = false; mismatch = false;
   await adapter.load();
   assert.equal(provenance.inspect().mode, 'SNAPSHOT');

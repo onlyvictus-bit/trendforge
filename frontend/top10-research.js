@@ -104,6 +104,7 @@
   }
 
   async function load() {
+    if (window.TrendForgeResearchSnapshot) return null;
     const generation = ++requestGeneration;
     try {
       const board = await fetchOptionalJson("/api/v1/selection/top10");
@@ -121,7 +122,7 @@
     }
   }
 
-  window.TrendForgeTop10Research = { contract: CONTRACT, load };
+  window.TrendForgeTop10Research = { contract: CONTRACT, load, apply(payload) { if (!payload) { renderWait('WAIT_SNAPSHOT_TOP10'); return; } render(payload); } };
 
   void load();
   const refresh = document.getElementById("previewRefresh");

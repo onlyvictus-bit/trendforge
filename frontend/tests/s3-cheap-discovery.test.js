@@ -10,7 +10,7 @@ const adapter = fs.readFileSync(path.join(root, "selection-live-adapter.js"), "u
 
 assert(html.includes('id="s3WatchQueue"'), "All Stocks must mount the S3 queue");
 assert(html.includes('id="s3WatchQueueOps"'), "Live Ops must mount the S3 queue");
-assert(adapter.includes("/api/v1/selection/cheap-discovery/watch?limit=50"),
+assert(adapter.includes("s3Watch"),
   "selection adapter must load the bounded S3 watch projection");
 assert(!script.includes("deliveryPct"), "S3 UI must not display delivery");
 assert(!script.includes("winProbability"), "S3 UI must not display win probability");

@@ -5,6 +5,34 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-07 - Atomic research snapshot (next requirement)
+
+The selection refresh now reads `GET /api/v1/selection/snapshot` instead of
+22 independent latest endpoints. A request-scoped read-only SQLite transaction
+pins the existing research, canonical market-data and macro-context readers.
+R1/R2 and downstream identity/hash mismatches cannot be mixed. One S8-service
+assembly supplies core panels; pipes and quantities reuse its outputs. Four
+existing dependent context rooms also travel in the envelope, for 26 named
+panels with individual unavailable reasons, one response identity and checksum.
+
+The old selection-ready listeners no longer start independent latest reads in
+the main terminal. The browser validates the entire envelope before rendering
+and rejects late overlapping responses. Source decision time, captured database
+view time and current gate evaluation time are distinct. S8 projections returned
+by this GET are explicitly NOT saved; History remains a separate read-only view.
+
+The existing R2-B observation assessment is recorded on the cash post-commit
+WRITE path before S8, not by the new GET. It retains the same named-source proof
+rules and matching input checks. Missing or obsolete activation evidence is not
+promoted. No new source downloader, database, migration or broker authority.
+
+Observed local checks: 43 focused backend tests passed; full frontend command
+passed with 220/220 acceptance checks plus the existing/new Node suites; Python
+compilation and whitespace checks passed. Local Chromium navigation was blocked
+by the execution environment, not recorded as a browser pass. Pinned full-suite,
+lint and browser CI results must be recorded after observation.
+See [ATOMIC_RESEARCH_SNAPSHOT.md](ATOMIC_RESEARCH_SNAPSHOT.md) for the contract.
+
 ## 2026-09-07 - Requirement 1: current state versus history
 
 Added the current-state summary, separate UI provenance axes and isolated saved

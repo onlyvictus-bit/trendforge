@@ -16,7 +16,7 @@ def test_service_passes_real_s3_batch_to_s8(monkeypatch) -> None:
     captured = {}
     monkeypatch.setattr(s8_service, "build_s3_cheap_discovery", lambda **_: s3)
     monkeypatch.setattr(s8_service, "build_native_core_run", lambda **_: SimpleNamespace(run_hash="native"))
-    monkeypatch.setattr(s8_service, "build_s2_market_weather", lambda: SimpleNamespace())
+    monkeypatch.setattr(s8_service, "build_s2_market_weather", lambda **_: SimpleNamespace())
     monkeypatch.setattr(s8_service, "build_s4_structure_pack", lambda **_: SimpleNamespace())
     monkeypatch.setattr(s8_service, "build_s5_enrichment", lambda **_: None)
     monkeypatch.setattr(s8_service, "build_s6_resolution", lambda **_: SimpleNamespace())

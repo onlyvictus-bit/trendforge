@@ -7,18 +7,19 @@
     <link rel="stylesheet" href="./styles.css?v=20260814-exact1" />
     <link rel="stylesheet" href="./theme-final.css?v=20260823-oi2" />
     <link rel="stylesheet" href="./status-provenance.css?v=20260907-r1" />
-    <script src="./status-provenance.js?v=20260907-r1" defer></script>
+    <script src="./research-snapshot.js?v=20260907-atomic-1" defer></script>
+    <script src="./status-provenance.js?v=20260907-r1&amp;atomic=20260907-1" defer></script>
     <script src="./scan-history.js?v=20260907-r1" defer></script>
     <script src="./q5-contract.js?v=20260720-r6" defer></script>
     <script src="./product-fixture.js?v=20260907-provenance" defer></script>
     <script src="./s3-cheap-discovery.js?v=20260824-s3-1" defer></script>
 <script src="./s7-state.js?v=20260907-provenance-1" defer></script>
-<script src="./guidance-oms.js?v=20260825-goms-1" defer></script>
-<script src="./native-core.js?v=20260827-r13-guidance-1" defer></script>
-<script src="./pipes.js?v=20260826-r10-1" defer></script>
-<script src="./mcx-master.js?v=20260825-r11-1" defer></script>
-<script src="./scanner-lab.js?v=20260827-r13-guidance-1" defer></script>
-<script src="./s8-persist.js?v=20260907-provenance-1" defer></script>
+<script src="./guidance-oms.js?v=20260825-goms-1&amp;atomic=20260907-1" defer></script>
+<script src="./native-core.js?v=20260827-r13-guidance-1&amp;atomic=20260907-1" defer></script>
+<script src="./pipes.js?v=20260826-r10-1&amp;atomic=20260907-1" defer></script>
+<script src="./mcx-master.js?v=20260825-r11-1&amp;atomic=20260907-1" defer></script>
+<script src="./scanner-lab.js?v=20260827-r13-guidance-1&amp;atomic=20260907-1" defer></script>
+<script src="./s8-persist.js?v=20260907-provenance-1&amp;atomic=20260907-1" defer></script>
 <script src="./r16-pit-validation.js?v=20260907-provenance-1" defer></script>
 <script src="./r18-model-governance.js?v=20260907-provenance-1" defer></script>
 <script src="./s9-pit-homework.js?v=20260828-r16-compat-1" defer></script>
@@ -28,13 +29,13 @@
     <script src="./s4-structure.js?v=20260824-s4-1" defer></script>
     <script src="./s5-enrichment.js?v=20260824-s5-1" defer></script>
     <script src="./s6-resolution.js?v=20260824-s6-1" defer></script>
-    <script src="./selection-live-adapter.js?v=20260907-provenance" defer></script>
-    <script src="./s4s5-compare.js?v=20260821-s4s5-ab2" defer></script>
-  <script src="./hybrid-v2-overlay.js?v=20260822-hv2-overlay1" defer></script>
-  <script src="./r2b-activation.js?v=20260822-r2b1" defer></script>
-  <script src="./top10-research.js?v=20260822-r6-top10" defer></script>
-  <script src="./evidence-radar.js?v=20260822-radar1" defer></script>
-  <script src="./s2-market-weather.js?v=20260822-s2w1" defer></script>
+    <script src="./selection-live-adapter.js?v=20260907-provenance&amp;atomic=20260907-1" defer></script>
+    <script src="./s4s5-compare.js?v=20260821-s4s5-ab2&amp;atomic=20260907-1" defer></script>
+  <script src="./hybrid-v2-overlay.js?v=20260822-hv2-overlay1&amp;atomic=20260907-1" defer></script>
+  <script src="./r2b-activation.js?v=20260822-r2b1&amp;atomic=20260907-1" defer></script>
+  <script src="./top10-research.js?v=20260822-r6-top10&amp;atomic=20260907-1" defer></script>
+  <script src="./evidence-radar.js?v=20260822-radar1&amp;atomic=20260907-1" defer></script>
+  <script src="./s2-market-weather.js?v=20260822-s2w1&amp;atomic=20260907-1" defer></script>
   <script src="./m-factor-live.js?v=20260823-mf4" defer></script>
 <script src="./oi-options-live.js?v=20260823-oi3" defer></script>
     <script src="./app.js?v=20260814-exact1" defer></script>
@@ -91,7 +92,7 @@
 </nav><main class="main"><section id="statusProvenance" class="status-provenance" data-mode="FIXTURE" aria-label="Data provenance">
   <strong id="snapshotMode" role="status" aria-live="polite">FIXTURE PREVIEW - NOT MARKET EVIDENCE</strong>
   <small id="viewProvenance">Current selection and historical scans are separate views.</small>
-  <dl><dt>Selection run</dt><dd id="snapshotRunId">NONE</dd><dt>Decision as-of</dt><dd id="snapshotAsOf">UNKNOWN</dd><dt>Response received</dt><dd id="snapshotReceivedAt">NOT RECEIVED</dd><dt>Source freshness</dt><dd id="snapshotFreshness">UNKNOWN</dd></dl>
+  <dl><dt>Selection run</dt><dd id="snapshotRunId">NONE</dd><dt>Source decision as-of</dt><dd id="snapshotAsOf">UNKNOWN</dd><dt>Response received</dt><dd id="snapshotReceivedAt">NOT RECEIVED</dd><dt>Source freshness</dt><dd id="snapshotFreshness">UNKNOWN</dd><dt>Atomic snapshot ID</dt><dd id="snapshotBundleId">NONE</dd><dt>Database view captured</dt><dd id="snapshotCapturedAt">UNKNOWN</dd><dt>Current gates evaluated</dt><dd id="snapshotEvaluatedAt">UNKNOWN</dd></dl>
   <details><summary>Implementation, test evidence and runtime permissions</summary>
     <p>These are separate checks, not one completed/not-completed flag. Repository checkpoint: <code>docs/CURRENT_STATE.md</code>.</p>
     <div class="status-table-wrap"><table><thead><tr><th>Question</th><th>Observed status</th><th>Meaning and evidence</th></tr></thead><tbody id="capabilityStatusBody"></tbody></table></div>
