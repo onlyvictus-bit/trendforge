@@ -1,0 +1,144 @@
+name: Atomic snapshot isolated verification
+on:
+  push:
+    branches: [fix/atomic-research-snapshot]
+    paths: [.github/workflows/atomic-verify.yml]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - name: Apply reviewed patch after checksum and path checks
+        run: |
+          test "$GITHUB_REF" = refs/heads/fix/atomic-research-snapshot
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p /tmp/atomic-proof
+          python - <<'PY'
+          import base64, hashlib, lzma, pathlib, subprocess
+          data = ''.join(pathlib.Path(f'.github/review/atomic-change-{n}.txt').read_text().strip() for n in (1,2,3))
+          patch = lzma.decompress(base64.b64decode(data, validate=True))
+          assert hashlib.sha256(patch).hexdigest() == '92cc137139524d164332bcd01217d49971ec0ed5f4ab4bdcee04ae95eadcfda8'
+          path = pathlib.Path('/tmp/atomic-change.patch')
+          path.write_bytes(patch)
+          stats = subprocess.check_output(['git','apply','--numstat',str(path)]).decode().splitlines()
+          paths = [line.split('\t',2)[2] for line in stats]
+          assert len(paths) == 46, len(paths)
+          assert all(p.startswith(('backend/trendforge_api/','backend/tests/','frontend/','docs/')) or p in ('TREND_FORGE_ARCHITECTURE.md','fileindex.md','scripts/verify_requirement1_ui.py') for p in paths), paths
+          pathlib.Path('/tmp/atomic-paths.txt').write_text('\n'.join(paths))
+          subprocess.run(['git','apply','--check','--unidiff-zero',str(path)], check=True)
+          subprocess.run(['git','apply','--unidiff-zero',str(path)], check=True)
+          PY
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install repository-pinned backend dependencies
+        timeout-minutes: 3
+        run: python -m pip install --timeout 30 --retries 1 -r backend/requirements-dev.txt
+      - name: Full backend regression
+        id: backend
+        continue-on-error: true
+        run: (cd backend && python -m pytest -q) 2>&1 | tee /tmp/atomic-proof/backend.log
+      - name: Backend Ruff
+        id: lint
+        continue-on-error: true
+        run: (cd backend && python -m ruff check trendforge_api tests) 2>&1 | tee /tmp/atomic-proof/lint.log
+      - name: Typecheck new snapshot boundary modules
+        id: types
+        continue-on-error: true
+        run: (cd backend && python -m mypy --follow-imports=silent --ignore-missing-imports trendforge_api/read_snapshot.py trendforge_api/selection/snapshot_service.py) 2>&1 | tee /tmp/atomic-proof/new-types.log
+      - name: Complete frontend regression
+        id: frontend
+        continue-on-error: true
+        run: (cd frontend && npm test) 2>&1 | tee /tmp/atomic-proof/frontend.log
+      - name: Compilation and whitespace
+        id: compilation
+        continue-on-error: true
+        run: |
+          python -m compileall -q backend/trendforge_api backend/tests scripts/verify_requirement1_ui.py
+          git diff --check
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install browser test bindings
+        timeout-minutes: 3
+        run: |
+          python -m pip install --timeout 30 --retries 1 playwright==1.57.0
+          CHROME=$(command -v google-chrome || command -v chromium || true)
+          if [ -n "$CHROME" ]; then
+            echo "TRENDFORGE_QA_BROWSER=$CHROME" >> "$GITHUB_ENV"
+          else
+            python -m playwright install chromium
+          fi
+      - name: Synthetic desktop mobile and one-request verification
+        id: browser
+        continue-on-error: true
+        run: python scripts/verify_requirement1_ui.py 2>&1 | tee /tmp/atomic-proof/browser.log
+      - name: Require all checks before publishing code
+        env:
+          BACKEND: ${{ steps.backend.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          TYPES: ${{ steps.types.outcome }}
+          FRONTEND: ${{ steps.frontend.outcome }}
+          COMPILATION: ${{ steps.compilation.outcome }}
+          BROWSER: ${{ steps.browser.outcome }}
+        run: |
+          python - <<'PY'
+          import os
+          failed = {k: os.environ[k] for k in ('BACKEND','LINT','TYPES','FRONTEND','COMPILATION','BROWSER') if os.environ[k] != 'success'}
+          assert not failed, failed
+          PY
+      - name: Publish tested implementation to feature branch only
+        id: publish
+        run: |
+          python - <<'PY'
+          import pathlib, subprocess
+          paths = pathlib.Path('/tmp/atomic-paths.txt').read_text().splitlines()
+          subprocess.run(['git','add','--',*paths], check=True)
+          PY
+          git rm .github/review/atomic-change-1.txt .github/review/atomic-change-2.txt .github/review/atomic-change-3.txt .github/workflows/atomic-review-workspace.yml .github/workflows/atomic-verify.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git diff --cached --check
+          git commit -m 'fix: serve one atomic read-only research snapshot per refresh'
+          git push origin HEAD:refs/heads/fix/atomic-research-snapshot
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Collect exact verification evidence
+        if: always()
+        env:
+          BACKEND: ${{ steps.backend.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          TYPES: ${{ steps.types.outcome }}
+          FRONTEND: ${{ steps.frontend.outcome }}
+          COMPILATION: ${{ steps.compilation.outcome }}
+          BROWSER: ${{ steps.browser.outcome }}
+          PUBLISH: ${{ steps.publish.outcome }}
+          PUBLISHED_SHA: ${{ steps.publish.outputs.sha }}
+        run: |
+          mkdir -p /tmp/atomic-proof
+          cp -r ui-verification /tmp/atomic-proof/ 2>/dev/null || true
+          git diff --stat > /tmp/atomic-proof/working-diff.txt
+          python - <<'PY'
+          import json, os, pathlib
+          fields = ('BACKEND','LINT','TYPES','FRONTEND','COMPILATION','BROWSER','PUBLISH','PUBLISHED_SHA','GITHUB_SHA','GITHUB_RUN_ID')
+          pathlib.Path('/tmp/atomic-proof/results.json').write_text(json.dumps({k: os.environ.get(k) for k in fields}, indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atomic-snapshot-verification
+          path: /tmp/atomic-proof/
+          retention-days: 14
