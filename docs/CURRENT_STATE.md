@@ -1,6 +1,6 @@
 # Current code and readiness snapshot
 
-**Reviewed:** 2026-09-08. **Code baseline:** retention branch `fix/retention-evidence-safety`, layered on TF-01 `19a8c762314cdb7b54556c17c8ae5a46ad7325e8`.
+**Reviewed:** 2026-09-08. **Previous reviewed checkpoint preserved:** 2026-09-07. **Code baseline:** retention branch `fix/retention-evidence-safety`, layered on TF-01 `19a8c762314cdb7b54556c17c8ae5a46ad7325e8`.
 **Role:** current navigation and evidence summary, not a new plan, source registry,
 activation authority, or production certification. File A retains build order,
 public-state definitions and acceptance ceilings. Read this page before dated
