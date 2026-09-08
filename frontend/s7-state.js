@@ -84,7 +84,20 @@
   }
 
   function apply(batch) {
-    if (!batch) return;
+    if (!batch) {
+      for (const id of ["s7StatePanel", "s7StateOps"]) {
+        const stale = document.getElementById(id);
+        if (stale) stale.innerHTML = '<p role="status">S7 UNAVAILABLE - previous cards cleared. See refresh failures; no confirmation inferred.</p>';
+      }
+      const badge = document.getElementById("confirmedModeChip");
+      if (badge) {
+        badge.textContent = "CONFIRMED STATUS UNAVAILABLE";
+        badge.title = "No current S7 response; not an observed activation result";
+        badge.classList.remove("wait");
+        badge.classList.add("bad");
+      }
+      return;
+    }
     const panel = document.getElementById("s7StatePanel");
     if (panel) {
       const rows = batch.rows || [];

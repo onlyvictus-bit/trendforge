@@ -2,6 +2,11 @@
 
 ## Authority
 
+Read `docs/CURRENT_STATE.md` for the reviewed code/readiness summary before dated
+status logs. An old "current" heading is historical, not a runtime observation.
+Keep implementation, test evidence, observed data, freshness, research activation,
+PIT approval, model approval and execution permission separate.
+
 1. Read this file and File A (`docs/fable/new_merge_PLAN_2026-07-18.md`) before changing business logic. Before each milestone, also read the current `docs/BUILD_STATUS.md`, `docs/VALIDATION.md`, `docs/fable/remaining_build/README.md`, and then `docs/fable/remaining_build/REMAINING_PROJECT_BUILD_FILES.md` to locate the relevant code and tests. The remaining-project file map is a checklist/navigation aid only; it cannot change File A scope, sequence, IDs, or acceptance ceilings. Open `TREND_FORGE_ARCHITECTURE.md` for system boundaries, `TREND_FORGE_SOURCE_REGISTRY.md` for source meaning, and Hybrid detail only through File A Section 0.5/Section 25 pointers. Open `docs/fable/FINAL_MERGE_PLAN.md` for every milestone mapped to its `FMR-*` addendum, including all-stock research, discovery, PKScreener, derivatives, Gamma/GEX, strike intelligence, and trader-facing research workflows. The Final Merge plan is a mandatory product/design addendum, not a second build sequence; File A still controls scope, order, stable implementation IDs, states, ceilings, and acceptance. `present.md` is historical context, not the current build order.
 2. The preserved master plan hash is recorded in `README.md` and `docs/DECISIONS.md`.
 3. Later explicit final rules override earlier historical text.

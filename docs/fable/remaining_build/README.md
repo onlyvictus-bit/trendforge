@@ -1,3 +1,12 @@
+<!-- CURRENT_STATE_HISTORY_BOUNDARY: requirement-1 -->
+> **Current code/readiness summary (reviewed 2026-09-07): [../../CURRENT_STATE.md](../../CURRENT_STATE.md).**
+> This file retains dated technical notes and historical observations below.
+> Older phrases such as "current", "not implemented", "next" or "passed" describe
+> their recorded checkpoint, not today's code, database, freshness or permissions.
+> File A remains plan authority. Historical counts never grant runtime activation.
+
+<!-- HISTORICAL_CHECKPOINTS_START: original content preserved below -->
+
 ## 2026-09-04 - Build plan for the three blocked parts (price-band, R5, activation)
 
 No code changed. Start here before building:

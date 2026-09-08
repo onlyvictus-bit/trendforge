@@ -18,11 +18,13 @@
   }
 
   function fmt(value, digits = 2) {
-    return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : "UNAVAILABLE";
+    return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value))
+      ? Number(value).toFixed(digits) : "UNAVAILABLE";
   }
 
   function pct(value) {
-    return Number.isFinite(Number(value)) ? `${(Number(value) * 100).toFixed(1)}%` : "UNAVAILABLE";
+    return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value))
+      ? `${(Number(value) * 100).toFixed(1)}%` : "UNAVAILABLE";
   }
 
   function stateClass(value) {
@@ -75,7 +77,7 @@
 
     if (!status) {
       panel.innerHTML = '<div class="s9-wait">WAIT_R16_STATUS_UNAVAILABLE</div><p>The backend validation status could not be read.</p>';
-      lock.textContent = "PIT_NOT_APPROVED � R16 backend status unavailable � Not an order.";
+      lock.textContent = "PIT STATUS UNKNOWN - R16 backend status unavailable - Not an order.";
       return;
     }
 

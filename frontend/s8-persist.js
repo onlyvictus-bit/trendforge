@@ -13,13 +13,18 @@
   }
 
   function apply(batch) {
-    if (!batch) return;
+    if (!batch) {
+      const stale = document.getElementById("s8HistoryPanel");
+      if (stale) stale.innerHTML = '<p role="status">LATEST SAVED SCAN UNAVAILABLE - previous metadata cleared. Use History for saved runs.</p>';
+      return;
+    }
     const panel = document.getElementById("s8HistoryPanel");
     if (!panel) return;
     const lineage = batch.lineage || {};
     const missing = lineage.missingStages || [];
-    const rows = batch.rows || [];
+
     panel.innerHTML = `
+      <strong>Latest saved research snapshot - not a live quote</strong>
       <div class="s8-meta">
         runId: ${escapeHtml(batch.runId || "")} ·
         asOf: ${escapeHtml(batch.asOf || "")} ·
