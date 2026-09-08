@@ -1559,3 +1559,264 @@ When a future patch materially changes architecture, ownership, state meaning, s
 - never rewrite a past verification claim to make it look as though it was always true.
 
 This file is a navigation and reasoning authority for future implementation work, but runtime behavior remains the final authority.
+
+---
+
+## 26. Production-readiness execution checkpoint — TF-00 baseline and TF-01 entry gate
+
+**Recorded:** 2026-09-08  
+**Baseline branch:** `docs/trendforge-system-brain`  
+**Baseline commit under CI:** `9d72a409efccd6d50ba77131283acb198bea4b6a`  
+**PR CI run:** `34234433122`  
+
+This section is the starting verification checkpoint for using the TF roadmap to drive TrendForge toward production readiness. It does not declare the system production-ready, AGI-ready, profitable, execution-authorized or live-data-verified.
+
+### 26.1 TF-00 — Verified Production Baseline
+
+TF-00 exists to establish a truthful, reproducible starting point before any safety/architecture patch.
+
+The documentation/index change initially exposed a frontend contract requirement: `fileindex.md` needed to retain the explicit `CURRENT_STATE_HISTORY_BOUNDARY` marker. Commit `9d72a409efccd6d50ba77131283acb198bea4b6a` restored that boundary.
+
+At the time this checkpoint is written, the CI for that commit has **completed**. The earlier wording that backend/typecheck were still running is superseded by these final observed results:
+
+| Check | Final observed result |
+| --- | ---: |
+| Full backend tests | **1,512 passed** |
+| Backend warnings | **2 warnings** |
+| Ruff | **Passed** |
+| Frontend | **Passed** |
+| Mypy/type checking | **513 errors in 70 files; 266 source files checked** |
+
+The GitHub workflow is overall green because the typecheck job is intentionally non-blocking, but the Mypy result remains a real unresolved engineering baseline. Do not interpret a green workflow badge as proof that the codebase is production-ready.
+
+The error population spans parsers, market-data service/scheduler, intraday analysis, commodity code, R16/PIT code, tradability, scanners, selection/resolution code, source/profile contracts, UI-support modules and other areas. Some errors appear to be model-construction or annotation mismatches; others involve `None` handling, invalid attribute assumptions, incompatible states, numeric optionality and other conditions that may correspond to runtime risk.
+
+#### Known concrete baseline defect
+
+The CI still reports:
+
+```text
+trendforge_api/main.py:1795:
+"R5StructureBatchV1" has no attribute "built_at"
+```
+
+This independently confirms finding **A07** remains present at the TF-00 baseline.
+
+#### TF-00 error-classification policy
+
+Do **not** attempt to mechanically eliminate all 513 Mypy errors before architecture work. First classify them into:
+
+1. **RUNTIME_DANGEROUS**
+   - possible `None` dereference,
+   - wrong/nonexistent attribute,
+   - invalid numeric operation,
+   - wrong state/contract assumption,
+   - invalid scheduler/data-flow return type,
+   - anything that can change data, gate, publication or execution correctness.
+
+2. **CONTRACT_TYPE_MISMATCH**
+   - alias/model constructor mismatch,
+   - literal/enum narrowing issue,
+   - list/tuple variance or declared interface mismatch that needs review but is not automatically a runtime bug.
+
+3. **FIXTURE_TEST_ONLY**
+   - errors confined to fixture/test-support code that cannot enter production runtime.
+
+4. **LOW_RISK_TYPING_CLEANUP**
+   - annotation/style issues that do not affect runtime semantics after inspection.
+
+A Mypy error must not be classified from its error code alone; inspect the actual producer, consumer and runtime reachability.
+
+#### TF-00 completion gate
+
+TF-00 may be considered complete only when all of the following are recorded:
+
+- pinned/declared dependency environment reproduced,
+- exact tested revision recorded,
+- backend result recorded,
+- Ruff result recorded,
+- frontend result recorded,
+- full Mypy baseline recorded,
+- the 513 errors classified by risk/reachability,
+- P0 runtime defects that would make TF-01 testing unreliable are fixed or explicitly isolated,
+- remaining risk is documented.
+
+**Current TF-00 status:** **CI baseline captured; Mypy risk classification remains open.**
+
+Do not advance TF-01 into implementation/activation until TF-00's classification and P0-baseline gate are closed. Investigation and test design for TF-01 may proceed in parallel, but production claims may not.
+
+### 26.2 TF-01 — first runtime production-safety correction
+
+Once TF-00 is closed, the first code-level safety stage is:
+
+**TF-01 — Event clearance + mandatory gate semantics**
+
+This comes before discovery optimization, new indicators, ranking changes, additional data links or strategy activation because a qualification gate must mean what its name claims.
+
+The already reproduced dangerous semantic pattern is:
+
+```text
+Event-related pages successfully collected
+        |
+        v
+macro event state = RESEARCH_ONLY
+        |
+        v
+S7 interprets that state as event blackout clear
+        |
+        v
+other required gates pass
+        |
+        v
+S7 may produce CONFIRMED
+```
+
+The correct contract is:
+
+```text
+Sources downloaded
+        |
+        v
+Sources parsed
+        |
+        v
+Events mapped to the exact instrument/contract
+        |
+        v
+Determine whether each event applies to THIS strategy/profile
+        |
+        v
+Evaluate the relevant event window and source coverage
+        |
+        v
+EventClearanceResult = CLEAR | BLOCKED | UNKNOWN
+        |
+        v
+Only valid, unexpired CLEAR may satisfy the mandatory event gate
+```
+
+#### Practical example — INFY results event
+
+Dangerous interpretation:
+
+```text
+NSE announcement page downloaded successfully
+-> source system healthy
+-> treated as event-clear
+-> swing breakout passes the other gates
+-> CONFIRMED candidate may be produced at S7
+```
+
+But source availability is not instrument-specific semantic clearance.
+
+Correct behavior:
+
+```text
+Announcement page downloaded
+-> parser/mapping coverage is incomplete
+-> INFY event coverage is not proven complete
+-> EventClearanceResult = UNKNOWN
+-> the affected swing opportunity remains WAIT
+```
+
+This prevents the system from qualifying a stock immediately before a material result/event merely because the source website responded successfully.
+
+TF-01 must also repair the broader **mandatory-gate propagation** issue from finding A03: required upstream WAIT/UNKNOWN conditions must remain typed enforced conditions, not become explanatory strings that can be ignored by later classification.
+
+### 26.3 TF-01 required acceptance tests
+
+At minimum, TF-01 must adversarially prove:
+
+1. transport success + no semantic parsing -> `UNKNOWN`, never `CLEAR`,
+2. parsed source + incomplete coverage -> `UNKNOWN`,
+3. correct instrument mapping + relevant blocking event -> `BLOCKED`,
+4. complete applicable coverage + no blocking event -> `CLEAR`,
+5. expired `CLEAR` -> no longer passes until recalculated,
+6. event for another instrument cannot block/clear this opportunity,
+7. event relevant to one strategy does not automatically block unrelated strategies unless their evidence contract declares it,
+8. contradictory sources -> `UNKNOWN` or explicit conflict policy, never silent `CLEAR`,
+9. missing mandatory upstream gate cannot be converted to a reason string and then ignored,
+10. S7/S8 publication behavior remains fail-closed while TF-04 has not yet aligned their state contract,
+11. no change activates live orders.
+
+### 26.4 Production-readiness sequence from this checkpoint
+
+```text
+TF-00  Verified baseline
+   |
+   v
+TF-01  Event + mandatory gates
+   |
+   v
+TF-02  Tradability correctness
+   |
+   v
+TF-03  Live-order/pre-trade boundary
+   |
+   v
+TF-04  S7 <-> S8 state/publication contract
+   |
+   v
+TF-05  One canonical assembly path
+   |
+   v
+TF-06  Data timestamps + revisions
+   |
+   v
+TF-07  Instrument / contract identity
+   |
+   v
+TF-08  Verify every source contract
+   |
+   v
+TF-09  Correct source-specific scheduling
+   |
+   v
+TF-10  Instrument -> multiple opportunities
+   |
+   v
+TF-11  Multi-reason discovery
+   |
+   v
+TF-12  Shared feature reuse + performance
+   |
+   v
+TF-13  Executable strategy profiles
+   |
+   v
+TF-14  Equity swing
+TF-15  Equity intraday continuation
+TF-16  Reversal strategies
+TF-17  Event / ownership
+TF-18  Commodities
+TF-19  Cost / liquidity / ranking
+   |
+   v
+TF-20  Incremental recalculation
+TF-21  Immutable publication
+TF-22  UI / alerts
+TF-23  Exact outcome tracking
+   |
+   v
+TF-24  Whole-system backtest
+TF-25  Real-data / shadow production acceptance
+```
+
+### 26.5 Stage-advance rule
+
+Do not move a TF stage to **complete/accepted** until the current stage has all of these:
+
+1. reproduced current-state problem or explicit verified requirement,
+2. exact contract/behavior change defined,
+3. implementation where needed,
+4. adversarial tests,
+5. focused tests,
+6. full pinned regression evidence,
+7. before/after evidence,
+8. remaining-risk statement,
+9. documentation/current-state update,
+10. no accidental expansion of execution authority.
+
+The controlling rule is:
+
+> **A green test suite is necessary evidence, not production-readiness proof. A stage is accepted only when its semantic contract, failure behavior, runtime wiring and remaining risk are all verified.**
