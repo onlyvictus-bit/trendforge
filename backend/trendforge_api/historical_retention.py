@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 RETENTION_MIGRATION_VERSION = "0022_historical_evidence_retention"
@@ -81,15 +81,20 @@ class RetentionReference(BaseModel):
     retain_until: date | None = None
     created_at: datetime
 
+    @field_validator("content_hash")
+    @classmethod
+    def normalize_hash(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.casefold()
+        if not _HASH_PATTERN.fullmatch(normalized):
+            raise ValueError("content_hash must be a SHA-256 hex digest")
+        return normalized
+
     @model_validator(mode="after")
     def validate_reference(self) -> RetentionReference:
         if not any((self.content_hash, self.run_id, self.trading_date)):
             raise ValueError("retention reference must identify evidence")
-        if self.content_hash is not None:
-            normalized = self.content_hash.casefold()
-            if not _HASH_PATTERN.fullmatch(normalized):
-                raise ValueError("content_hash must be a SHA-256 hex digest")
-            object.__setattr__(self, "content_hash", normalized)
         if self.permanent and self.retain_until is not None:
             raise ValueError("permanent retention reference cannot have retain_until")
         if not self.permanent and self.retain_until is None:
@@ -192,57 +197,82 @@ class HistoricalRetentionAuthority:
     ) -> None:
         if reference.content_hash is not None:
             if not self._known_table(connection, "market_data_objects"):
-                raise ValueError("market_data_objects is unavailable; refusing unknown content_hash")
+                raise ValueError(
+                    "market_data_objects is unavailable; refusing unknown content_hash"
+                )
             row = connection.execute(
                 "SELECT 1 FROM market_data_objects WHERE content_hash = ?",
                 (reference.content_hash,),
             ).fetchone()
             if row is None:
                 raise ValueError("unknown content_hash; refusing retention reference")
+
+        run_row: sqlite3.Row | None = None
         if reference.run_id is not None:
             if not self._known_table(connection, "market_data_manifests"):
-                raise ValueError("market_data_manifests is unavailable; refusing unknown run_id")
-            row = connection.execute(
+                raise ValueError(
+                    "market_data_manifests is unavailable; refusing unknown run_id"
+                )
+            run_row = connection.execute(
                 "SELECT trading_date FROM market_data_manifests WHERE run_id = ?",
                 (reference.run_id,),
             ).fetchone()
-            if row is None:
+            if run_row is None:
                 raise ValueError("unknown run_id; refusing retention reference")
             if (
                 reference.trading_date is not None
-                and row["trading_date"] != reference.trading_date.isoformat()
+                and run_row["trading_date"] != reference.trading_date.isoformat()
             ):
                 raise ValueError("run_id trading_date does not match retention reference")
+
+        if reference.trading_date is not None and run_row is None:
+            if not self._known_table(connection, "market_data_manifests"):
+                raise ValueError(
+                    "market_data_manifests is unavailable; refusing unknown trading_date"
+                )
+            row = connection.execute(
+                "SELECT 1 FROM market_data_manifests WHERE trading_date = ? LIMIT 1",
+                (reference.trading_date.isoformat(),),
+            ).fetchone()
+            if row is None:
+                raise ValueError("unknown trading_date; refusing retention reference")
+
+    @staticmethod
+    def _reference_values(reference: RetentionReference) -> tuple[object, ...]:
+        return (
+            reference.reference_type.value,
+            reference.content_hash,
+            reference.run_id,
+            reference.trading_date.isoformat() if reference.trading_date else None,
+            int(reference.permanent),
+            reference.retain_until.isoformat() if reference.retain_until else None,
+            reference.created_at.isoformat(),
+        )
 
     def register(self, reference: RetentionReference) -> RetentionReference:
         self.initialize_schema()
         with self._connect() as connection:
             self._validate_evidence_exists(connection, reference)
+            existing = connection.execute(
+                "SELECT * FROM historical_retention_references WHERE reference_id = ?",
+                (reference.reference_id,),
+            ).fetchone()
+            if existing is not None:
+                existing_reference = self._from_row(existing)
+                if existing_reference != reference:
+                    raise ValueError(
+                        "retention reference_id is immutable and cannot be repointed"
+                    )
+                return existing_reference
+
             connection.execute(
                 """
                 INSERT INTO historical_retention_references(
                     reference_id, reference_type, content_hash, run_id, trading_date,
                     permanent, retain_until, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(reference_id) DO UPDATE SET
-                    reference_type=excluded.reference_type,
-                    content_hash=excluded.content_hash,
-                    run_id=excluded.run_id,
-                    trading_date=excluded.trading_date,
-                    permanent=excluded.permanent,
-                    retain_until=excluded.retain_until,
-                    created_at=excluded.created_at
                 """,
-                (
-                    reference.reference_id,
-                    reference.reference_type.value,
-                    reference.content_hash,
-                    reference.run_id,
-                    reference.trading_date.isoformat() if reference.trading_date else None,
-                    int(reference.permanent),
-                    reference.retain_until.isoformat() if reference.retain_until else None,
-                    reference.created_at.isoformat(),
-                ),
+                (reference.reference_id, *self._reference_values(reference)),
             )
         return reference
 
@@ -253,9 +283,13 @@ class HistoricalRetentionAuthority:
             reference_type=RetentionReferenceType(row["reference_type"]),
             content_hash=row["content_hash"],
             run_id=row["run_id"],
-            trading_date=date.fromisoformat(row["trading_date"]) if row["trading_date"] else None,
+            trading_date=date.fromisoformat(row["trading_date"])
+            if row["trading_date"]
+            else None,
             permanent=bool(row["permanent"]),
-            retain_until=date.fromisoformat(row["retain_until"]) if row["retain_until"] else None,
+            retain_until=date.fromisoformat(row["retain_until"])
+            if row["retain_until"]
+            else None,
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 
@@ -275,9 +309,26 @@ class HistoricalRetentionAuthority:
         hashes = {ref.content_hash for ref in references if ref.content_hash is not None}
 
         with self._connect() as connection:
+            if dates:
+                if not self._known_table(connection, "market_data_manifests"):
+                    raise RuntimeError(
+                        "cannot resolve protected trading dates without manifest table"
+                    )
+                for trading_date in sorted(dates):
+                    row = connection.execute(
+                        "SELECT 1 FROM market_data_manifests WHERE trading_date = ? LIMIT 1",
+                        (trading_date.isoformat(),),
+                    ).fetchone()
+                    if row is None:
+                        raise RuntimeError(
+                            f"protected trading_date disappeared: {trading_date.isoformat()}"
+                        )
+
             if run_ids:
                 if not self._known_table(connection, "market_data_manifests"):
-                    raise RuntimeError("cannot resolve protected run_ids without manifest table")
+                    raise RuntimeError(
+                        "cannot resolve protected run_ids without manifest table"
+                    )
                 for run_id in sorted(run_ids):
                     row = connection.execute(
                         "SELECT trading_date FROM market_data_manifests WHERE run_id = ?",
@@ -293,6 +344,22 @@ class HistoricalRetentionAuthority:
                             (run_id,),
                         ).fetchall()
                         hashes.update(row["content_hash"] for row in object_rows)
+
+            if hashes:
+                if not self._known_table(connection, "market_data_objects"):
+                    raise RuntimeError(
+                        "cannot resolve protected content hashes without object table"
+                    )
+                for content_hash in sorted(hashes):
+                    row = connection.execute(
+                        "SELECT 1 FROM market_data_objects WHERE content_hash = ?",
+                        (content_hash,),
+                    ).fetchone()
+                    if row is None:
+                        raise RuntimeError(
+                            f"protected content_hash disappeared: {content_hash}"
+                        )
+
             if hashes and self._known_table(connection, "market_data_manifest_objects"):
                 for content_hash in tuple(hashes):
                     object_rows = connection.execute(
