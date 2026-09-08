@@ -105,6 +105,13 @@ class GateOutcome(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class GateScope(StrEnum):
+    """Controls whether a gate is allowed to block later pipeline stages."""
+
+    PIPELINE_MANDATORY = "PIPELINE_MANDATORY"
+    STAGE_LOCAL = "STAGE_LOCAL"
+
+
 def _json_default(value: Any) -> str:
     if isinstance(value, (date, datetime, StrEnum)):
         return value.isoformat() if not isinstance(value, StrEnum) else value.value
@@ -403,6 +410,9 @@ class SelectionGateResult(BaseModel):
     blocks_confirmed: bool
     reason: str = Field(min_length=1)
     required: bool = True
+    # Scope is intentionally excluded from the legacy gate serialization.
+    # S6 persists only the already-filtered pipeline-mandatory gate set.
+    scope: GateScope = Field(default=GateScope.PIPELINE_MANDATORY, exclude=True)
 
     @model_validator(mode="after")
     def validate_blocking_semantics(self) -> "SelectionGateResult":

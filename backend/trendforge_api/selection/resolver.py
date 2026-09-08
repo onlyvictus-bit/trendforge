@@ -14,6 +14,7 @@ from .contracts import (
     EvidenceDirection,
     EvidenceFamily,
     GateOutcome,
+    GateScope,
     MODEL_CONFIG,
     NormalizedFact,
     SelectionGateResult,
@@ -264,6 +265,8 @@ def _gate(
     code: str,
     outcome: GateOutcome,
     reason: str,
+    *,
+    scope: GateScope = GateScope.PIPELINE_MANDATORY,
 ) -> SelectionGateResult:
     return SelectionGateResult(
         code=code,
@@ -276,6 +279,7 @@ def _gate(
         },
         reason=reason,
         required=True,
+        scope=scope,
     )
 
 
@@ -625,6 +629,7 @@ def resolve_evidence(
                 "WAIT_Q5_R2_NO_CONFIRMED",
                 GateOutcome.WAIT,
                 "Q5-R2 resolver is capped at WAIT until Q5-R3 closed-bar acceptance.",
+                scope=GateScope.STAGE_LOCAL,
             ),
         )
         state = SelectionState.WAIT

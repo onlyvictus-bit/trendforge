@@ -98,3 +98,35 @@ review date; append test observations to the verification/build logs. Preserve
 older entries as history. Never delete contradictory old evidence merely to make
 the current summary look cleaner. `present.md` and dated gate/audit reports remain
 historical evidence, not current build instructions.
+---
+
+## TF-01 safety checkpoint — 2026-09-08
+
+**Base:** `docs/trendforge-system-brain` at `62307eb237731e71dda20cb9216fff281ab7ebcf`.
+**Pinned pre-commit verifier:** GitHub Actions run `34255614854`.
+
+TF-01 changes the safety contract in two places without activating execution:
+
+- Generic macro collection state `RESEARCH_ONLY` no longer proves an event blackout is clear. S7 now requires an exact instrument/symbol/profile/version `EventClearanceResult`; missing, expired, metadata-only, incomplete, wrong-scope or contradictory evidence fails closed. Only current lineage-backed semantic `CLEAR` can satisfy the mandatory event gate.
+- Required upstream resolver gates remain typed through S6 as `inherited_gates` and are structurally enforced by S7. `PIPELINE_MANDATORY` gates propagate; S6-local activation/profile ceilings remain diagnostic/local and optional evidence does not become a permanent downstream blocker.
+
+Observed pinned verification for the corrected candidate before the final commit:
+
+| Check | Observed result |
+|---|---:|
+| Focused macro/S6/S7/S8/TF-01 chain | **79 passed, 2 warnings** |
+| Full backend regression | **1,527 passed, 2 warnings** |
+| Ruff | **Passed** |
+| Mypy | **513 errors in 70 files; 266 source files checked — unchanged from TF-00 baseline** |
+| Frontend | **220/220 passed** |
+| Compile/import checks | **Passed** |
+| Diff / execution-authority scan | **Passed; no live-order authority added** |
+
+Status at this checkpoint:
+
+- **IMPLEMENTED:** YES — this TF-01 commit contains the scoped event-clearance and typed-gate contract changes.
+- **TESTED:** YES — pinned pre-commit verification passed; exact final PR-head CI must still be observed separately.
+- **LIVE-DATA-VERIFIED:** NO — no production/live event feed acceptance is claimed here.
+- **PRODUCTION-ACCEPTED:** NO at commit creation — exact final-head CI and the documented stage-acceptance review remain required.
+
+The existing TF-00 Mypy risk-classification work, A07 and other unrelated baseline defects are not silently closed by TF-01. No broker/order activation, arm switch or live execution authority is changed.

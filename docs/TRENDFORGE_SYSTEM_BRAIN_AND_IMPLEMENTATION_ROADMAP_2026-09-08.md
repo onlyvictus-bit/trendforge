@@ -1820,3 +1820,79 @@ Do not move a TF stage to **complete/accepted** until the current stage has all 
 The controlling rule is:
 
 > **A green test suite is necessary evidence, not production-readiness proof. A stage is accepted only when its semantic contract, failure behavior, runtime wiring and remaining risk are all verified.**
+
+---
+
+## 27. TF-01 implementation checkpoint — scoped event clearance and mandatory gates
+
+**Recorded:** 2026-09-08
+**Exact base:** `docs/trendforge-system-brain` at `62307eb237731e71dda20cb9216fff281ab7ebcf`
+**Pinned pre-commit verifier:** GitHub Actions run `34255614854`
+
+### 27.1 A01 contract correction
+
+`RESEARCH_ONLY` remains a collection/research state. It is no longer accepted as proof that an instrument-specific event blackout is clear.
+
+TF-01 introduces lineage-backed `EventClearanceEvidence` and `EventClearanceResult` with exact instrument/symbol/profile/version scope, semantic coverage, parser/content lineage, assessment time, validity/expiry, event window and `CLEAR | BLOCKED | UNKNOWN` outcome.
+
+Only a current, complete, exact-scope, lineage-backed semantic `CLEAR` may satisfy S7's mandatory event gate. Missing scope, metadata-only/incomplete parsing, future evidence, expired evidence, event-window mismatch, contradictory evidence or `UNKNOWN` fails closed. A valid blocking event remains blocking. Evidence for another symbol or another strategy/profile cannot clear the current opportunity.
+
+### 27.2 A03 contract correction
+
+TF-01 adds explicit gate scope:
+
+- `PIPELINE_MANDATORY` — required blockers that must survive into later qualification stages.
+- `STAGE_LOCAL` — local stage ceilings such as S6 source-activation/profile ceilings that must not become permanent downstream blockers.
+
+S6 now preserves required pipeline gates as typed `inherited_gates` instead of reducing their enforcement semantics to `why` strings. S7 structurally enforces inherited required `WAIT`, `UNKNOWN` and `REJECT` outcomes. Optional evidence and stage-local gates remain non-permanent downstream context.
+
+### 27.3 Adversarial evidence
+
+The TF-01 suite explicitly covers:
+
+1. legacy `RESEARCH_ONLY` cannot create event `CLEAR`,
+2. expired clearance -> `UNKNOWN`,
+3. incomplete/metadata-only coverage -> `UNKNOWN`,
+4. blocking event -> `BLOCKED`,
+5. complete exact-scope evidence -> `CLEAR`,
+6. another symbol cannot clear the current instrument,
+7. another strategy/profile cannot clear the current strategy,
+8. contradictory valid sources cannot silently clear,
+9. required upstream `WAIT` survives S6 -> S7 structurally,
+10. required upstream `UNKNOWN` survives structurally,
+11. required upstream `REJECT` survives structurally,
+12. optional gates do not freeze S7,
+13. stage-local S6 gates do not become permanent inherited blockers,
+14. positive S7 confirmation remains possible when explicit valid clearance and all other gates pass,
+15. no live-order authority is added.
+
+### 27.4 Pinned pre-commit verification
+
+| Check | Observed result |
+|---|---:|
+| Focused TF-01 chain | **79 passed, 2 warnings** |
+| Full backend regression | **1,527 passed, 2 warnings** |
+| Ruff | **Passed** |
+| Mypy | **513 errors in 70 files; 266 checked — unchanged from baseline** |
+| Frontend | **220/220 passed** |
+| Compile/import | **Passed** |
+| `git diff --check` / execution-authority scan | **Passed** |
+
+The first pre-commit candidate exposed one Ruff-only unused import in an updated test. That line was removed and the complete pinned verifier was rerun from the beginning; run `34255614854` is the successful corrected-candidate evidence.
+
+### 27.5 Status and remaining risk
+
+- **IMPLEMENTED:** YES in this TF-01 commit.
+- **TESTED:** YES in the repository-pinned pre-commit verifier; exact final PR-head CI is still a separate acceptance check.
+- **LIVE-DATA-VERIFIED:** NO. No current production event-source semantic coverage has been asserted by this stage.
+- **PRODUCTION-ACCEPTED:** NO at commit creation. Final exact-head CI and explicit acceptance review are still required.
+
+Remaining boundaries:
+
+- TF-01 does not redesign S7/S8 publication semantics; TF-04 remains responsible for that contract.
+- TF-01 does not fix tradability/A07; those remain TF-02 scope.
+- TF-01 does not create opportunity identity; later stages still own that strengthening.
+- The broad TF-00 Mypy risk classification remains open even though TF-01 did not increase the 513-error baseline.
+- No live-order switch, broker authorization or execution arm is enabled.
+
+Do not start TF-02 until TF-01's exact final-head CI and stage acceptance are recorded.

@@ -27,12 +27,20 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime
-from typing import Any
+from typing import Any, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
-from .contracts import EvidenceDirection, SelectionState, stable_id
+from ..macro_event_context import EventClearanceOutcome, EventClearanceResult
+from .contracts import (
+    EvidenceDirection,
+    GateOutcome,
+    GateScope,
+    SelectionGateResult,
+    SelectionState,
+    stable_id,
+)
 from .r5_live import R5StructureBatchV1, latest_r5_structure_batch
 from .s4_structure_pack import (
     S4StructurePackBatchV1,
@@ -74,6 +82,7 @@ class S7IdeaCardV1(BaseModel):
     family_support: dict[str, float]
     family_opposition: dict[str, float]
     missing_families: tuple[str, ...] = ()
+    gate_results: tuple[SelectionGateResult, ...] = ()
     why: tuple[str, ...] = ()
     missing_evidence: tuple[str, ...] = ()
     next_trigger: str | None = None
@@ -97,6 +106,15 @@ class S7IdeaCardV1(BaseModel):
 
     @model_validator(mode="after")
     def enforce_card_law(self) -> "S7IdeaCardV1":
+        blocking_gates = [
+            gate
+            for gate in self.gate_results
+            if gate.required
+            and gate.scope is GateScope.PIPELINE_MANDATORY
+            and gate.blocks_confirmed
+        ]
+        if self.public_state is SelectionState.CONFIRMED and blocking_gates:
+            raise ValueError("S7 CONFIRMED cannot carry a mandatory pipeline blocker")
         if self.public_state is SelectionState.CONFIRMED:
             if not self.draft_confirmed_eligible:
                 raise ValueError(
@@ -206,6 +224,16 @@ def classify_row(
     why: list[str] = []
     reasons, hard_reject = _reasons(row6)
     why.extend(reasons)
+    inherited_block = False
+    for gate in row6.inherited_gates:
+        if not gate.required or gate.scope is GateScope.STAGE_LOCAL:
+            continue
+        if gate.code not in why:
+            why.append(gate.code)
+        if gate.outcome is GateOutcome.REJECT:
+            hard_reject = True
+        elif gate.outcome in {GateOutcome.WAIT, GateOutcome.UNKNOWN} or gate.blocks_confirmed:
+            inherited_block = True
     if ca_break:
         why.append("WAIT_CA_IDENTITY_BREAK")
 
@@ -235,6 +263,7 @@ def classify_row(
         or (not blackout_known_clear)
         or ca_break
         or conflict
+        or inherited_block
     )
 
     if tradability_outcome is TradabilityOutcome.REJECT:
@@ -324,6 +353,112 @@ def _paper_plan_for(
     )
 
 
+def _unknown_event_gate(code: str, reason: str) -> SelectionGateResult:
+    return SelectionGateResult(
+        code=code,
+        outcome=GateOutcome.UNKNOWN,
+        blocks_confirmed=True,
+        reason=reason,
+        required=True,
+        scope=GateScope.PIPELINE_MANDATORY,
+    )
+
+
+def _event_gate_for_row(
+    *,
+    instrument_id: str | None,
+    symbol: str,
+    decision_at: datetime,
+    clearances: Sequence[EventClearanceResult],
+    legacy_snapshot: Any | None,
+) -> SelectionGateResult:
+    if not instrument_id:
+        return _unknown_event_gate(
+            "WAIT_EVENT_CLEARANCE_INSTRUMENT_UNKNOWN",
+            "S7 cannot prove event clearance without exact instrument identity.",
+        )
+    exact = [
+        item
+        for item in clearances
+        if item.instrument_id == instrument_id
+        and item.symbol.upper() == symbol.upper()
+        and item.profile_id == ACTIVE_PROFILE_ID
+        and item.profile_version == ACTIVE_PROFILE_VERSION
+    ]
+    if not exact:
+        if getattr(legacy_snapshot, "state", None) == "RESEARCH_ONLY":
+            return _unknown_event_gate(
+                "WAIT_EVENT_CLEARANCE_LEGACY_RESEARCH_ONLY",
+                "Generic RESEARCH_ONLY collection state is not semantic event clearance.",
+            )
+        return _unknown_event_gate(
+            "WAIT_EVENT_CLEARANCE_NO_SCOPED_EVIDENCE",
+            "No exact instrument/profile event clearance was supplied to S7.",
+        )
+
+    active: list[EventClearanceResult] = []
+    invalid_codes: list[str] = []
+    for item in exact:
+        if item.assessed_at is not None and item.assessed_at > decision_at:
+            invalid_codes.append("WAIT_EVENT_CLEARANCE_FUTURE_EVIDENCE")
+            continue
+        if item.valid_until is None or item.valid_until < decision_at:
+            invalid_codes.append("WAIT_EVENT_CLEARANCE_EXPIRED")
+            continue
+        if (
+            item.event_window_start is None
+            or item.event_window_end is None
+            or not (item.event_window_start <= decision_at <= item.event_window_end)
+        ):
+            invalid_codes.append("WAIT_EVENT_CLEARANCE_WINDOW_MISS")
+            continue
+        active.append(item)
+
+    if not active:
+        code = invalid_codes[0] if invalid_codes else "WAIT_EVENT_CLEARANCE_UNKNOWN"
+        return _unknown_event_gate(code, "Scoped event clearance is not current at S7 decision time.")
+
+    outcomes = {item.outcome for item in active}
+    if len(outcomes) > 1:
+        return _unknown_event_gate(
+            "WAIT_EVENT_CLEARANCE_CONTRADICTORY",
+            "Conflicting scoped event-clearance results cannot clear S7.",
+        )
+    if EventClearanceOutcome.UNKNOWN in outcomes or invalid_codes:
+        code = invalid_codes[0] if invalid_codes else next(
+            (code for item in active for code in item.reason_codes),
+            "WAIT_EVENT_CLEARANCE_UNKNOWN",
+        )
+        return _unknown_event_gate(code, "Event clearance remains unknown or incomplete.")
+    if EventClearanceOutcome.BLOCKED in outcomes:
+        return SelectionGateResult(
+            code="WAIT_EVENT_BLACKOUT_BLOCKED",
+            outcome=GateOutcome.WAIT,
+            blocks_confirmed=True,
+            reason="A scoped blocking event is active for this instrument/profile.",
+            required=True,
+            scope=GateScope.PIPELINE_MANDATORY,
+        )
+    if all(
+        item.outcome is EventClearanceOutcome.CLEAR
+        and item.can_satisfy_mandatory_gate
+        and item.semantic_coverage_complete
+        for item in active
+    ):
+        return SelectionGateResult(
+            code="EVENT_CLEARANCE_CLEAR",
+            outcome=GateOutcome.PASS,
+            blocks_confirmed=False,
+            reason="Current scoped semantic event clearance is proven.",
+            required=True,
+            scope=GateScope.PIPELINE_MANDATORY,
+        )
+    return _unknown_event_gate(
+        "WAIT_EVENT_CLEARANCE_UNKNOWN",
+        "Event evidence exists but does not prove semantic clearance.",
+    )
+
+
 def build_s7_state(
     *,
     r5: R5StructureBatchV1 | None = None,
@@ -332,6 +467,7 @@ def build_s7_state(
     s6: S6ResolutionBatchV1 | None = None,
     weather: Any = None,
     event_snapshot: Any | None = None,
+    event_clearances: Sequence[EventClearanceResult] = (),
     activation_ready: bool | None = None,
     lane: Any = None,
     tradability: TradabilityBatchV1 | None = None,
@@ -371,12 +507,6 @@ def build_s7_state(
 
     intraday_ok = _intraday_guidance(lane)
 
-    blackout_known_clear = (
-        getattr(event_snapshot, "state", None) == "RESEARCH_ONLY"
-        if event_snapshot is not None
-        else False
-    )
-
     pack_by_symbol = {row.symbol: row for row in pack.rows}
     s5_by_symbol = {
         row.symbol.upper(): row for row in (s5_batch.rows if s5_batch else ())
@@ -387,6 +517,13 @@ def build_s7_state(
     for row6 in resolution.rows:
         prow = pack_by_symbol.get(row6.symbol)
         erow = s5_by_symbol.get(row6.symbol.upper())
+        event_gate = _event_gate_for_row(
+            instrument_id=getattr(prow, "instrument_id", None) if prow else None,
+            symbol=row6.symbol,
+            decision_at=resolution.built_at,
+            clearances=event_clearances,
+            legacy_snapshot=event_snapshot,
+        )
         next_trigger = getattr(prow, "next_trigger", None) if prow else None
         invalidation = getattr(prow, "invalidation_condition", None) if prow else None
         has_tags = bool(getattr(prow, "detected_setups", ()) ) if prow else False
@@ -411,7 +548,7 @@ def build_s7_state(
             invalidation=invalidation,
             has_structure_tags=has_tags,
             ca_break=ca_break,
-            blackout_known_clear=blackout_known_clear,
+            blackout_known_clear=(event_gate.outcome is GateOutcome.PASS),
             rs_ok=None,
             weather_unknown=weather_unknown,
             tradability_outcome=restriction_outcome,
@@ -459,7 +596,12 @@ def build_s7_state(
                     k: v.oppose for k, v in row6.families.items()
                 },
                 missing_families=row6.missing_families,
-                why=tuple(why) + tuple(row6.why_unknown),
+                gate_results=tuple(
+                    gate
+                    for gate in row6.inherited_gates
+                    if gate.required and gate.scope is GateScope.PIPELINE_MANDATORY
+                ) + (event_gate,),
+                why=tuple(why) + (event_gate.code,) + tuple(row6.why_unknown),
                 missing_evidence=tuple(row6.why_unknown),
                 next_trigger=next_trigger,
                 invalidation_condition=invalidation,

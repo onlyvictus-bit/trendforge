@@ -318,6 +318,46 @@ def test_s6_missing_required_structure_gives_zero_strength_wait(
     assert row.resolution_state is SelectionState.WAIT
 
 
+def test_s6_preserves_only_pipeline_mandatory_gates(
+    tmp_path, monkeypatch
+) -> None:
+    """Required evidence failures survive S6, but S6-local ceilings do not."""
+    from datetime import time as dtime
+    from zoneinfo import ZoneInfo
+
+    monkeypatch.setattr(storage, "DB_PATH", tmp_path / "s6-inherited-gates.db")
+    ist = ZoneInfo("Asia/Kolkata")
+    instrument, identity, history, bundle, attention, staging, context = s4f._fixtures()
+    s4f._store_breakout_history(instrument)
+    mid_session = datetime.combine(TRADING_DATE, dtime(10, 0), tzinfo=ist)
+    r5 = s4f._build_r5(
+        instrument,
+        identity,
+        history,
+        bundle,
+        attention,
+        staging,
+        context,
+        decision_at=mid_session,
+    )
+    batch = build_s6_resolution(
+        r5=r5,
+        bundle=bundle,
+        attention=attention,
+        source_result=_source(),
+        ca_join=s4f._ca_join(bundle, attention, identity),
+        bound_to_shortlist=False,
+        built_at=DECISION_AT,
+    )
+    row = batch.rows[0]
+    inherited_codes = {gate.code for gate in row.inherited_gates}
+
+    assert "WAIT_REQUIRED_FAMILY_STRUCTURE" in inherited_codes
+    assert "WAIT_SOURCE_ACTIVATION" not in inherited_codes
+    assert "WAIT_Q5_R2_NO_CONFIRMED" not in inherited_codes
+    assert "WAIT_SOURCE_ACTIVATION" in row.why
+
+
 def test_s6_strength_label_is_not_win_probability(tmp_path, monkeypatch) -> None:
     batch = _s6(tmp_path, monkeypatch)
     assert batch.rows[0].evidence_strength_label == STRENGTH_LABEL

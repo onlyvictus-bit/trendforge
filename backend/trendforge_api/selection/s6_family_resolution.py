@@ -36,7 +36,9 @@ from .contracts import (
     EvidenceClaim,
     EvidenceDirection,
     EvidenceFamily,
+    GateScope,
     NormalizedFact,
+    SelectionGateResult,
     SelectionState,
     StateCeiling,
     stable_id,
@@ -89,6 +91,7 @@ class S6ResolutionRowV1(BaseModel):
     missing_families: tuple[str, ...] = ()
     representative_claim_ids: tuple[str, ...] = ()
     suppressed_claim_ids: tuple[str, ...] = ()
+    inherited_gates: tuple[SelectionGateResult, ...] = ()
     why: tuple[str, ...] = ()
     why_unknown: tuple[str, ...] = ()
     can_unlock_confirmed: bool = False
@@ -166,7 +169,7 @@ def _market_context(weather: Any) -> S6MarketContextBlockV1 | None:
 
 
 def _r2_gate(state: SelectionState):
-    from .contracts import GateOutcome, SelectionGateResult
+    from .contracts import GateOutcome
 
     if state is SelectionState.REJECT:
         return SelectionGateResult(
@@ -174,12 +177,14 @@ def _r2_gate(state: SelectionState):
             outcome=GateOutcome.REJECT,
             blocks_confirmed=True,
             reason="R2 already rejected this row.",
+            scope=GateScope.STAGE_LOCAL,
         )
     return SelectionGateResult(
         code="WAIT_SOURCE_ACTIVATION",
         outcome=GateOutcome.WAIT,
         blocks_confirmed=True,
         reason="Source activation remains false; S6 resolution is diagnostic.",
+        scope=GateScope.STAGE_LOCAL,
     )
 
 
@@ -410,6 +415,11 @@ def build_s6_resolution(
             not in {ClaimDisposition.SELECTED_SUPPORT, ClaimDisposition.SELECTED_OPPOSITION}
         )
         conflict = bool(resolution.family_opposes) and bool(resolution.family_supports)
+        inherited_gates = tuple(
+            gate
+            for gate in resolution.gate_results
+            if gate.required and gate.scope is GateScope.PIPELINE_MANDATORY
+        )
         why = tuple(dict.fromkeys(gate.code for gate in resolution.gate_results))
         why_unknown = tuple(
             dict.fromkeys(
@@ -439,6 +449,7 @@ def build_s6_resolution(
                 ),
                 representative_claim_ids=selected_ids,
                 suppressed_claim_ids=suppressed_ids,
+                inherited_gates=inherited_gates,
                 why=why,
                 why_unknown=why_unknown,
             )
