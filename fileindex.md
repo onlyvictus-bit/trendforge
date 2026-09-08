@@ -1,3 +1,6 @@
+<!-- CURRENT_STATE_HISTORY_BOUNDARY: system-brain-navigation -->
+> **Current code/readiness summary:** [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md). Historical material is preserved separately and must not override current runtime evidence.
+
 # TrendForge Document Index
 
 > **Current navigation layer.** Use this file to locate the present architecture, readiness, implementation-flow and historical references. Runtime behavior always wins over documentation.
