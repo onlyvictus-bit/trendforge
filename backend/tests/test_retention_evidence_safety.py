@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -243,6 +244,21 @@ def test_unknown_hash_and_run_fail_closed(tmp_path: Path) -> None:
         )
 
 
+def test_unknown_trading_date_fails_closed(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    authority = _authority(store)
+
+    with pytest.raises(ValueError, match="unknown trading_date"):
+        authority.register(
+            RetentionReference(
+                reference_id="unknown-day",
+                reference_type=RetentionReferenceType.AUDIT,
+                trading_date=date(2025, 1, 1),
+                created_at=NOW,
+            )
+        )
+
+
 def test_run_date_mismatch_fails_closed(tmp_path: Path) -> None:
     store = _store(tmp_path)
     authority = _authority(store)
@@ -286,3 +302,66 @@ def test_registration_is_idempotent(tmp_path: Path) -> None:
     active = authority.active_references(as_of_date=date(2026, 9, 8))
 
     assert [ref.reference_id for ref in active].count("decision-version-100") == 1
+
+
+def test_reference_id_cannot_be_repointed_to_different_evidence(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    authority = _authority(store)
+    first_hash = _manifest_for_object(
+        store,
+        day=date(2026, 1, 2),
+        run_id="immutable-source-1",
+        payload=b"immutable-one",
+    )
+    second_hash = _manifest_for_object(
+        store,
+        day=date(2026, 1, 3),
+        run_id="immutable-source-2",
+        payload=b"immutable-two",
+    )
+    authority.register(
+        RetentionReference(
+            reference_id="decision-version-immutable",
+            reference_type=RetentionReferenceType.DECISION_VERSION,
+            content_hash=first_hash,
+            created_at=NOW,
+        )
+    )
+
+    with pytest.raises(ValueError, match="immutable"):
+        authority.register(
+            RetentionReference(
+                reference_id="decision-version-immutable",
+                reference_type=RetentionReferenceType.DECISION_VERSION,
+                content_hash=second_hash,
+                created_at=NOW,
+            )
+        )
+
+
+def test_protection_fails_closed_if_referenced_hash_disappears(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    authority = _authority(store)
+    content_hash = _manifest_for_object(
+        store,
+        day=date(2026, 1, 4),
+        run_id="hash-disappearance-source",
+        payload=b"must-not-disappear",
+    )
+    authority.register(
+        RetentionReference(
+            reference_id="audit-hash-integrity",
+            reference_type=RetentionReferenceType.AUDIT,
+            content_hash=content_hash,
+            created_at=NOW,
+        )
+    )
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute("PRAGMA foreign_keys = OFF")
+        connection.execute(
+            "DELETE FROM market_data_objects WHERE content_hash = ?",
+            (content_hash,),
+        )
+
+    with pytest.raises(RuntimeError, match="protected content_hash disappeared"):
+        authority.protection_set(as_of_date=date(2026, 9, 8))
