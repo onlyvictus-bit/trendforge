@@ -1,6 +1,6 @@
 # TrendForge Historical Data Retention, Point-in-Time Memory, and ML Evidence Plan
 
-**Status:** IMPLEMENTATION STARTED — retention authority foundation only  
+**Status:** R-HIST-01 IMPLEMENTED + TESTED; R-HIST-02 IMPLEMENTED, exact-head CI pending  
 **Branch:** `fix/retention-evidence-safety`  
 **Base:** TF-01 exact head `19a8c762314cdb7b54556c17c8ae5a46ad7325e8`  
 **Trading authority:** unchanged; no live-order capability is added by this work.
@@ -26,15 +26,15 @@ The governing rule is:
 
 Age determines storage tier. Evidence references determine whether data may be deleted.
 
-## 2. Defect discovered in the current implementation
+## 2. Defect and current mitigation
 
-`MarketDataStore.cleanup_retention()` currently defaults to retaining only the latest **5 completed trading days** of day directories. With `dry_run=False`, older directories are eligible for deletion. After an old manifest expires, a content-addressed object is also eligible for deletion when it is not referenced by `market_data_latest` or a surviving manifest.
+The legacy `MarketDataStore.cleanup_retention()` defaults to retaining only the latest **5 completed trading days** of day directories. Historically, with `dry_run=False`, older directories were eligible for deletion and an old content-addressed object became eligible once it was no longer referenced by `market_data_latest` or a surviving manifest.
 
-The existing protection set does **not yet know about future decision versions, outcomes, revisions, ML datasets, model evaluations, or audit records**.
+R-HIST-02 now wires the historical retention authority into that real cleanup path. A protected decision/outcome/revision/ML/model/profile/audit date, run, or content hash is excluded from ordinary age-based deletion. Cleanup also re-resolves protection immediately before destructive work and fails closed if lineage/protection changed or disappeared.
 
-This creates a reconstructability defect: a published decision or ML example can outlive the source evidence needed to prove how it was produced.
+This does **not** make five days the desired long-term lifecycle. It only prevents age-based cleanup from deleting durable referenced evidence. R-HIST-04 still needs to replace blind aging with HOT -> WARM -> COLD/archive movement.
 
-Changing `5` to `90` would postpone the defect, not solve it. The cleanup authority must become reference-aware first.
+Changing `5` to `90` alone would still only postpone the reconstructability problem. Reference-aware protection is the required authority.
 
 ## 3. Target lifecycle
 
@@ -46,11 +46,11 @@ Changing `5` to `90` would postpone the defect, not solve it. The cleanup author
 | >365 days | COLD | long-term archive, backtest and ML evidence | may move to archive/object storage; referenced evidence is not routinely deleted |
 | Any age with durable evidence reference | PROTECTED | decisions, outcomes, revisions, ML, audit, model/profile lineage | no routine deletion |
 
-The first code foundation implements the HOT/WARM/COLD policy as **classification**, not as destructive movement.
+HOT/WARM/COLD is currently a classification contract. Physical tier movement is R-HIST-04.
 
 ## 4. Evidence classes that require durable retention
 
-The initial retention authority supports these reference types:
+The retention authority supports these reference types:
 
 1. `DECISION_VERSION` — immutable published assessment of an opportunity.
 2. `OUTCOME` — trigger/no-entry/expiry/ambiguous/censored and realized result evidence.
@@ -63,6 +63,8 @@ The initial retention authority supports these reference types:
 
 Decision/outcome/revision/ML/model/profile/audit evidence must not be converted to temporary retention merely to save disk space.
 
+Reference IDs are immutable: registering the same ID with different evidence is rejected rather than silently repointing historical lineage.
+
 ## 5. Identity and transitive protection
 
 A retention reference may identify evidence by one or more of:
@@ -71,7 +73,7 @@ A retention reference may identify evidence by one or more of:
 - collector/manifest `run_id`
 - immutable SHA-256 `content_hash`
 
-Protection must expand transitively:
+Protection expands transitively:
 
 ```text
 DECISION / OUTCOME / ML DATASET
@@ -94,7 +96,9 @@ point-in-time manifest
 exact source object hash(es)
 ```
 
-A referenced run therefore protects its trading date and all content objects in its point-in-time manifest. A referenced content hash resolves back to manifests/dates that used it. Missing or contradictory identity is a fail-closed error, not permission to delete.
+A referenced run protects its trading date and all content objects in its point-in-time manifest. A referenced content hash resolves back to manifests/dates that used it. A date-only reference must resolve to a real manifest. Missing or contradictory identity is a fail-closed error, not permission to delete.
+
+Protection resolution also verifies that protected run/date/hash evidence still exists. If a durable reference survives but its underlying manifest/object disappears, cleanup fails instead of normalizing the corruption away.
 
 ## 6. ML and research correctness
 
@@ -141,11 +145,11 @@ Historical memory is not only for predicting `price up/down`. TrendForge should 
 - which rejected/WAIT opportunity later became valid;
 - model/profile drift across time.
 
-Rejected, WAIT, WATCH, no-entry, expired, and ambiguous opportunities are therefore useful research data and should not be discarded merely because no trade was taken.
+Rejected, WAIT, WATCH, no-entry, expired, ambiguous and censored opportunities are useful research data and should not be discarded merely because no trade was taken.
 
 ## 8. Relationship to the main TF roadmap
 
-This branch is a cross-cutting **retention-safety foundation**. It does not claim completion of later roadmap stages and does not skip their dependencies.
+This branch is a cross-cutting retention-safety foundation. It does not claim completion of later roadmap stages and does not skip their dependencies.
 
 | Roadmap stage | Retention dependency |
 |---|---|
@@ -162,37 +166,51 @@ TF-02 through TF-05 remain separate roadmap work. This change must not be used t
 
 ## 9. Implementation stages for retention
 
-### R-HIST-01 — Retention authority contract — STARTED
+### R-HIST-01 — Retention authority contract — IMPLEMENTED + TESTED
 
-Implement:
+Implemented:
 
 - `RetentionPolicy`
 - HOT/WARM/COLD classification
 - typed durable reference classes
 - additive SQLite retention-reference table
-- identity validation against content objects/manifests
+- evidence identity validation against content objects/manifests/dates
+- immutable reference IDs
 - active reference resolution
 - transitive protection set
+- fail-closed disappearance/corruption detection
 - fail-closed deletion assertion
 - adversarial tests
 
-No file deletion is performed by this authority.
+The authority itself performs no file deletion.
 
-### R-HIST-02 — Wire protection into destructive cleanup — NEXT
+### R-HIST-02 — Wire protection into destructive cleanup — IMPLEMENTED, FINAL CI PENDING
 
-Before `MarketDataStore.cleanup_retention(..., dry_run=False)` may delete anything:
+`MarketDataStore.cleanup_retention()` now:
 
-1. load the active protection set;
-2. exclude protected trading dates;
-3. exclude protected manifest runs;
-4. exclude protected content hashes;
-5. re-resolve immediately before deletion to avoid stale protection state;
-6. fail closed on missing/invalid reference tables or inconsistent lineage;
-7. record an immutable cleanup report of what was evaluated, retained, moved, or deleted.
+1. loads the active protection set before computing deletion eligibility;
+2. excludes protected trading dates from expired day-directory cleanup;
+3. excludes protected content hashes from object garbage collection;
+4. preserves protected manifest runs through transitive date/hash protection;
+5. re-resolves protection immediately before destructive work;
+6. fails closed if the protection set changes during the cleanup window;
+7. calls deletion assertions for candidate dates/runs/hashes;
+8. fails closed when protected run/date/hash lineage has disappeared or is inconsistent;
+9. preserves existing current-day, path, symlink/reparse and object-root safety checks;
+10. preserves `dry_run=True` as the default.
 
-Until this wiring is verified, the existing destructive 5-day cleanup must not be treated as safe for research-history preservation.
+Adversarial integration tests cover:
 
-### R-HIST-03 — Producer wiring
+- durable decision reference protects old date/run/hash;
+- ML hash reference protects its point-in-time manifest transitively;
+- expired temporary reference becomes deletable;
+- disappeared protected run causes delete-nothing failure;
+- a new durable reference appearing during cleanup causes delete-nothing failure;
+- genuinely unprotected old history remains eligible for cleanup.
+
+R-HIST-02 is not PRODUCTION-ACCEPTED until exact-head CI and later real-data/shadow acceptance are recorded.
+
+### R-HIST-03 — Producer wiring — NEXT
 
 Register evidence references automatically when these artifacts are created:
 
@@ -203,6 +221,8 @@ Register evidence references automatically when these artifacts are created:
 - frozen ML datasets;
 - model/profile versions used for evaluation or publication;
 - audit/acceptance artifacts.
+
+This is the next major correctness step. Manual retention references alone are not enough for autonomous historical memory.
 
 ### R-HIST-04 — Tier movement, not blind deletion
 
@@ -231,7 +251,7 @@ Build deterministic historical datasets from exact availability timestamps and r
 
 ### R-HIST-06 — Outcome/failure memory
 
-Persist and analyze the complete opportunity population, not only winners/trades. Use it to calibrate strategy-specific ranking, uncertainty, failure risk, and regime behavior.
+Persist and analyze the complete opportunity population, not only winners/trades. Use it to calibrate strategy-specific ranking, uncertainty, failure risk and regime behavior.
 
 ### R-HIST-07 — Acceptance gates
 
@@ -252,11 +272,12 @@ Do not call historical memory production-accepted until:
 3. **A permanent evidence class cannot receive an expiry.**
 4. **A temporary reference must have an explicit expiry.**
 5. **A protected run must resolve to the same trading date recorded by its reference.**
-6. **A referenced content hash must exist before the reference is accepted.**
-7. **Archive/move operations must verify content hashes before deleting a source copy.**
-8. **Historical corrections create new versions/supersession relationships; they do not rewrite the past.**
-9. **ML datasets are frozen manifests, never views over mutable current data.**
-10. **Retention changes do not grant trading/execution authority.**
+6. **A referenced content hash must exist before the reference is accepted and while it remains protected.**
+7. **Reference IDs are immutable and cannot be repointed to different evidence.**
+8. **Archive/move operations must verify content hashes before deleting a source copy.**
+9. **Historical corrections create new versions/supersession relationships; they do not rewrite the past.**
+10. **ML datasets are frozen manifests, never views over mutable current data.**
+11. **Retention changes do not grant trading/execution authority.**
 
 ## 11. Current implementation checkpoint
 
@@ -268,15 +289,19 @@ As of this branch:
 - additive reference schema: **IMPLEMENTED**
 - HOT/WARM/COLD classification: **IMPLEMENTED**
 - permanent/temporary evidence rules: **IMPLEMENTED**
+- immutable reference identity: **IMPLEMENTED**
 - manifest/hash/date validation: **IMPLEMENTED**
 - transitive protection-set computation: **IMPLEMENTED**
+- protected-evidence disappearance detection: **IMPLEMENTED**
 - fail-closed deletion assertion API: **IMPLEMENTED**
-- existing `MarketDataStore.cleanup_retention()` wired to authority: **NO — R-HIST-02**
+- existing `MarketDataStore.cleanup_retention()` wired to authority: **IMPLEMENTED — R-HIST-02**
+- R-HIST-02 exact final-head CI: **PENDING**
 - decision/outcome/ML producers automatically register references: **NO — R-HIST-03**
 - WARM/COLD physical archive mover: **NO — R-HIST-04**
 - point-in-time ML dataset builder: **NO — R-HIST-05**
-- real-data verification: **NO**
+- complete opportunity/outcome failure memory: **NO — R-HIST-06**
+- real-data verification: **NO — R-HIST-07**
 - production acceptance: **NO**
 - live orders enabled: **NO**
 
-This distinction is deliberate: green unit tests for the retention authority do not prove end-to-end historical reconstructability or ML quality.
+Green unit tests for retention do not by themselves prove end-to-end historical reconstructability, leakage-free ML quality, profitable trading, or live execution safety.
