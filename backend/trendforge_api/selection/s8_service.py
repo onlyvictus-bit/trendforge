@@ -54,16 +54,19 @@ def _exact_r1_evidence(
     roots: list[RetentionEvidenceRoot] = []
     seen: set[str] = set()
     for source in sorted(bundle.source_records, key=lambda row: row.source_key):
-        for digest in (source.normalized_content_hash, source.last_good_hash):
-            if digest is None or digest in seen:
-                continue
-            seen.add(digest)
-            roots.append(
-                RetentionEvidenceRoot(
-                    role=f"R1_SOURCE_{len(roots) + 1:04d}",
-                    content_hash=digest,
-                )
+        # last_good_hash is the exact content-addressed MarketDataStore object.
+        # normalized_content_hash can represent an in-flight/valid-empty result
+        # that R1 records for lineage but that was never installed as an object.
+        digest = source.last_good_hash
+        if digest is None or digest in seen:
+            continue
+        seen.add(digest)
+        roots.append(
+            RetentionEvidenceRoot(
+                role=f"R1_SOURCE_{len(roots) + 1:04d}",
+                content_hash=digest,
             )
+        )
     if not roots:
         raise ValueError("WAIT_RHIST03_R1_EVIDENCE_HASHES_MISSING")
     return bundle, tuple(roots)
