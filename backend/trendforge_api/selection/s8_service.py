@@ -21,17 +21,58 @@ from .s4_structure_pack import S4StructurePackBatchV1, build_s4_structure_pack
 from .s5_shortlist_enrichment import S5EnrichmentBatchV1, build_s5_enrichment
 from .s6_family_resolution import S6ResolutionBatchV1, build_s6_resolution
 from .s7_state_gates import S7StateBatchV1, build_s7_state
-from .inventory_source_bundle import InventorySourceBundleV1
+from .inventory_source_bundle import (
+    PROFILE_ID as R1_PROFILE_ID,
+    InventorySourceBundleV1,
+)
 from .r14_live import R14CaJoinBatchV1
 from .tradability import TradabilityBatchV1, build_tradability_batch
-from .s8_persist_run import PROFILE_ID, S8ScanBlobV1, build_s8_scan, latest_matching_s8
-from .store import latest_selection_payload
+from .s8_persist_run import (
+    PROFILE_ID,
+    S8ScanBlobV1,
+    build_s8_scan,
+    latest_matching_s8,
+)
+from .store import get_selection_payload, latest_selection_payload
 from ..scanners.native_core import NativeCoreRunV1, build_native_core_run
+from ..retention_publication import RetentionEvidenceRoot
 from ..s8_retention import persist_protected_s8
+
+
+def _exact_r1_evidence(
+    r5: R5StructureBatchV1,
+) -> tuple[InventorySourceBundleV1, tuple[RetentionEvidenceRoot, ...]]:
+    payload = get_selection_payload(R1_PROFILE_ID, r5.r1_bundle_id)
+    if payload is None:
+        raise ValueError("WAIT_RHIST03_R1_BUNDLE_MISSING")
+    bundle = InventorySourceBundleV1.model_validate(payload)
+    if bundle.bundle_hash != r5.r1_bundle_hash or bundle.bundle_id != r5.r1_bundle_id:
+        raise ValueError("WAIT_RHIST03_R1_BUNDLE_HASH_MISMATCH")
+    if bundle.trading_date.isoformat() != r5.trading_date:
+        raise ValueError("WAIT_RHIST03_R1_TRADING_DATE_MISMATCH")
+
+    roots: list[RetentionEvidenceRoot] = []
+    seen: set[str] = set()
+    for source in sorted(bundle.source_records, key=lambda row: row.source_key):
+        for digest in (source.normalized_content_hash, source.last_good_hash):
+            if digest is None or digest in seen:
+                continue
+            seen.add(digest)
+            roots.append(
+                RetentionEvidenceRoot(
+                    role=f"R1_SOURCE_{len(roots) + 1:04d}",
+                    content_hash=digest,
+                )
+            )
+    if not roots:
+        raise ValueError("WAIT_RHIST03_R1_EVIDENCE_HASHES_MISSING")
+    return bundle, tuple(roots)
 
 
 @dataclass(frozen=True)
 class CurrentScanAssembly:
+    """One assembly shared by the producer and the read-only snapshot endpoint."""
+
     blob: S8ScanBlobV1
     s3: S3CheapDiscoveryBatchV1
     native: NativeCoreRunV1
@@ -59,6 +100,8 @@ def assemble_current_scan(
     event_snapshot: Any = None,
     activation_ready: bool | None = None,
 ) -> CurrentScanAssembly:
+    """Assemble once, without persistence; caller owns its input read scope."""
+
     r5 = r5_batch or latest_r5_structure_batch()
     a3 = discovery or latest_cash_discovery()
     r2 = attention or latest_attention_order()
@@ -66,6 +109,7 @@ def assemble_current_scan(
         raise ValueError("WAIT_R5_NOT_READY")
     if a3 is None or r2 is None:
         raise ValueError("WAIT_S3_SPINE_NOT_READY")
+
     effective_time = built_at or datetime.now(timezone.utc)
     symbols = tuple(
         str(row.symbol).upper()
@@ -78,8 +122,12 @@ def assemble_current_scan(
         decision_at=effective_time,
         sources={} if not symbols else None,
     )
+
     s3 = build_s3_cheap_discovery(
-        discovery=a3, attention=r2, built_at=effective_time, loader=loader
+        discovery=a3,
+        attention=r2,
+        built_at=effective_time,
+        loader=loader,
     )
     native = native_core or build_native_core_run(r5=r5)
     weather = build_s2_market_weather(built_at=effective_time, loader=loader)
@@ -143,14 +191,13 @@ def build_and_persist_current_s8(
     r5 = r5_batch or latest_r5_structure_batch()
     if r5 is None:
         raise ValueError("WAIT_R5_NOT_READY")
-    collector_run_id = str(getattr(r5, "collector_run_id", "") or "").strip()
     trading_date_raw = str(getattr(r5, "trading_date", "") or "").strip()
-    if not collector_run_id:
-        raise ValueError("WAIT_RHIST03_COLLECTOR_RUN_REQUIRED")
     try:
         evidence_date = date.fromisoformat(trading_date_raw)
     except ValueError as exc:
         raise ValueError("WAIT_RHIST03_TRADING_DATE_REQUIRED") from exc
+    r1_bundle, evidence_roots = _exact_r1_evidence(r5)
+
     assembly = assemble_current_scan(
         r5_batch=r5,
         discovery=discovery,
@@ -163,13 +210,21 @@ def build_and_persist_current_s8(
     return persist_protected_s8(
         blob=assembly.blob,
         prior_payload=assembly.prior,
-        collector_run_id=collector_run_id,
+        evidence_roots=evidence_roots,
+        publication_lineage={
+            "collectorRunId": r1_bundle.collector_run_id,
+            "r1BundleId": r1_bundle.bundle_id,
+            "r1BundleHash": r1_bundle.bundle_hash,
+            "sourceRootCount": len(evidence_roots),
+        },
         trading_date=evidence_date,
         market_db_path=market_db_path,
     )
 
 
 def latest_or_build_current_s8() -> S8ScanBlobV1:
+    """Read-only current snapshot: return persisted match or assemble ephemerally."""
+
     r5 = latest_r5_structure_batch()
     r2 = latest_attention_order()
     if r5 is None:
@@ -217,4 +272,8 @@ def latest_or_build_current_s8() -> S8ScanBlobV1:
     ).blob
 
 
-__all__ = ["assemble_current_scan", "build_and_persist_current_s8", "latest_or_build_current_s8"]
+__all__ = [
+    "assemble_current_scan",
+    "build_and_persist_current_s8",
+    "latest_or_build_current_s8",
+]

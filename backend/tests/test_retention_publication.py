@@ -88,7 +88,7 @@ def test_two_phase_publication_requires_protection_then_artifact(tmp_path: Path)
     authority = FakeAuthority()
     store, _ = _store(tmp_path, authority=authority)
     staged = store.stage_owned(_request())
-    with pytest.raises(RuntimeError, match="artifact publication is incomplete"):
+    with pytest.raises(RuntimeError, match="not retention-protected"):
         store.assert_published(staged.publication_id)
     protected = store.finalize(staged.publication_id)
     assert protected.status is RetentionPublicationStatus.PROTECTED_PENDING_ARTIFACT

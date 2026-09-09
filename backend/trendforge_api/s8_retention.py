@@ -19,25 +19,31 @@ MARKET_DB_ENV = "TRENDFORGE_MARKET_DATA_DB_PATH"
 ARTIFACT_TYPE = "S8_DECISION_VERSION"
 
 
-def _market_db_contains_run(db_path: Path, run_id: str, trading_date: date) -> bool:
-    if not db_path.is_file():
+def _market_db_contains_roots(
+    db_path: Path, evidence_roots: tuple[RetentionEvidenceRoot, ...]
+) -> bool:
+    hashes = tuple(
+        sorted({root.content_hash for root in evidence_roots if root.content_hash})
+    )
+    if not hashes or not db_path.is_file():
         return False
     try:
         with sqlite3.connect(db_path) as conn:
-            row = conn.execute(
-                "SELECT trading_date FROM market_data_manifests WHERE run_id = ? LIMIT 1",
-                (run_id,),
-            ).fetchone()
+            placeholders = ",".join("?" for _ in hashes)
+            count = conn.execute(
+                "SELECT COUNT(*) FROM market_data_objects "
+                f"WHERE content_hash IN ({placeholders})",
+                hashes,
+            ).fetchone()[0]
     except sqlite3.Error:
         return False
-    return row is not None and row[0] == trading_date.isoformat()
+    return int(count) == len(hashes)
 
 
 def resolve_market_db_path(
     *,
     research_db_path: Path,
-    collector_run_id: str,
-    trading_date: date,
+    evidence_roots: tuple[RetentionEvidenceRoot, ...],
     explicit: Path | None = None,
 ) -> Path:
     candidates: list[Path] = []
@@ -53,10 +59,11 @@ def resolve_market_db_path(
         if resolved in seen:
             continue
         seen.add(resolved)
-        if _market_db_contains_run(resolved, collector_run_id, trading_date):
+        if _market_db_contains_roots(resolved, evidence_roots):
             return resolved
     raise RuntimeError(
-        "WAIT_RHIST03_MARKET_LINEAGE_UNBOUND: exact collector run is not present in an approved market-data DB"
+        "WAIT_RHIST03_MARKET_LINEAGE_UNBOUND: exact R1 evidence hashes are not "
+        "present in an approved market-data DB"
     )
 
 
@@ -64,33 +71,41 @@ def persist_protected_s8(
     *,
     blob: Any,
     prior_payload: dict[str, Any] | None,
-    collector_run_id: str,
+    evidence_roots: tuple[RetentionEvidenceRoot, ...],
+    publication_lineage: dict[str, Any],
     trading_date: date,
     market_db_path: Path | None = None,
 ):
-    """Protect exact collector evidence before publishing immutable S8."""
+    """Protect exact collector evidence before making the immutable S8 artifact public.
+
+    Cross-database atomicity is impossible without a distributed transaction.
+    This uses a fail-closed two-phase publication: stage durable intent -> apply
+    exact market retention -> persist immutable S8 -> mark publication PUBLISHED.
+    A crash can create extra protection, never an unprotected successful decision.
+    """
 
     from . import storage
     from .selection.s8_persist_run import persist_s8_scan
 
-    if not collector_run_id.strip():
-        raise ValueError("WAIT_RHIST03_COLLECTOR_RUN_REQUIRED")
+    if not evidence_roots:
+        raise ValueError("WAIT_RHIST03_EVIDENCE_ROOTS_REQUIRED")
+    if any(root.content_hash is None for root in evidence_roots):
+        raise ValueError("WAIT_RHIST03_CONTENT_HASH_REQUIRED")
     if getattr(blob, "trading_date", None) != trading_date.isoformat():
         raise ValueError("WAIT_RHIST03_TRADING_DATE_LINEAGE_MISMATCH")
     research_db = Path(storage.DB_PATH).expanduser().resolve(strict=False)
     market_db = resolve_market_db_path(
         research_db_path=research_db,
-        collector_run_id=collector_run_id,
-        trading_date=trading_date,
+        evidence_roots=evidence_roots,
         explicit=market_db_path,
     )
     authority = HistoricalRetentionAuthority(db_path=market_db)
     registrar = DurableRetentionRegistrar(db_path=research_db, authority=authority)
     publications = RetentionPublicationStore(db_path=research_db, registrar=registrar)
-    lineage = getattr(blob, "lineage", None)
+    s8_lineage = getattr(blob, "lineage", None)
     lineage_payload = (
-        lineage.model_dump(mode="json", by_alias=True)
-        if lineage is not None and hasattr(lineage, "model_dump")
+        s8_lineage.model_dump(mode="json", by_alias=True)
+        if s8_lineage is not None and hasattr(s8_lineage, "model_dump")
         else {}
     )
     request = RetentionPublicationRequest(
@@ -98,15 +113,9 @@ def persist_protected_s8(
         artifact_id=str(blob.run_id),
         artifact_version=str(getattr(blob, "schema_version", "unknown")),
         reference_type=RetentionReferenceType.DECISION_VERSION,
-        evidence_roots=(
-            RetentionEvidenceRoot(
-                role="COLLECTOR_RUN",
-                run_id=collector_run_id,
-                trading_date=trading_date,
-            ),
-        ),
+        evidence_roots=evidence_roots,
         lineage={
-            "collectorRunId": collector_run_id,
+            **publication_lineage,
             "tradingDate": trading_date.isoformat(),
             "s8": lineage_payload,
             "profileId": getattr(blob, "profile_id", None),
