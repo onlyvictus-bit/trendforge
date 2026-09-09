@@ -42,8 +42,33 @@ def _aware(value: datetime, code: str) -> datetime:
 
 
 def _hash64(value: str | None, code: str) -> None:
-    if value is None or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value.casefold()):
+    if value is None or len(value) != 64 or any(
+        ch not in "0123456789abcdef" for ch in value.casefold()
+    ):
         raise ValueError(code)
+
+
+def _normalized_material(
+    model_type: type[BaseModel],
+    values: dict[str, Any],
+    *,
+    computed_field: str,
+) -> dict[str, Any]:
+    """Return the canonical logical representation used by builder and validator.
+
+    Pydantic field names are normalized to their public aliases and defaults are
+    materialized. The object's own computed identity field is excluded so the
+    identity never hashes itself.
+    """
+    draft_values = dict(values)
+    draft_values.pop(computed_field, None)
+    draft_values.pop(to_camel(computed_field), None)
+    draft = model_type.model_construct(**draft_values, **{computed_field: "0" * 64})
+    return draft.model_dump(
+        mode="json",
+        by_alias=True,
+        exclude={computed_field},
+    )
 
 
 class FrozenEvidenceRootV1(BaseModel):
@@ -119,18 +144,26 @@ class FrozenDatasetMemberV1(BaseModel):
         for value in self.input_hashes:
             _hash64(value, "INPUT_HASH_INVALID")
         decision_at = _aware(self.decision_at, "DECISION_TIME_REQUIRES_TIMEZONE")
-        decision_cutoff = _aware(self.decision_data_cutoff, "DECISION_CUTOFF_REQUIRES_TIMEZONE")
-        max_feature = _aware(self.max_feature_available_at, "FEATURE_TIME_REQUIRES_TIMEZONE")
+        decision_cutoff = _aware(
+            self.decision_data_cutoff, "DECISION_CUTOFF_REQUIRES_TIMEZONE"
+        )
+        max_feature = _aware(
+            self.max_feature_available_at, "FEATURE_TIME_REQUIRES_TIMEZONE"
+        )
         if decision_cutoff < decision_at:
             raise ValueError("DECISION_CUTOFF_BEFORE_DECISION")
         if max_feature > decision_cutoff:
             raise ValueError("FUTURE_FEATURE_EXCEEDS_DECISION_CUTOFF")
         if self.outcome_available_at is not None:
-            outcome_at = _aware(self.outcome_available_at, "OUTCOME_TIME_REQUIRES_TIMEZONE")
+            outcome_at = _aware(
+                self.outcome_available_at, "OUTCOME_TIME_REQUIRES_TIMEZONE"
+            )
             if outcome_at < decision_at:
                 raise ValueError("FUTURE_LABEL_CHRONOLOGY_INVALID")
         if self.label_available_at is not None:
-            label_at = _aware(self.label_available_at, "LABEL_TIME_REQUIRES_TIMEZONE")
+            label_at = _aware(
+                self.label_available_at, "LABEL_TIME_REQUIRES_TIMEZONE"
+            )
             if label_at < decision_at:
                 raise ValueError("FUTURE_LABEL_CHRONOLOGY_INVALID")
         if self.revision_available_at is not None:
@@ -141,7 +174,11 @@ class FrozenDatasetMemberV1(BaseModel):
             raise ValueError("REVISION_ID_HASH_PAIR_REQUIRED")
         if not self.evidence_roots:
             raise ValueError("EVIDENCE_ROOTS_REQUIRED")
-        material = self.model_dump(mode="json", by_alias=True, exclude={"memberId", "memberHash"})
+        material = self.model_dump(
+            mode="json",
+            by_alias=True,
+            exclude={"member_id", "member_hash"},
+        )
         expected_hash = canonical_hash(material)
         if self.member_hash != expected_hash:
             raise ValueError("DATASET_MEMBER_HASH_MISMATCH")
@@ -152,7 +189,6 @@ class FrozenDatasetMemberV1(BaseModel):
 
 
 def build_frozen_dataset_member(**values: Any) -> FrozenDatasetMemberV1:
-    # Fail before hashing so chronology mistakes cannot receive a stable identity.
     for key in ("decision_at", "decision_data_cutoff", "max_feature_available_at"):
         values[key] = _aware(values[key], key.upper() + "_REQUIRES_TIMEZONE")
     if values["decision_data_cutoff"] < values["decision_at"]:
@@ -160,15 +196,20 @@ def build_frozen_dataset_member(**values: Any) -> FrozenDatasetMemberV1:
     if values["max_feature_available_at"] > values["decision_data_cutoff"]:
         raise ValueError("FUTURE_FEATURE_EXCEEDS_DECISION_CUTOFF")
     for key in ("outcome_available_at", "label_available_at"):
-        if values.get(key) is not None and _aware(values[key], "FUTURE_LABEL_TIMEZONE_REQUIRED") > values.get("dataset_build_cutoff", datetime.max.replace(tzinfo=UTC)):
-            raise ValueError("FUTURE_LABEL_EXCEEDS_BUILD_CUTOFF")
-    # Member-local future label guard uses the latest declared availability as a
-    # conservative ceiling until the dataset builder applies its exact build cutoff.
-    if values.get("outcome_available_at") is not None and values["outcome_available_at"] > values.get("label_available_at", values["outcome_available_at"]):
+        if values.get(key) is not None:
+            values[key] = _aware(values[key], "FUTURE_LABEL_TIMEZONE_REQUIRED")
+    if (
+        values.get("outcome_available_at") is not None
+        and values.get("label_available_at") is not None
+        and values["outcome_available_at"] != values["label_available_at"]
+    ):
         raise ValueError("FUTURE_LABEL_AVAILABILITY_MISMATCH")
-    material = dict(values)
-    material.pop("member_id", None)
-    material.pop("member_hash", None)
+    material = _normalized_material(
+        FrozenDatasetMemberV1,
+        values,
+        computed_field="member_hash",
+    )
+    material.pop("memberId", None)
     member_hash = canonical_hash(material)
     return FrozenDatasetMemberV1(
         **values,
@@ -238,19 +279,34 @@ class FrozenDatasetManifestV1(BaseModel):
         if not self.base_population:
             if not self.transformation_policy_id or not self.transformation_policy_version:
                 raise ValueError("EXCLUSION_POLICY_REQUIRED")
-            if self.source_population_count != self.member_count + sum(self.exclusion_reason_distribution.values()):
+            if self.source_population_count != self.member_count + sum(
+                self.exclusion_reason_distribution.values()
+            ):
                 raise ValueError("TRANSFORMED_POPULATION_COUNT_MISMATCH")
-        expected_members = canonical_hash([row.member_hash for row in sorted(self.members, key=lambda item: item.member_id)])
+        expected_members = canonical_hash(
+            [
+                row.member_hash
+                for row in sorted(self.members, key=lambda item: item.member_id)
+            ]
+        )
         if self.member_manifest_hash != expected_members:
             raise ValueError("MEMBER_MANIFEST_HASH_MISMATCH")
-        material = self.model_dump(mode="json", by_alias=True, exclude={"datasetHash"})
+        material = self.model_dump(
+            mode="json", by_alias=True, exclude={"dataset_hash"}
+        )
         if self.dataset_hash != canonical_hash(material):
             raise ValueError("DATASET_HASH_MISMATCH")
         return self
 
 
-def _member_with_dataset_cutoff(member: FrozenDatasetMemberV1, build_cutoff: datetime, label_cutoff: datetime) -> FrozenDatasetMemberV1:
-    for value in (member.outcome_available_at, member.label_available_at, member.revision_available_at):
+def _member_with_dataset_cutoff(
+    member: FrozenDatasetMemberV1, build_cutoff: datetime, label_cutoff: datetime
+) -> FrozenDatasetMemberV1:
+    for value in (
+        member.outcome_available_at,
+        member.label_available_at,
+        member.revision_available_at,
+    ):
         if value is not None and value > build_cutoff:
             raise ValueError("FUTURE_LABEL_EXCEEDS_BUILD_CUTOFF")
     if member.label_available_at is not None and member.label_available_at > label_cutoff:
@@ -259,27 +315,40 @@ def _member_with_dataset_cutoff(member: FrozenDatasetMemberV1, build_cutoff: dat
 
 
 def build_frozen_dataset_manifest(**values: Any) -> FrozenDatasetManifestV1:
-    decision_cutoff = _aware(values["decision_cutoff"], "DATASET_DECISION_CUTOFF_REQUIRES_TIMEZONE")
-    label_cutoff = _aware(values["label_cutoff"], "DATASET_LABEL_CUTOFF_REQUIRES_TIMEZONE")
-    build_cutoff = _aware(values["build_cutoff"], "DATASET_BUILD_CUTOFF_REQUIRES_TIMEZONE")
+    decision_cutoff = _aware(
+        values["decision_cutoff"], "DATASET_DECISION_CUTOFF_REQUIRES_TIMEZONE"
+    )
+    label_cutoff = _aware(
+        values["label_cutoff"], "DATASET_LABEL_CUTOFF_REQUIRES_TIMEZONE"
+    )
+    build_cutoff = _aware(
+        values["build_cutoff"], "DATASET_BUILD_CUTOFF_REQUIRES_TIMEZONE"
+    )
     if not decision_cutoff < label_cutoff < build_cutoff:
         raise ValueError("DATASET_CUTOFF_ORDER_INVALID")
-    members = tuple(_member_with_dataset_cutoff(member, build_cutoff, label_cutoff) for member in values["members"])
+    members = tuple(
+        _member_with_dataset_cutoff(member, build_cutoff, label_cutoff)
+        for member in values["members"]
+    )
     if len({row.member_id for row in members}) != len(members):
         raise ValueError("DUPLICATE_DATASET_MEMBER")
     state_distribution = dict(sorted(Counter(row.public_state for row in members).items()))
-    outcome_distribution = dict(sorted(Counter(row.outcome_state for row in members if row.outcome_state).items()))
+    outcome_distribution = dict(
+        sorted(Counter(row.outcome_state for row in members if row.outcome_state).items())
+    )
     exclusions = dict(sorted(values.get("exclusion_reason_distribution", {}).items()))
-    member_manifest_hash = canonical_hash([row.member_hash for row in sorted(members, key=lambda item: item.member_id)])
+    member_manifest_hash = canonical_hash(
+        [row.member_hash for row in sorted(members, key=lambda item: item.member_id)]
+    )
     evidence_material = sorted(
-        canonical_json(root)
-        for member in members
-        for root in member.evidence_roots
+        canonical_json(root) for member in members for root in member.evidence_roots
     )
     evidence_root_digest = canonical_hash(evidence_material)
     prepared = {
         **values,
-        "created_at": _aware(values["created_at"], "DATASET_CREATED_AT_REQUIRES_TIMEZONE"),
+        "created_at": _aware(
+            values["created_at"], "DATASET_CREATED_AT_REQUIRES_TIMEZONE"
+        ),
         "decision_cutoff": decision_cutoff,
         "label_cutoff": label_cutoff,
         "build_cutoff": build_cutoff,
@@ -291,29 +360,43 @@ def build_frozen_dataset_manifest(**values: Any) -> FrozenDatasetManifestV1:
         "exclusion_reason_distribution": exclusions,
         "evidence_root_digest": evidence_root_digest,
     }
-    if prepared.get("base_population", True) and prepared.get("source_population_count") != len(members):
+    if prepared.get("base_population", True) and prepared.get(
+        "source_population_count"
+    ) != len(members):
         raise ValueError("BASE_POPULATION_INCOMPLETE")
     if not prepared.get("base_population", True):
-        if not prepared.get("transformation_policy_id") or not prepared.get("transformation_policy_version"):
+        if not prepared.get("transformation_policy_id") or not prepared.get(
+            "transformation_policy_version"
+        ):
             raise ValueError("EXCLUSION_POLICY_REQUIRED")
-    material = {
-        **prepared,
-        "schema_version": DATASET_SCHEMA_VERSION,
-    }
-    material.pop("dataset_hash", None)
-    dataset_hash = canonical_hash(FrozenDatasetManifestV1.model_construct(dataset_hash="0" * 64, **material).model_dump(mode="json", by_alias=True, exclude={"datasetHash"}))
+    material = _normalized_material(
+        FrozenDatasetManifestV1,
+        prepared,
+        computed_field="dataset_hash",
+    )
+    dataset_hash = canonical_hash(material)
     return FrozenDatasetManifestV1(**prepared, dataset_hash=dataset_hash)
 
 
 def verify_frozen_dataset_manifest(
-    manifest: FrozenDatasetManifestV1 | dict[str, Any], *, available_evidence_hashes: set[str]
+    manifest: FrozenDatasetManifestV1 | dict[str, Any],
+    *,
+    available_evidence_hashes: set[str],
 ) -> FrozenDatasetManifestV1:
-    model = manifest if isinstance(manifest, FrozenDatasetManifestV1) else FrozenDatasetManifestV1.model_validate(manifest)
+    model = (
+        manifest
+        if isinstance(manifest, FrozenDatasetManifestV1)
+        else FrozenDatasetManifestV1.model_validate(manifest)
+    )
     available = {value.casefold() for value in available_evidence_hashes}
     for member in model.members:
         if member.feature_manifest_hash != model.feature_manifest_hash:
             raise ValueError("FEATURE_MANIFEST_MISMATCH")
-        required = {root.content_hash.casefold() for root in member.evidence_roots if root.content_hash}
+        required = {
+            root.content_hash.casefold()
+            for root in member.evidence_roots
+            if root.content_hash
+        }
         if not required.issubset(available):
             raise ValueError("EVIDENCE_ROOT_MISSING")
     return model
@@ -353,15 +436,43 @@ class GovernedModelVersionV1(BaseModel):
     automatic_promotion_allowed: Literal[False] = False
     execution_authorized: Literal[False] = False
 
+    @model_validator(mode="after")
+    def validate_model_hash(self) -> "GovernedModelVersionV1":
+        for value, code in (
+            (self.training_dataset_hash, "MODEL_TRAINING_DATASET_HASH_INVALID"),
+            (self.evaluation_dataset_hash, "MODEL_EVALUATION_DATASET_HASH_INVALID"),
+            (self.feature_set_hash, "MODEL_FEATURE_SET_HASH_INVALID"),
+            (self.formula_set_hash, "MODEL_FORMULA_SET_HASH_INVALID"),
+            (self.model_artifact_hash, "MODEL_ARTIFACT_HASH_INVALID"),
+            (self.code_build_hash, "MODEL_CODE_HASH_INVALID"),
+            (self.config_hash, "MODEL_CONFIG_HASH_INVALID"),
+            (self.evaluation_hash, "MODEL_EVALUATION_HASH_INVALID"),
+            (self.model_hash, "MODEL_HASH_INVALID"),
+        ):
+            _hash64(value, code)
+        if self.holdout_dataset_hash is not None:
+            _hash64(self.holdout_dataset_hash, "MODEL_HOLDOUT_HASH_INVALID")
+        material = self.model_dump(
+            mode="json", by_alias=True, exclude={"model_hash"}
+        )
+        if self.model_hash != canonical_hash(material):
+            raise ValueError("MODEL_HASH_MISMATCH")
+        return self
+
 
 def build_governed_model_version(**values: Any) -> GovernedModelVersionV1:
     training = values.pop("training_dataset")
     evaluation = values.pop("evaluation_dataset")
     holdout = values.pop("holdout_dataset", None)
     provided_training_hash = values.pop("training_dataset_hash", None)
-    if provided_training_hash is not None and provided_training_hash != training.dataset_hash:
+    if (
+        provided_training_hash is not None
+        and provided_training_hash != training.dataset_hash
+    ):
         raise ValueError("MODEL_DATASET_BINDING_MISMATCH")
-    if values.get("model_artifact_hash") is None or len(str(values["model_artifact_hash"])) != 64:
+    if values.get("model_artifact_hash") is None or len(
+        str(values["model_artifact_hash"])
+    ) != 64:
         raise ValueError("MODEL_ARTIFACT_HASH_INVALID")
     prepared = {
         **values,
@@ -374,9 +485,16 @@ def build_governed_model_version(**values: Any) -> GovernedModelVersionV1:
         "holdout_dataset_id": holdout.dataset_id if holdout else None,
         "holdout_dataset_version": holdout.dataset_version if holdout else None,
         "holdout_dataset_hash": holdout.dataset_hash if holdout else None,
-        "created_at": _aware(values["created_at"], "MODEL_CREATED_AT_REQUIRES_TIMEZONE"),
+        "created_at": _aware(
+            values["created_at"], "MODEL_CREATED_AT_REQUIRES_TIMEZONE"
+        ),
     }
-    model_hash = canonical_hash({**prepared, "schemaVersion": MODEL_SCHEMA_VERSION})
+    material = _normalized_material(
+        GovernedModelVersionV1,
+        prepared,
+        computed_field="model_hash",
+    )
+    model_hash = canonical_hash(material)
     return GovernedModelVersionV1(**prepared, model_hash=model_hash)
 
 
@@ -411,21 +529,48 @@ class StrategyProfileVersionV1(BaseModel):
     valid_from: datetime
     content_hash: str
 
+    @model_validator(mode="after")
+    def validate_content_hash(self) -> "StrategyProfileVersionV1":
+        _hash64(self.content_hash, "PROFILE_CONTENT_HASH_INVALID")
+        if any((self.model_id, self.model_version, self.model_hash)) and not all(
+            (self.model_id, self.model_version, self.model_hash)
+        ):
+            raise ValueError("PROFILE_MODEL_BINDING_INCOMPLETE")
+        if self.model_hash is not None:
+            _hash64(self.model_hash, "PROFILE_MODEL_HASH_INVALID")
+        material = self.model_dump(
+            mode="json", by_alias=True, exclude={"content_hash"}
+        )
+        if self.content_hash != canonical_hash(material):
+            raise ValueError("PROFILE_CONTENT_HASH_MISMATCH")
+        return self
+
 
 def build_strategy_profile_version(**values: Any) -> StrategyProfileVersionV1:
     if values.get("activation_allowed", False):
         raise ValueError("R_HIST_03D_CANNOT_ACTIVATE_PROFILE")
-    if any(values.get(name) for name in ("model_id", "model_version", "model_hash")) and not all(values.get(name) for name in ("model_id", "model_version", "model_hash")):
+    if any(values.get(name) for name in ("model_id", "model_version", "model_hash")) and not all(
+        values.get(name) for name in ("model_id", "model_version", "model_hash")
+    ):
         raise ValueError("PROFILE_MODEL_BINDING_INCOMPLETE")
     if values.get("model_hash") is not None:
         _hash64(values["model_hash"], "PROFILE_MODEL_HASH_INVALID")
     prepared = {
         **values,
-        "created_at": _aware(values["created_at"], "PROFILE_CREATED_AT_REQUIRES_TIMEZONE"),
-        "valid_from": _aware(values["valid_from"], "PROFILE_VALID_FROM_REQUIRES_TIMEZONE"),
+        "created_at": _aware(
+            values["created_at"], "PROFILE_CREATED_AT_REQUIRES_TIMEZONE"
+        ),
+        "valid_from": _aware(
+            values["valid_from"], "PROFILE_VALID_FROM_REQUIRES_TIMEZONE"
+        ),
     }
     prepared.pop("content_hash", None)
-    content_hash = canonical_hash({**prepared, "schemaVersion": PROFILE_SCHEMA_VERSION})
+    material = _normalized_material(
+        StrategyProfileVersionV1,
+        prepared,
+        computed_field="content_hash",
+    )
+    content_hash = canonical_hash(material)
     return StrategyProfileVersionV1(**prepared, content_hash=content_hash)
 
 
@@ -459,19 +604,46 @@ class GovernanceAuditRecordV1(BaseModel):
     automatic_promotion_allowed: Literal[False] = False
     execution_authorized: Literal[False] = False
 
+    @model_validator(mode="after")
+    def validate_record_hash(self) -> "GovernanceAuditRecordV1":
+        _hash64(self.record_hash, "AUDIT_RECORD_HASH_INVALID")
+        material = self.model_dump(
+            mode="json", by_alias=True, exclude={"record_hash"}
+        )
+        if self.record_hash != canonical_hash(material):
+            raise ValueError("AUDIT_RECORD_HASH_MISMATCH")
+        return self
+
 
 def build_governance_audit_record(**values: Any) -> GovernanceAuditRecordV1:
     if values.get("decision") == "APPROVE" and not values.get("pit_prerequisite_proven"):
         raise ValueError("PIT_PREREQUISITE_UNPROVEN")
-    if not str(values.get("reviewer", "")).strip() or not str(values.get("reason", "")).strip():
+    if not str(values.get("reviewer", "")).strip() or not str(
+        values.get("reason", "")
+    ).strip():
         raise ValueError("AUDIT_REVIEWER_AND_REASON_REQUIRED")
-    for key in ("artifact_hash", "dataset_hash", "model_hash", "profile_hash", "evaluation_hash", "predecessor_audit_hash", "evidence_hash"):
+    for key in (
+        "artifact_hash",
+        "dataset_hash",
+        "model_hash",
+        "profile_hash",
+        "evaluation_hash",
+        "predecessor_audit_hash",
+        "evidence_hash",
+    ):
         if values.get(key) is not None:
             _hash64(values[key], "AUDIT_HASH_INVALID")
     prepared = {
         **values,
-        "reviewed_at": _aware(values["reviewed_at"], "AUDIT_REVIEWED_AT_REQUIRES_TIMEZONE"),
+        "reviewed_at": _aware(
+            values["reviewed_at"], "AUDIT_REVIEWED_AT_REQUIRES_TIMEZONE"
+        ),
     }
     prepared.pop("record_hash", None)
-    record_hash = canonical_hash({**prepared, "schemaVersion": AUDIT_SCHEMA_VERSION})
+    material = _normalized_material(
+        GovernanceAuditRecordV1,
+        prepared,
+        computed_field="record_hash",
+    )
+    record_hash = canonical_hash(material)
     return GovernanceAuditRecordV1(**prepared, record_hash=record_hash)
