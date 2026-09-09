@@ -1,7 +1,7 @@
 name: Temporary review workspace
 on:
   push:
-    branches: [fix/current-state-history]
+    branches: [fix/current-state-history, feat/rhist03-producer-wiring]
     paths: [.github/workflows/review-workspace.yml]
 permissions:
   contents: read
