@@ -24,6 +24,8 @@ def _now() -> datetime:
 
 
 def r16_schema_status() -> dict[str, Any]:
+    from ..r16_retention import schema_ready
+
     storage.init_db()
     conn = storage.connect()
     try:
@@ -37,6 +39,7 @@ def r16_schema_status() -> dict[str, Any]:
             "SELECT 1 FROM schema_migrations WHERE version = ?",
             (MIGRATION_VERSION,),
         ).fetchone()
+        retention_ready = schema_ready(conn)
     finally:
         conn.close()
     present = tuple(name for name in TABLES if name in existing)
@@ -46,6 +49,7 @@ def r16_schema_status() -> dict[str, Any]:
         "tables": present,
         "missingTables": tuple(name for name in TABLES if name not in existing),
         "workerStateReady": WORKER_TABLE in existing,
+        "retentionReady": retention_ready,
     }
 
 
@@ -214,6 +218,9 @@ def apply_r16_schema() -> dict[str, Any]:
                 now,
             ),
         )
+        from ..r16_retention import apply_schema
+
+        apply_schema(conn)
         conn.commit()
     finally:
         conn.close()
@@ -275,13 +282,17 @@ def persist_dataset_run(payload: dict[str, Any]) -> bool:
 
 
 def persist_hypotheses(dataset_run_id: str, rows: Iterable[dict[str, Any]]) -> int:
+    from ..r16_retention import R16RetentionWriter, finalize_publications
     from .r16_metrics import exact_cell_key
     from .r16_pit import R16FrozenHypothesisV1
 
     _require_schema()
     conn = storage.connect()
     inserted = 0
+    publications: list[str] = []
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        writer = R16RetentionWriter(conn)
         for payload in rows:
             model = R16FrozenHypothesisV1.model_validate(payload)
             encoded = storage.encode_json(payload)
@@ -291,6 +302,7 @@ def persist_hypotheses(dataset_run_id: str, rows: Iterable[dict[str, Any]]) -> i
             if existing is not None:
                 if existing != encoded:
                     raise ValueError(f"PIT hypothesis {model.hypothesis_id} is immutable")
+                publications.append(writer.hypothesis(dataset_run_id, payload))
                 continue
             conn.execute(
                 """
@@ -316,19 +328,28 @@ def persist_hypotheses(dataset_run_id: str, rows: Iterable[dict[str, Any]]) -> i
                 ),
             )
             inserted += 1
+            publications.append(writer.hypothesis(dataset_run_id, payload))
         conn.commit()
-        return inserted
+    except BaseException:
+        conn.rollback()
+        raise
     finally:
         conn.close()
+    finalize_publications(publications)
+    return inserted
 
 
 def persist_observations(dataset_run_id: str, rows: Iterable[dict[str, Any]]) -> int:
+    from ..r16_retention import R16RetentionWriter, finalize_publications
     from .r16_pit import R16ObservationV1
 
     _require_schema()
     conn = storage.connect()
     inserted = 0
+    publications: list[str] = []
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        writer = R16RetentionWriter(conn)
         for payload in rows:
             model = R16ObservationV1.model_validate(payload)
             encoded = storage.encode_json(payload)
@@ -338,6 +359,7 @@ def persist_observations(dataset_run_id: str, rows: Iterable[dict[str, Any]]) ->
             if existing is not None:
                 if existing != encoded:
                     raise ValueError(f"PIT observation {model.observation_id} is immutable")
+                publications.append(writer.observation(dataset_run_id, payload))
                 continue
             conn.execute(
                 """
@@ -361,10 +383,58 @@ def persist_observations(dataset_run_id: str, rows: Iterable[dict[str, Any]]) ->
                 ),
             )
             inserted += 1
+            publications.append(writer.observation(dataset_run_id, payload))
         conn.commit()
-        return inserted
+    except BaseException:
+        conn.rollback()
+        raise
     finally:
         conn.close()
+    finalize_publications(publications)
+    return inserted
+
+
+def persist_revisions(dataset_run_id: str, rows: Iterable[dict[str, Any]]) -> int:
+    from ..r16_retention import R16RetentionWriter, finalize_publications
+    from .r16_pit import R16RevisionV1
+
+    _require_schema()
+    conn = storage.connect()
+    publications: list[str] = []
+    inserted = 0
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        writer = R16RetentionWriter(conn)
+        for payload in rows:
+            model = R16RevisionV1.model_validate(payload)
+            encoded = storage.encode_json(payload)
+            existing = _existing_payload(conn, "pit_revisions", "revision_id", model.revision_id)
+            if existing is not None:
+                if existing != encoded:
+                    raise ValueError(f"PIT revision {model.revision_id} is immutable")
+            else:
+                conn.execute(
+                    "INSERT INTO pit_revisions (revision_id, hypothesis_id, dataset_run_id, "
+                    "predecessor_type, predecessor_id, predecessor_hash, revision_kind, "
+                    "recorded_at, content_hash, payload_json, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (model.revision_id, model.hypothesis_id, dataset_run_id,
+                     model.predecessor_type, model.predecessor_id, model.predecessor_hash,
+                     model.revision_kind, model.recorded_at.isoformat(), _content_hash(payload),
+                     encoded, _now().isoformat()),
+                )
+                inserted += 1
+            publications.append(writer.revision(dataset_run_id, payload))
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    finalize_publications(publications)
+    return inserted
+
+
 def persist_fold(payload: dict[str, Any]) -> bool:
     _require_schema()
     encoded = storage.encode_json(payload)
@@ -477,11 +547,16 @@ def _page(
     where: str = "",
     params: tuple[Any, ...] = (),
 ) -> dict[str, Any]:
+    from ..r16_retention import RECORD_TABLES, publication_predicate, schema_ready, verified_record
+
     _require_schema()
-    if table not in TABLES:
+    if table not in (*TABLES, "pit_revisions"):
         raise ValueError("unsupported PIT table")
     page_size = max(1, min(int(limit), 1000))
     clauses = [where.removeprefix("WHERE ")] if where else []
+    governed = next(((kind, key) for kind, (name, key) in RECORD_TABLES.items() if name == table), None)
+    if governed:
+        clauses.append(publication_predicate(table))
     values: list[Any] = list(params)
     if cursor is not None:
         clauses.append("rowid < ?")
@@ -489,11 +564,19 @@ def _page(
     predicate = " WHERE " + " AND ".join(clauses) if clauses else ""
     conn = storage.connect()
     try:
+        if governed and not schema_ready(conn):
+            return {"items": [], "nextCursor": None}
         rows = conn.execute(
             f"SELECT rowid AS cursor_id, payload_json FROM {table}"
             f"{predicate} ORDER BY rowid DESC LIMIT ?",
             (*values, page_size + 1),
         ).fetchall()
+        if governed:
+            kind, key = governed
+            identity_key = {"hypothesis_id": "hypothesisId", "observation_id": "observationId", "revision_id": "revisionId"}[key]
+            for row in rows[:page_size]:
+                payload = storage.decode_json(row["payload_json"])
+                verified_record(conn, kind, payload[identity_key])
     finally:
         conn.close()
     has_more = len(rows) > page_size
@@ -578,17 +661,31 @@ def list_observations(
     )
 
 
+def list_revisions(hypothesis_id: str | None = None, limit: int = 5000) -> list[dict[str, Any]]:
+    return _list_all(
+        "pit_revisions", limit=limit,
+        where="WHERE hypothesis_id = ?" if hypothesis_id else "",
+        params=(hypothesis_id,) if hypothesis_id else (),
+    )
+
+
 def list_latest_observations(limit: int = 10000) -> list[dict[str, Any]]:
+    from ..r16_retention import publication_predicate, schema_ready, verified_record
+
     _require_schema()
     conn = storage.connect()
     try:
+        if not schema_ready(conn):
+            return []
+        protected = publication_predicate("pit_observations")
         rows = conn.execute(
-            """
+            f"""
             SELECT o.payload_json
             FROM pit_observations o
-            WHERE o.rowid = (
+            WHERE {protected.replace('pit_observations.', 'o.')} AND o.rowid = (
                 SELECT o2.rowid FROM pit_observations o2
                 WHERE o2.hypothesis_id = o.hypothesis_id
+                  AND {protected.replace('pit_observations.', 'o2.')}
                 ORDER BY o2.label_computed_at DESC, o2.rowid DESC
                 LIMIT 1
             )
@@ -597,7 +694,10 @@ def list_latest_observations(limit: int = 10000) -> list[dict[str, Any]]:
             """,
             (max(1, min(int(limit), 500000)),),
         ).fetchall()
-        return [storage.decode_json(row["payload_json"]) for row in rows]
+        payloads = [storage.decode_json(row["payload_json"]) for row in rows]
+        for payload in payloads:
+            verified_record(conn, "OUTCOME", payload["observationId"])
+        return payloads
     finally:
         conn.close()
 

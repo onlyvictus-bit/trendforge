@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -239,8 +242,14 @@ def _persist_r16_test_bar(
 ) -> None:
     from trendforge_api.selection.cash_a4_history import CashRawSessionBar, _store_raw_bar
     from trendforge_api.selection.contracts import stable_id
+    from trendforge_api.market_data_store import MarketDataStore
 
-    artifact = f"r16-artifact-{symbol}-{day.isoformat()}-{high}-{low}-{close}"
+    market = MarketDataStore(root=Path(storage.DB_PATH).parent / "market", db_path=storage.DB_PATH)
+    market.initialize_schema()
+    artifact = market.install_object(
+        json.dumps({"symbol": symbol, "date": day.isoformat(), "high": high, "low": low, "close": close}).encode(),
+        extension="json", media_type="application/json",
+    ).content_hash
     _store_raw_bar(
         CashRawSessionBar(
             bar_id=stable_id("r16-test-bar", symbol, day.isoformat(), artifact),
@@ -260,26 +269,24 @@ def _persist_r16_test_bar(
     )
 
 def _prepare_r16_service_db(tmp_path, monkeypatch) -> None:
+    from trendforge_api.historical_retention import HistoricalRetentionAuthority, RetentionReferenceType
+    from trendforge_api.retention_producer import DurableRetentionRegistrar
+    from trendforge_api.retention_publication import RetentionEvidenceRoot, RetentionPublicationRequest, RetentionPublicationStore
     from trendforge_api.selection.r16_store import apply_r16_schema
     from trendforge_api.selection.s8_persist_run import PROFILE_ID as S8_PROFILE_ID
     from trendforge_api.selection.store import persist_selection_payload
 
     monkeypatch.setattr(storage, "DB_PATH", tmp_path / "r16-service.db")
+    monkeypatch.delenv("TRENDFORGE_MARKET_DATA_DB_PATH", raising=False)
     storage._INITIALIZED_DB_PATHS.clear()
     storage.init_db()
     apply_r16_schema()
 
     payload = _s8_payload()
+    payload["schemaVersion"] = "trendforge.s8-scan.v1"
     payload["runId"] = "s8-2026-08-03"
     payload["tradingDate"] = "2026-08-03"
     payload["asOf"] = "2026-08-03T14:00:00+00:00"
-    persist_selection_payload(
-        run_id=payload["runId"],
-        profile_id=S8_PROFILE_ID,
-        as_of=datetime.fromisoformat(payload["asOf"]),
-        payload=payload,
-    )
-
     start = date(2026, 7, 1)
     for index in range(22):
         if index < 8:
@@ -291,6 +298,30 @@ def _prepare_r16_service_db(tmp_path, monkeypatch) -> None:
         _persist_r16_test_bar(
             start + timedelta(days=index), high=high, low=low, close=close
         )
+
+    with storage.connect() as conn:
+        hashes = [row[0] for row in conn.execute("SELECT artifact_hash FROM cash_raw_session_bars ORDER BY trade_date")]
+    authority = HistoricalRetentionAuthority(db_path=storage.DB_PATH)
+    publications = RetentionPublicationStore(
+        db_path=storage.DB_PATH,
+        registrar=DurableRetentionRegistrar(db_path=storage.DB_PATH, authority=authority),
+    )
+    request = RetentionPublicationRequest(
+        artifact_type="S8_DECISION_VERSION", artifact_id=payload["runId"],
+        artifact_version=payload["schemaVersion"],
+        reference_type=RetentionReferenceType.DECISION_VERSION,
+        evidence_roots=tuple(RetentionEvidenceRoot(role=f"R1_RAW_{index}", content_hash=value) for index, value in enumerate(hashes)),
+        lineage={"s8": payload["lineage"], "tradingDate": payload["tradingDate"],
+                 "s8PayloadHash": hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()},
+        created_at=datetime.fromisoformat(payload["asOf"]),
+    )
+    publications.stage_owned(request)
+    publications.finalize(request.publication_id)
+    persist_selection_payload(
+        run_id=payload["runId"], profile_id=S8_PROFILE_ID,
+        as_of=datetime.fromisoformat(payload["asOf"]), payload=payload,
+    )
+    publications.mark_published(request.publication_id)
 
 
 def test_bulk_bar_loader_excludes_unrequested_symbols_and_old_history(

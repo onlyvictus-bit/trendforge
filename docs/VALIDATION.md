@@ -5,6 +5,58 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-09 - R-HIST-03C local verification evidence
+
+Repository baseline: `fc236893b1504b857513fb896b8cb89050e17ffd` (tested 03B),
+implementation branch `feat/rhist03-producer-wiring`, existing PR #6. Execution
+used an isolated Python 3.13 environment with this repository's pinned
+`backend/requirements-dev.txt`, including Ruff 0.15.5 and Mypy 1.19.1. Local Node
+was 22; repository CI separately uses Python 3.14 / Node 24. Test fixtures use
+real SQLite, market object bytes, HRA, publication and outbox; they are not live
+trading-data verification.
+
+Safety-first red/green evidence: the first 34 new tests failed before the
+implementation. Worker, rebuild and predecessor-tamper tests also failed before
+their corresponding fixes. The final new file contains 57 adversarial cases.
+
+Commands from `backend`:
+
+```sh
+python -m pytest -q tests/test_r16_retention.py tests/test_r16_pit.py tests/test_s8_retention.py tests/test_retention_producer.py tests/test_retention_publication.py --tb=short
+python -m pytest -q -rs --tb=short
+python -m ruff check trendforge_api tests
+python -m compileall -q trendforge_api tests
+python -m mypy trendforge_api --ignore-missing-imports
+```
+
+Observed focused result: **92 passed, 2 warnings**, comprising 57 new 03C tests
+plus 35 existing R16/retention tests. Full backend: **1,621 passed, 2 skipped,
+2 warnings**. The two existing network-dependent DGCIS and EIA tests skipped
+because this local execution environment could not resolve their hosts. No new
+03C test was skipped. Ruff and compilation passed. `cd frontend && npm test`
+passed, including the existing history/current-state documentation contracts.
+
+Mypy is NOT green: unchanged non-blocking legacy baseline, **512 errors across
+70 files** at this implementation versus **513 errors across 70 files** on the
+original backend. A per-file diagnostic multiset comparison (normalizing source
+line coordinates, including embedded line references) found **zero new
+diagnostics** and one removed old public-state Literal error. The new retention
+module has no Mypy errors. Do not substitute the workflow's non-blocking success
+for a claim of type-check cleanliness.
+
+Coverage includes exact/missing/wrong/tampered S8 parents, real S8 payload
+sealing, refusal to backfill unsealed legacy parents, all non-trade populations,
+separate outcome evidence and time, duplicate replay, immutable revision chains,
+linked rebuild versions, source-correction isolation, read-only fail-closed
+proof checks, old decision/outcome/revision survival through actual cleanup,
+transaction rollback, authority failure, crash after registration before
+acknowledgement, and crash between an outcome and its explicit revision.
+
+This entry records local evidence only. Exact final PR-head backend/Ruff,
+frontend and baseline-aware Mypy results must be verified on PR #6 before
+declaring **R-HIST-03C = IMPLEMENTED + TESTED**. 03D/E/F, the full R-HIST-03 gate,
+R-HIST-04, live-data verification and production acceptance are not implied.
+
 ## 2026-09-07 - Atomic research snapshot (next requirement)
 
 The selection refresh now reads `GET /api/v1/selection/snapshot` instead of

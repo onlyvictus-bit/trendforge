@@ -8,7 +8,9 @@ from datetime import date, datetime, timedelta
 from typing import Any, Literal
 from uuid import uuid4
 
+from .. import storage
 from ..exchange_calendar import evaluate_nse_calendar
+from ..r16_retention import freeze_s8_hypotheses, resume_pending_publications, verified_record
 from .cash_a4_history import list_raw_bars_by_symbol
 from .contracts import stable_id
 from .r16_metrics import POLICY_VERSION, build_metrics, evaluate_approval
@@ -20,7 +22,7 @@ from .r16_pit import (
     PROFILE_VERSION,
     R16FrozenHypothesisV1,
     R16ObservationV1,
-    build_frozen_hypotheses,
+    R16RevisionV1,
     label_hypothesis,
     validate_s8_contract,
 )
@@ -31,6 +33,7 @@ from .r16_store import (
     list_hypotheses,
     list_latest_observations,
     list_metrics,
+    list_observations,
     page_dataset_runs,
     page_observations,
     persist_approval,
@@ -39,6 +42,7 @@ from .r16_store import (
     persist_hypotheses,
     persist_metric,
     persist_observations,
+    persist_revisions,
     r16_schema_status,
     release_worker_lease,
     save_worker_checkpoint,
@@ -48,12 +52,13 @@ from .s8_persist_run import PROFILE_ID as S8_PROFILE_ID
 from .store import list_latest_selection_payloads
 
 CONTRACT = "trendforge.r16-service.v2"
-DATA_POLICY_VERSION = "R16_NSE_CASH_EOD_DATASET_V1"
+DATA_POLICY_VERSION = "R16_NSE_CASH_EOD_EXACT_PARENT_V2"
 TERMINAL_STATUSES = frozenset(
     {
         "TARGET", "STOP", "NO_HIT", "NO_ENTRY", "NO_GEOMETRY",
         "DATA_GAP", "DELISTED", "CORPORATE_ACTION_UNRESOLVED",
         "INVALIDATED_BEFORE_ENTRY",
+        "AMBIGUOUS", "EXPIRED",
     }
 )
 ReplayMode = Literal["incremental", "catch_up", "replay", "rebuild"]
@@ -225,10 +230,57 @@ def _status_without_schema(schema: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _link_rebuild_versions(hypotheses: list[R16FrozenHypothesisV1], reason: str) -> int:
+    """Link an explicit reinterpretation to the exact original policy version.
+
+    This is not a latest-decision lookup. A missing original is not fabricated;
+    the new initial hypothesis already has its exact S8 parent.
+    """
+    original_revision = _revision_hash(None)
+    keys = ("sourceS8RunId", "sourceS8Hash", "candidateId", "direction", "horizonSessions")
+    originals = {
+        tuple(row[key] for key in keys): row
+        for row in list_hypotheses(limit=500000)
+        if row.get("datasetRevisionHash") == original_revision
+    }
+    original_runs = {
+        (row["sourceS8RunId"], row["sourceS8Hash"]): row["runId"]
+        for row in list_dataset_runs(limit=500000)
+        if row.get("datasetRevisionHash") == original_revision
+    }
+    inserted = 0
+    for hypothesis in hypotheses:
+        payload = hypothesis.model_dump(mode="json", by_alias=True)
+        previous = originals.get(tuple(payload[key] for key in keys))
+        if previous is None or previous["hypothesisId"] == hypothesis.hypothesis_id:
+            continue
+        conn = storage.connect()
+        try:
+            _, _, publication = verified_record(conn, "DECISION_VERSION", hypothesis.hypothesis_id)
+        finally:
+            conn.close()
+        revision = R16RevisionV1(
+            revision_id=stable_id("r16reinterpretation", previous["hypothesisId"], hypothesis.hypothesis_id),
+            hypothesis_id=previous["hypothesisId"], predecessor_type="DECISION_VERSION",
+            predecessor_id=previous["hypothesisId"], predecessor_hash=_hash(previous),
+            revision_kind="INTERPRETATION", recorded_at=publication.created_at, reason=reason,
+            replacement_hypothesis_id=hypothesis.hypothesis_id, replacement_hypothesis_hash=_hash(payload),
+            changes={"datasetRevisionHash": hypothesis.dataset_revision_hash},
+            evidence_hashes=hypothesis.source_bar_hashes,
+        )
+        dataset_run_id = original_runs[(hypothesis.source_s8_run_id, hypothesis.source_s8_hash)]
+        inserted += persist_revisions(dataset_run_id, [revision.model_dump(mode="json", by_alias=True)])
+    return inserted
+
+
 def status_payload() -> dict[str, Any]:
     schema = r16_schema_status()
     if not schema["applied"]:
         return _status_without_schema(schema)
+    if not schema.get("retentionReady"):
+        result = _status_without_schema(schema)
+        result["blockers"] = ["WAIT_RHIST03_R16_SCHEMA_NOT_APPLIED"]
+        return result
     runs = list_dataset_runs(limit=1)
     latest_run_id = runs[0].get("runId") if runs else None
     approvals = (
@@ -284,6 +336,9 @@ def run_incremental(
     if not acquire_worker_lease(owner):
         raise RuntimeError("WAIT_R16_REPLAY_LEASE")
     try:
+        resume_pending_publications()
+        # Discovery enumerates immutable history; it does not choose an S8
+        # parent for an existing hypothesis. Every freeze resolves its exact ID.
         persisted_s8 = list_latest_selection_payloads(S8_PROFILE_ID, limit=500000)
         selected_s8, rejected_s8, conflict_count = _select_s8_history(persisted_s8)
         revision_hash = _revision_hash(
@@ -312,12 +367,11 @@ def run_incremental(
         build_rejections = list(rejected_s8)
         for s8_payload in selected_s8:
             try:
-                hypotheses = build_frozen_hypotheses(
+                hypotheses = freeze_s8_hypotheses(
                     s8_payload=s8_payload,
-                    bars_by_symbol=bars_by_symbol,
                     dataset_revision_hash=revision_hash,
                 )
-            except ValueError as exc:
+            except (ValueError, RuntimeError) as exc:
                 build_rejections.append(
                     {
                         "runId": str(s8_payload.get("runId") or "UNKNOWN"),
@@ -380,6 +434,11 @@ def run_incremental(
             )
             if prior is not None and prior.observation_id == observation.observation_id:
                 continue
+            if prior is not None:
+                observation = observation.model_copy(update={
+                    "predecessor_observation_id": prior.observation_id,
+                    "predecessor_observation_hash": _hash(prior.model_dump(mode="json", by_alias=True)),
+                })
             dataset_run_id = run_by_s8.get(hypothesis.source_s8_run_id)
             if dataset_run_id is None:
                 raise RuntimeError("WAIT_R16_HYPOTHESIS_DATASET_LINEAGE")
@@ -387,6 +446,34 @@ def run_incremental(
                 dataset_run_id,
                 [observation.model_dump(mode="json", by_alias=True)],
             )
+
+        # Repair the outcome-revision boundary on every worker retry, including
+        # a crash after the outcome published but before its revision published.
+        revisions_created = 0
+        for payload in list_observations(limit=500000):
+            if payload.get("datasetRevisionHash") != revision_hash or not payload.get("predecessorObservationId"):
+                continue
+            observation = R16ObservationV1.model_validate(payload)
+            predecessor_id = observation.predecessor_observation_id
+            predecessor_hash = observation.predecessor_observation_hash
+            if not predecessor_id or not predecessor_hash:
+                raise RuntimeError("WAIT_RHIST03_OUTCOME_PREDECESSOR_REQUIRED")
+            revision = R16RevisionV1(
+                revision_id=stable_id("r16revision", observation.observation_id, observation.predecessor_observation_id),
+                hypothesis_id=observation.hypothesis_id,
+                predecessor_type="OUTCOME", predecessor_id=predecessor_id,
+                predecessor_hash=predecessor_hash,
+                revision_kind="OUTCOME_CORRECTION", recorded_at=observation.label_computed_at,
+                reason="Later observed path; the previous outcome remains immutable.",
+                changes={"replacementObservationId": observation.observation_id,
+                         "replacementObservationHash": _hash(payload), "status": observation.status},
+                evidence_hashes=observation.outcome_bar_hashes,
+            )
+            revisions_created += persist_revisions(
+                run_by_s8[observation.source_s8_run_id], [revision.model_dump(mode="json", by_alias=True)],
+            )
+        if mode == "rebuild" and rebuild_reason:
+            revisions_created += _link_rebuild_versions(all_hypotheses, rebuild_reason.strip())
 
         latest_observations = [
             R16ObservationV1.model_validate(payload)
@@ -427,6 +514,7 @@ def run_incremental(
             "hypothesisCount": len(all_hypotheses),
             "latestObservationCount": len(latest_observations),
             "observationsAppended": observations_created,
+            "revisionsAppended": revisions_created,
             "metricCount": len(metrics),
             "foldCount": len(folds),
             "approvalCount": len(approval_rows),

@@ -35,6 +35,7 @@ ObservationStatus = Literal[
     "TARGET", "STOP", "NO_HIT", "NO_ENTRY", "NO_GEOMETRY", "CENSORED",
     "NO_FORWARD_SESSION", "DATA_GAP", "DELISTED",
     "CORPORATE_ACTION_UNRESOLVED", "INVALIDATED_BEFORE_ENTRY",
+    "AMBIGUOUS", "EXPIRED",
 ]
 
 
@@ -65,6 +66,9 @@ class R16FrozenHypothesisV1(BaseModel):
     source_s8_run_id: str
     source_s8_hash: str
     source_s8_lineage_hash: str
+    source_s8_publication_id: str | None = None
+    source_s8_version: str | None = None
+    source_s8_publication_lineage_hash: str | None = None
     candidate_id: str
     symbol: str
     instrument_class: str = INSTRUMENT_CLASS
@@ -77,7 +81,8 @@ class R16FrozenHypothesisV1(BaseModel):
     max_input_available_at: datetime | None = None
     direction: Direction
     horizon_sessions: int = Field(gt=0)
-    public_state: Literal["WATCH", "WAIT", "REJECT"]
+    # Retained historical state is not confirmation or execution authority.
+    public_state: str = Field(min_length=1)
     geometry_status: GeometryStatus
     setup_policy_id: str = SETUP_POLICY_ID
     geometry_policy_version: str = GEOMETRY_POLICY_VERSION
@@ -101,6 +106,7 @@ class R16FrozenHypothesisV1(BaseModel):
     structural_risk: float | None = None
     source_bar_hashes: tuple[str, ...] = ()
     source_feature_hashes: dict[str, str] = {}
+    decision_inputs: tuple[dict[str, Any], ...] = ()
     exclusion_reason: str | None = None
     confirmation_authorized: bool = False
     execution_authorized: bool = False
@@ -138,6 +144,9 @@ class R16ObservationV1(BaseModel):
     schema_version: str = SCHEMA_VERSION
     observation_id: str
     hypothesis_id: str
+    source_hypothesis_hash: str | None = None
+    predecessor_observation_id: str | None = None
+    predecessor_observation_hash: str | None = None
     dataset_revision_hash: str
     source_s8_run_id: str
     symbol: str
@@ -167,6 +176,7 @@ class R16ObservationV1(BaseModel):
     gap_policy_version: str = GAP_POLICY_VERSION
     target_2_hit: bool = False
     outcome_bar_hashes: tuple[str, ...] = ()
+    path_evidence: tuple[dict[str, Any], ...] = ()
     censor_reason: str | None = None
     costs_declared: bool = False
     cost_model_version: str | None = None
@@ -181,6 +191,42 @@ class R16ObservationV1(BaseModel):
             raise ValueError("entered observations require an entry")
         if self.label_computed_at.tzinfo is None:
             raise ValueError("label_computed_at must be timezone-aware")
+        if bool(self.predecessor_observation_id) != bool(self.predecessor_observation_hash):
+            raise ValueError("observation predecessor requires both identity and hash")
+        return self
+
+
+class R16RevisionV1(BaseModel):
+    """An append-only correction or interpretation of an exact predecessor."""
+
+    model_config = MODEL_CONFIG
+
+    schema_version: str = "trendforge.r16-revision.v1"
+    revision_id: str = Field(min_length=1)
+    hypothesis_id: str = Field(min_length=1)
+    predecessor_type: Literal["DECISION_VERSION", "OUTCOME", "REVISION"]
+    predecessor_id: str = Field(min_length=1)
+    predecessor_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    revision_kind: Literal["SOURCE_CORRECTION", "OUTCOME_CORRECTION", "INTERPRETATION"]
+    recorded_at: datetime
+    reason: str = Field(min_length=1)
+    changes: dict[str, Any] = Field(default_factory=dict)
+    evidence_hashes: tuple[str, ...] = ()
+    replacement_hypothesis_id: str | None = None
+    replacement_hypothesis_hash: str | None = None
+    confirmation_authorized: bool = False
+    execution_authorized: bool = False
+
+    @model_validator(mode="after")
+    def validate_law(self) -> "R16RevisionV1":
+        if self.recorded_at.tzinfo is None or not self.reason.strip():
+            raise ValueError("revision requires an aware recorded_at and a reason")
+        if self.confirmation_authorized or self.execution_authorized:
+            raise ValueError("R16 revisions cannot authorize confirmation or execution")
+        if bool(self.replacement_hypothesis_id) != bool(self.replacement_hypothesis_hash):
+            raise ValueError("replacement requires both identity and hash")
+        if self.revision_kind == "SOURCE_CORRECTION" and not self.evidence_hashes:
+            raise ValueError("source correction requires new evidence")
         return self
 
 
@@ -450,9 +496,7 @@ def build_frozen_hypotheses(
                     max_input_available_at=max_available,
                     direction=direction,
                     horizon_sessions=horizon,
-                    public_state=(
-                        state if state in {"WATCH", "WAIT", "REJECT"} else "WAIT"
-                    ),
+                    public_state=state,
                     source_bar_hashes=source_hashes,
                     source_feature_hashes=feature_hashes,
                     **cost_fields,
@@ -478,6 +522,7 @@ def _observation(
     return R16ObservationV1(
         observation_id=observation_id,
         hypothesis_id=hypothesis.hypothesis_id,
+        source_hypothesis_hash=_payload_hash(hypothesis.model_dump(mode="json", by_alias=True)),
         dataset_revision_hash=hypothesis.dataset_revision_hash,
         source_s8_run_id=hypothesis.source_s8_run_id,
         symbol=hypothesis.symbol,
@@ -568,20 +613,19 @@ def label_hypothesis(
     later = [item for item in candidates if item[2] <= computed_at.astimezone(UTC)]
     later = later[: hypothesis.horizon_sessions]
     hashes = tuple(filter(None, (_bar_hash(row) for row, _, _ in later)))
+    path_evidence = tuple(
+        {
+            "date": day.isoformat(),
+            "availableAt": available.isoformat(),
+            "hash": _bar_hash(row),
+            "ohlc": [_number(row, key) for key in ("open", "high", "low", "close")],
+        }
+        for row, day, available in later
+    )
     path_hash = _payload_hash(
         {
             "hypothesis": hypothesis.hypothesis_id,
-            "bars": [
-                {
-                    "date": day.isoformat(),
-                    "availableAt": available.isoformat(),
-                    "hash": _bar_hash(row),
-                    "ohlc": [
-                        _number(row, key) for key in ("open", "high", "low", "close")
-                    ],
-                }
-                for row, day, available in later
-            ],
+            "bars": path_evidence,
             "labelPolicy": hypothesis.label_policy_version,
             "gapPolicy": hypothesis.gap_policy_version,
         }
@@ -593,6 +637,7 @@ def label_hypothesis(
             label_computed_at=computed_at,
             path_hash=path_hash,
             outcome_hashes=hashes,
+            path_evidence=path_evidence,
             censor_reason=hypothesis.exclusion_reason,
         )
     if not later:
@@ -605,6 +650,7 @@ def label_hypothesis(
             label_computed_at=computed_at,
             path_hash=path_hash,
             outcome_hashes=hashes,
+            path_evidence=path_evidence,
             censor_reason=(
                 "MALFORMED_LATER_BAR" if malformed_after_cutoff
                 else "NO_LATER_AVAILABLE_BAR"
@@ -631,6 +677,7 @@ def label_hypothesis(
                 label_computed_at=computed_at,
                 path_hash=path_hash,
                 outcome_hashes=hashes,
+                path_evidence=path_evidence,
                 outcome_at=available,
                 bars_observed=index,
                 censor_reason="MALFORMED_LATER_BAR",
@@ -650,6 +697,7 @@ def label_hypothesis(
                 label_computed_at=computed_at,
                 path_hash=path_hash,
                 outcome_hashes=hashes,
+                path_evidence=path_evidence,
                 outcome_at=available,
                 bars_observed=index,
                 censor_reason="UNRESOLVED_CORPORATE_ACTION",
@@ -661,6 +709,7 @@ def label_hypothesis(
                 label_computed_at=computed_at,
                 path_hash=path_hash,
                 outcome_hashes=hashes,
+                path_evidence=path_evidence,
                 outcome_at=available,
                 bars_observed=index,
                 censor_reason="SECURITY_DELISTED",
@@ -685,6 +734,7 @@ def label_hypothesis(
                     label_computed_at=computed_at,
                     path_hash=path_hash,
                     outcome_hashes=hashes,
+                    path_evidence=path_evidence,
                     outcome_at=available,
                     bars_observed=index,
                     censor_reason="INVALIDATION_BEFORE_ENTRY",
@@ -700,6 +750,7 @@ def label_hypothesis(
                     label_computed_at=computed_at,
                     path_hash=path_hash,
                     outcome_hashes=hashes,
+                    path_evidence=path_evidence,
                     outcome_at=available,
                     bars_observed=index,
                     censor_reason="GAP_BEYOND_ENTRY_ZONE_NO_CHASE",
@@ -757,6 +808,7 @@ def label_hypothesis(
                 label_computed_at=computed_at,
                 path_hash=path_hash,
                 outcome_hashes=hashes,
+                path_evidence=path_evidence,
                 entry_price=entry_price,
                 entry_at=entry_at,
                 exit_price=exit_price,
@@ -787,6 +839,7 @@ def label_hypothesis(
             label_computed_at=computed_at,
             path_hash=path_hash,
             outcome_hashes=hashes,
+            path_evidence=path_evidence,
             bars_observed=len(later),
             censor_reason=(
                 "ENTRY_ZONE_NOT_TOUCHED"
@@ -800,6 +853,7 @@ def label_hypothesis(
             label_computed_at=computed_at,
             path_hash=path_hash,
             outcome_hashes=hashes,
+            path_evidence=path_evidence,
             entry_price=entry_price,
             entry_at=entry_at,
             bars_to_entry=bars_to_entry,
@@ -813,6 +867,7 @@ def label_hypothesis(
         label_computed_at=computed_at,
         path_hash=path_hash,
         outcome_hashes=hashes,
+        path_evidence=path_evidence,
         entry_price=entry_price,
         entry_at=entry_at,
         exit_price=last_close,
@@ -843,6 +898,7 @@ __all__ = [
     "R16CostPolicyV1",
     "R16FrozenHypothesisV1",
     "R16ObservationV1",
+    "R16RevisionV1",
     "build_frozen_hypotheses",
     "label_hypothesis",
     "validate_s8_contract",

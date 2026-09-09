@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 import sqlite3
@@ -158,6 +160,11 @@ def persist_protected_s8(
             **publication_lineage,
             "tradingDate": trading_date.isoformat(),
             "s8": lineage_payload,
+            # Seal the exact persisted payload, not merely its upstream IDs.
+            "s8PayloadHash": hashlib.sha256(json.dumps(
+                blob.model_copy(update={"persisted": True}).model_dump(mode="json", by_alias=True),
+                sort_keys=True, separators=(",", ":"), default=str,
+            ).encode()).hexdigest(),
             "profileId": getattr(blob, "profile_id", None),
             "profileVersion": getattr(blob, "profile_version", None),
         },
@@ -165,7 +172,10 @@ def persist_protected_s8(
     )
     staged = publications.stage_owned(request)
     protected = publications.finalize(staged.publication_id)
-    if protected.status is not RetentionPublicationStatus.PROTECTED_PENDING_ARTIFACT:
+    if protected.status not in {
+        RetentionPublicationStatus.PROTECTED_PENDING_ARTIFACT,
+        RetentionPublicationStatus.PUBLISHED,
+    }:
         raise RuntimeError(
             f"WAIT_RHIST03_RETENTION_BLOCKED:{protected.last_error or protected.status.value}"
         )

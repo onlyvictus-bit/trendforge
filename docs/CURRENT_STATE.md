@@ -1,10 +1,39 @@
 # Current code and readiness snapshot
 
-**Reviewed:** 2026-09-08. **Previous reviewed checkpoint preserved:** 2026-09-07. **Code baseline:** retention branch `fix/retention-evidence-safety`, layered on TF-01 `19a8c762314cdb7b54556c17c8ae5a46ad7325e8`.
+**Reviewed:** 2026-09-09. **Previous reviewed checkpoints preserved:** 2026-09-08 and 2026-09-07. **Code baseline:** R-HIST-03C on `feat/rhist03-producer-wiring` (PR #6), stacked on retention branch `fix/retention-evidence-safety` and TF-01 `19a8c762314cdb7b54556c17c8ae5a46ad7325e8`.
 **Role:** current navigation and evidence summary, not a new plan, source registry,
 activation authority, or production certification. File A retains build order,
 public-state definitions and acceptance ceilings. Read this page before dated
 entries in BUILD_STATUS, VALIDATION, architecture notes or remaining-build guides.
+
+## R-HIST-03C implementation checkpoint - 2026-09-09
+
+The existing NSE cash EOD R16 producer now freezes hypotheses against an exact,
+protected S8 publication ID, artifact version, lineage hash and full payload
+seal. Decision inputs come only from that parent's original hash-bound evidence,
+not a later raw-bar query. Outcome observations and explicit source/outcome/
+interpretation revisions are immutable, separately timed records. Rebuilds link
+new decision versions to their original versions rather than replacing them.
+
+The existing retention publication/outbox/authority owns DECISION_VERSION,
+OUTCOME and REVISION protection. Canonical artifact and intent writes share one
+transaction; governed readers require PUBLISHED proof and perform no retention
+writes. WAIT/WATCH/REJECT/no-entry/expired and other non-trade history remains
+represented. Ambiguous stop/target collisions do not become certain losses in
+metrics. This is historical integrity, not intraday activation or PIT approval.
+
+R-HIST-03A/B were tested before this slice. The 03C local gate and commands are
+recorded in VALIDATION; exact PR-head CI acceptance is recorded separately on
+PR #6 and must be checked for the revision being reviewed. R-HIST-03D/E/F and the
+full R-HIST-03 gate remain open. R-HIST-04 remains plan-only. No live dataset was
+validated and no production, model, strategy or execution permission was added.
+
+Deployment requires the explicit additive `r16-schema --apply` command described
+in BUILD_STATUS. Legacy S8 rows without their original full-payload seal are NOT
+silently backfilled or accepted; legacy R16 rows without publication proof are
+preserved in storage but excluded from governed reads. Missing proof fails to a
+WAIT_RHIST03 reason. A future provenance-verified repair is a separate operation,
+never a read-time reconstruction from current data.
 
 ## Current refresh contract
 
@@ -47,7 +76,7 @@ No single `complete`, `ready`, or percentage-complete field replaces these quest
 | Research assembly | `selection/s8_service.py` connects S3, native guidance, weather, tradability and S4-S7 into saved S8 research. | Individual prerequisites can block the run. The older CLI assembler remains a separate follow-up issue. |
 | Final research state | `selection/s7_state_gates.py` owns public research classification. | Named PRF-003 EOD activation exists but must be observed; no activation setting changed here. |
 | Tradability | `selection/tradability.py` is implemented and integrated. | Price-band geometry/data-operation gaps and the separately identified API timestamp defect are not closed by retention work. |
-| Historical retention | `historical_retention.py` and R-HIST-02 cleanup integration exist on the retention branch. | Producer auto-registration, archive movement, PIT ML datasets, outcome memory, real-data reconstruction and acceptance remain open. |
+| Historical retention | R-HIST-01/02 authority and cleanup protection, 03A outbox, 03B exact S8 roots, and 03C R16 outcome/revision wiring exist on PR #6. | Exact-head gates are separate from local checks. ML/model/profile/audit producers (03D), registry/coverage (03E), complete fault acceptance (03F), archival, live-data reconstruction and production acceptance remain open. |
 | R16 PIT | Dataset/replay/label/metric/storage/service code and UI exist. | 2026-09-01 recorded only one complete S8 date and PIT_NOT_APPROVED. That is a dated observation, not today's database count. |
 | R18 governance | `r18_governance.py`, `r18_store.py`, `r18_service.py` and the Paper/ML renderer exist. | 2026-09-02 recorded MODEL_NOT_APPROVED and WAIT_R18_SCHEMA_NOT_APPLIED. Do not rebuild R18 merely because older notes say it is absent. |
 | OpenAlgo / intraday | R17 fixture-verified read-only shadow components exist. | R9 and R17-G were postponed in the 2026-09-01 handoff. A working live broker session was not observed in this review. |
