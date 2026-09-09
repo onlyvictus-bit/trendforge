@@ -75,6 +75,7 @@ def test_enqueue_is_idempotent(tmp_path: Path) -> None:
 def test_enqueue_can_share_producer_transaction_and_rollback(tmp_path: Path) -> None:
     db_path = tmp_path / "retention.db"
     registrar = DurableRetentionRegistrar(db_path=db_path)
+    registrar.initialize_schema()
     conn = sqlite3.connect(db_path)
     try:
         conn.execute("CREATE TABLE producer_artifacts (artifact_id TEXT PRIMARY KEY)")
