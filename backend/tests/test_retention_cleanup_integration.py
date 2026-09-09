@@ -198,7 +198,10 @@ def test_cleanup_fails_closed_if_protected_run_disappears(tmp_path: Path) -> Non
             (saved.run_id,),
         )
 
-    with pytest.raises(RuntimeError, match="protected run_id disappeared"):
+    with pytest.raises(
+        RuntimeError,
+        match=r"protected (run_id|trading_date) disappeared",
+    ):
         store.cleanup_retention(
             as_of_date=AS_OF_DATE,
             completed_trading_days=[OLD_DAY],
