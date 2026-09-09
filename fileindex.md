@@ -32,6 +32,26 @@ Use it to understand:
 
 **Important:** declarations, registry entries and UI labels are not proof of runtime activation. The system-brain document uses `VERIFIED RUNTIME-CONNECTED`, `DECLARED BUT NOT PROVEN ACTIVE`, `FIXTURE/TEST ONLY` and `NOT VERIFIED` to preserve that distinction.
 
+### Engineering audit crosswalk and preserved requirements
+
+**File:** [`docs/TRENDFORGE_ENGINEERING_AUDIT_CROSSWALK_AND_PRESERVED_REQUIREMENTS.md`](docs/TRENDFORGE_ENGINEERING_AUDIT_CROSSWALK_AND_PRESERVED_REQUIREMENTS.md)
+
+**Purpose:** verified crosswalk between the detailed 44-finding/26-ticket engineering audit and the current System Brain/trading-brain references.
+
+Use it to understand:
+
+- which detailed audit requirements are already preserved in Git,
+- the stage **0 -> 14** audit crosswalk from collection through research validity,
+- the exact collector/persistence versus screen event-input discrepancy,
+- the R16 proxy-plan / missing-S8-geometry limitation,
+- the same-day decision-version and availability-time requirements,
+- why attention priority must not become evidence strength,
+- why snapshot consistency is not the same as freshness/precomputation,
+- the historical source/test inventory boundary from the original audit,
+- which original generated audit artifacts are **not proven present in the repository**.
+
+**Important:** historical audit test counts and source inventories are preserved as audit evidence only. They must not replace newer branch-specific CI/runtime evidence.
+
 ### Trading brain / stock-picking strategy-engine reference
 
 **File:** [`docs/TRENDFORGE_TRADING_BRAIN_STRATEGY_ENGINE_REFERENCE.md`](docs/TRENDFORGE_TRADING_BRAIN_STRATEGY_ENGINE_REFERENCE.md)
@@ -126,15 +146,16 @@ For any important change:
 
 1. Read `docs/CURRENT_STATE.md`.
 2. Read the relevant section of `docs/TRENDFORGE_SYSTEM_BRAIN_AND_IMPLEMENTATION_ROADMAP_2026-09-08.md`.
-3. For strategy/opportunity work, also read `docs/TRENDFORGE_TRADING_BRAIN_STRATEGY_ENGINE_REFERENCE.md`.
-4. Inspect the current owning code and its producer/consumer contracts; do not trust documentation blindly.
-5. Identify the affected source, feature, discovery reason, opportunity/strategy, gate, publication and historical-outcome paths.
-6. Reproduce the problem on the current revision.
-7. Add adversarial tests.
-8. Implement the smallest architecture-consistent fix.
-9. Run focused and full pinned regression tests.
-10. Verify UI/API behavior if exposed.
-11. Update current readiness/capability documentation with observed results.
+3. Read `docs/TRENDFORGE_ENGINEERING_AUDIT_CROSSWALK_AND_PRESERVED_REQUIREMENTS.md` for the original audit-stage crosswalk and preserved edge cases.
+4. For strategy/opportunity work, also read `docs/TRENDFORGE_TRADING_BRAIN_STRATEGY_ENGINE_REFERENCE.md`.
+5. Inspect the current owning code and its producer/consumer contracts; do not trust documentation blindly.
+6. Identify the affected source, feature, discovery reason, opportunity/strategy, gate, publication and historical-outcome paths.
+7. Reproduce the problem on the current revision.
+8. Add adversarial tests.
+9. Implement the smallest architecture-consistent fix.
+10. Run focused and full pinned regression tests.
+11. Verify UI/API behavior if exposed.
+12. Update current readiness/capability documentation with observed results.
 
 ### Future implementation order
 
@@ -167,6 +188,7 @@ Observed runtime behavior
     > current verified tests/evidence
     > current-state capability summary
     > system-brain intended architecture/roadmap
+    > audit crosswalk / preserved requirements
     > historical plans/checkpoints
 ```
 
