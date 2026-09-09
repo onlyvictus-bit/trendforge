@@ -6,6 +6,11 @@ from datetime import UTC, datetime
 
 import pytest
 
+from trendforge_api.macro_event_context import (
+    EventClearanceEvidence,
+    EventClearanceOutcome,
+    evaluate_event_clearance,
+)
 from trendforge_api.selection.contracts import EvidenceDirection, SelectionState, stable_id
 from trendforge_api.selection.s7_state_gates import (
     S7IdeaCardV1,
@@ -75,6 +80,33 @@ def _classify(row6, **kw):
     kw.setdefault("rs_ok", None)
     kw.setdefault("weather_unknown", False)
     return classify_row(row6=row6, **kw)
+
+
+def _clearance(*, instrument_id: str, symbol: str, decision_at: datetime):
+    evidence = EventClearanceEvidence(
+        evidence_id=f"evt-clear-{symbol}",
+        source_key="nse_corporate_events",
+        instrument_id=instrument_id,
+        symbol=symbol,
+        profile_id="PRF-003-SWING-EOD",
+        profile_version="1.0.0",
+        event_window_start=decision_at.replace(hour=0, minute=0, second=0, microsecond=0),
+        event_window_end=decision_at.replace(hour=23, minute=59, second=59, microsecond=0),
+        assessed_at=decision_at,
+        valid_until=decision_at.replace(hour=23, minute=59, second=59, microsecond=0),
+        semantic_coverage_complete=True,
+        source_outcome=EventClearanceOutcome.CLEAR,
+        parser_version="test-parser-v1",
+        content_hash="a" * 64,
+    )
+    return evaluate_event_clearance(
+        instrument_id=instrument_id,
+        symbol=symbol,
+        profile_id="PRF-003-SWING-EOD",
+        profile_version="1.0.0",
+        decision_at=decision_at,
+        evidence=(evidence,),
+    )
 
 
 def test_activation_false_forces_wait_not_confirmed() -> None:
@@ -317,7 +349,6 @@ def test_build_s7_state_observes_named_ledger_by_default(
     tmp_path, monkeypatch
 ) -> None:
     """No persisted ledger -> default observation keeps the lock on."""
-    from types import SimpleNamespace
 
     from trendforge_api.hybrid_v2.tests_support.fixtures import (
         persist_overlay_lineage as _lineage,
@@ -327,14 +358,20 @@ def test_build_s7_state_observes_named_ledger_by_default(
     r5 = parts["structure"]
     pack = build_s4_structure_pack(r5=r5)
     six = _s6_batch_for(pack.rows[0].symbol)
+    decision_at = six.built_at
+    clearance = _clearance(
+        instrument_id=pack.rows[0].instrument_id,
+        symbol=pack.rows[0].symbol,
+        decision_at=decision_at,
+    )
     batch = build_s7_state(
         r5=r5,
         s4=pack,
         s6=six,
-        event_snapshot=SimpleNamespace(state="RESEARCH_ONLY"),
+        event_clearances=(clearance,),
         tradability=pass_fixture_batch(
             (pack.rows[0].symbol,),
-            decision_at=datetime(2026, 8, 14, 17, 0, tzinfo=UTC),
+            decision_at=decision_at,
         ),
     )
     assert batch.source_activation_ready is False
@@ -343,9 +380,10 @@ def test_build_s7_state_observes_named_ledger_by_default(
     target = next(row for row in batch.rows if row.symbol == pack.rows[0].symbol)
     assert target.draft_confirmed_eligible is True
     assert "WAIT_SOURCE_ACTIVATION" in target.why
+    assert "EVENT_CLEARANCE_CLEAR" in target.why
 
 
-def test_build_s7_state_emits_confirmed_when_activated(
+def test_build_s7_state_research_only_does_not_confirm_when_activated(
     tmp_path, monkeypatch
 ) -> None:
     from types import SimpleNamespace
@@ -370,10 +408,47 @@ def test_build_s7_state_emits_confirmed_when_activated(
             decision_at=datetime(2026, 8, 14, 17, 0, tzinfo=UTC),
         ),
     )
+    assert batch.confirmed_count == 0
+    target = next(row for row in batch.rows if row.symbol == symbol)
+    assert target.public_state is SelectionState.WAIT
+    assert target.draft_confirmed_eligible is False
+    assert "WAIT_EVENT_CLEARANCE_LEGACY_RESEARCH_ONLY" in target.why
+
+
+def test_build_s7_state_emits_confirmed_with_scoped_clearance_when_activated(
+    tmp_path, monkeypatch
+) -> None:
+    from trendforge_api.hybrid_v2.tests_support.fixtures import (
+        persist_overlay_lineage as _lineage,
+    )
+
+    parts = _lineage(tmp_path, monkeypatch, with_structure=True)
+    r5 = parts["structure"]
+    pack = build_s4_structure_pack(r5=r5)
+    symbol = pack.rows[0].symbol
+    six = _s6_batch_for(symbol)
+    decision_at = six.built_at
+    clearance = _clearance(
+        instrument_id=pack.rows[0].instrument_id,
+        symbol=symbol,
+        decision_at=decision_at,
+    )
+    batch = build_s7_state(
+        r5=r5,
+        s4=pack,
+        s6=six,
+        event_clearances=(clearance,),
+        activation_ready=True,
+        tradability=pass_fixture_batch(
+            (symbol,),
+            decision_at=decision_at,
+        ),
+    )
     assert batch.confirmed_count >= 1
     target = next(row for row in batch.rows if row.symbol == symbol)
     assert target.public_state is SelectionState.CONFIRMED
     assert target.draft_confirmed_eligible is True
+    assert "EVENT_CLEARANCE_CLEAR" in target.why
     assert "CONFIRMED_PRF003_EOD_NAMED_SOURCES" in target.why
     # Guidance fields exist; execution never appears.
     assert target.research_quantity is not None
