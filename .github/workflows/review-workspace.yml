@@ -24,7 +24,8 @@ jobs:
         with:
           python-version: "3.13"
       - name: Download pinned test dependencies for offline verification
-        run: python -m pip download --only-binary=:all: -r backend/requirements-dev.txt -d /tmp/review-wheels
+        run: |
+          python -m pip download --only-binary=:all: -r backend/requirements-dev.txt -d /tmp/review-wheels
       - uses: actions/upload-artifact@v4
         with:
           name: review-wheels
