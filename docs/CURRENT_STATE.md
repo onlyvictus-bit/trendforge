@@ -1,6 +1,6 @@
 # Current code and readiness snapshot
 
-**Reviewed:** 2026-09-07. **Code baseline:** `e2d501b793c6f329d91c65399255dace5b9acc8a`, plus the current/history presentation changes and the atomic-snapshot stage.
+**Reviewed:** 2026-09-08. **Previous reviewed checkpoint preserved:** 2026-09-07. **Code baseline:** retention branch `fix/retention-evidence-safety`, layered on TF-01 `19a8c762314cdb7b54556c17c8ae5a46ad7325e8`.
 **Role:** current navigation and evidence summary, not a new plan, source registry,
 activation authority, or production certification. File A retains build order,
 public-state definitions and acceptance ceilings. Read this page before dated
@@ -46,14 +46,15 @@ No single `complete`, `ready`, or percentage-complete field replaces these quest
 | Identity and EOD structure | R4, R14 and R5 implemented; R5 requires matching corporate-action lineage. R5 schema is `trendforge.structure-batch.v2`. | WAIT/REJECT research ceiling; implementation is not source activation. |
 | Research assembly | `selection/s8_service.py` connects S3, native guidance, weather, tradability and S4-S7 into saved S8 research. | Individual prerequisites can block the run. The older CLI assembler remains a separate follow-up issue. |
 | Final research state | `selection/s7_state_gates.py` owns public research classification. | Named PRF-003 EOD activation exists but must be observed; no activation setting changed here. |
-| Tradability | `selection/tradability.py` is implemented and integrated. | Price-band geometry/data-operation gaps and the separately identified API timestamp defect are not closed by documentation work. |
+| Tradability | `selection/tradability.py` is implemented and integrated. | Price-band geometry/data-operation gaps and the separately identified API timestamp defect are not closed by retention work. |
+| Historical retention | `historical_retention.py` and R-HIST-02 cleanup integration exist on the retention branch. | Producer auto-registration, archive movement, PIT ML datasets, outcome memory, real-data reconstruction and acceptance remain open. |
 | R16 PIT | Dataset/replay/label/metric/storage/service code and UI exist. | 2026-09-01 recorded only one complete S8 date and PIT_NOT_APPROVED. That is a dated observation, not today's database count. |
 | R18 governance | `r18_governance.py`, `r18_store.py`, `r18_service.py` and the Paper/ML renderer exist. | 2026-09-02 recorded MODEL_NOT_APPROVED and WAIT_R18_SCHEMA_NOT_APPLIED. Do not rebuild R18 merely because older notes say it is absent. |
 | OpenAlgo / intraday | R17 fixture-verified read-only shadow components exist. | R9 and R17-G were postponed in the 2026-09-01 handoff. A working live broker session was not observed in this review. |
-| Order guidance | Existing preview and separately guarded dispatch code remain unchanged. | This requirement neither tests a live order nor adds, arms or authorizes execution. |
+| Order guidance | Existing preview and separately guarded dispatch code remain unchanged. | Retention work neither tests a live order nor adds, arms or authorizes execution. |
 
 Status observations above are sourced from the explicitly dated entries retained
-in [BUILD_STATUS.md](BUILD_STATUS.md), [VALIDATION.md](VALIDATION.md), and the
+in [BUILD_STATUS.md](BUILD_STATUS.md), [VALIDATION.md](VALIDATION.md), the retention plan, and the
 module references. They must be re-observed before being described as current runtime state.
 
 ## UI meaning after requirement 1
@@ -98,6 +99,7 @@ review date; append test observations to the verification/build logs. Preserve
 older entries as history. Never delete contradictory old evidence merely to make
 the current summary look cleaner. `present.md` and dated gate/audit reports remain
 historical evidence, not current build instructions.
+
 ---
 
 ## TF-01 safety checkpoint — 2026-09-08
@@ -130,3 +132,50 @@ Status at this checkpoint:
 - **PRODUCTION-ACCEPTED:** NO at commit creation — exact final-head CI and the documented stage-acceptance review remain required.
 
 The existing TF-00 Mypy risk-classification work, A07 and other unrelated baseline defects are not silently closed by TF-01. No broker/order activation, arm switch or live execution authority is changed.
+
+---
+
+## R-HIST historical-retention checkpoint — 2026-09-08
+
+**Detailed authority and roadmap:** [HISTORICAL_DATA_RETENTION_AND_ML_MEMORY_PLAN.md](HISTORICAL_DATA_RETENTION_AND_ML_MEMORY_PLAN.md)  
+**Branch:** `fix/retention-evidence-safety`  
+**Base:** TF-01 exact head `19a8c762314cdb7b54556c17c8ae5a46ad7325e8`
+
+Purpose: preserve the exact point-in-time evidence required to reproduce decisions, outcomes, backtests and future ML datasets. The governing rule is **Delete copies, not history.** Age determines storage tier; evidence references determine deletability.
+
+### R-HIST-01
+
+- `HistoricalRetentionAuthority`: IMPLEMENTED
+- HOT/WARM/COLD policy: IMPLEMENTED
+- durable evidence classes: IMPLEMENTED
+- immutable reference IDs: IMPLEMENTED
+- date/run/hash validation: IMPLEMENTED
+- transitive protection: IMPLEMENTED
+- protected-evidence disappearance detection: IMPLEMENTED
+- fail-closed deletion assertions: IMPLEMENTED
+- adversarial unit tests: IMPLEMENTED
+- prior exact-head backend/Ruff/frontend CI: PASSED
+
+### R-HIST-02
+
+The real `MarketDataStore.cleanup_retention()` is now wired to the authority. Protected dates and hashes are removed from ordinary expiry/object-GC eligibility; candidate date/run/hash deletions are checked against the authority; protection is resolved again before destructive mutation; changed or corrupted lineage fails closed.
+
+Adversarial integration tests now cover decision protection, ML-hash transitive protection, temporary expiry, disappeared protected lineage, cleanup-time protection changes and preservation of legitimate unprotected deletion.
+
+Current R-HIST-02 status at this documentation commit:
+
+- **IMPLEMENTED:** YES
+- **TESTED:** PENDING exact final-head CI
+- **LIVE-DATA-VERIFIED:** NO
+- **PRODUCTION-ACCEPTED:** NO
+- **LIVE ORDER AUTHORITY:** unchanged / NO new authority
+
+Still open and must not be inferred complete:
+
+- R-HIST-03 automatic producer registration for decisions/outcomes/revisions/ML/model/profile/audit evidence
+- R-HIST-04 HOT -> WARM -> COLD/archive movement with hash-verified transfer
+- R-HIST-05 point-in-time ML dataset builder and leakage audit
+- R-HIST-06 complete opportunity/outcome/failure memory
+- R-HIST-07 real-data reconstruction, whole-system PIT replay/backtest, leakage testing and final acceptance
+
+The legacy five-day setting is therefore no longer allowed to override a durable active evidence reference, but it is **not** the desired final historical lifecycle. R-HIST-04 must replace simple aging with tiered movement/archive semantics.

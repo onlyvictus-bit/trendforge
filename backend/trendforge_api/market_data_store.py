@@ -15,6 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .historical_retention import HistoricalRetentionAuthority
 from .read_snapshot import borrow_connection
 
 
@@ -707,8 +708,6 @@ class MarketDataStore:
                         (manifest.run_id, entry.source_key, entry.content_hash),
                     )
         except Exception:
-            # Keep the filesystem and SQLite view on the same committed
-            # generation. A failed DB transaction restores the prior manifest.
             if previous_payload is None:
                 if target.exists():
                     target.unlink()
@@ -803,22 +802,29 @@ class MarketDataStore:
         self.initialize_schema()
         if detailed_trading_days < 0:
             raise ValueError("detailed_trading_days cannot be negative")
+
+        retention_authority = HistoricalRetentionAuthority(db_path=self.db_path)
+        protection = retention_authority.protection_set(as_of_date=as_of_date)
+        protected_dates = set(protection.trading_dates)
+        protected_hashes = set(protection.content_hashes)
+
         completed = sorted({day for day in completed_trading_days if day < as_of_date})
-        retained = (
-            tuple(completed[-detailed_trading_days:])
-            if detailed_trading_days
-            else ()
+        age_retained = (
+            set(completed[-detailed_trading_days:]) if detailed_trading_days else set()
         )
-        retained_set = set(retained)
-        expired = {day.isoformat() for day in completed if day not in retained_set}
+        retained_set = age_retained | (set(completed) & protected_dates)
+        retained = tuple(sorted(retained_set))
+        expired_dates = set(completed) - retained_set
+        expired = {day.isoformat() for day in expired_dates}
         targets = tuple(self.root / value for value in sorted(expired))
+
         for target in targets:
             safe_target = self.assert_safe_delete_target(
                 target, as_of_date=as_of_date
             )
             self._assert_tree_has_no_reparse_points(safe_target)
 
-        future_references = self._future_referenced_hashes(expired)
+        future_references = self._future_referenced_hashes(expired) | protected_hashes
         with self._connect() as connection:
             object_rows = connection.execute(
                 "SELECT content_hash, object_path FROM market_data_objects"
@@ -832,6 +838,7 @@ class MarketDataStore:
         eligible_object_paths = tuple(
             str(path) for path in eligible_objects if path.exists()
         )
+
         if dry_run:
             return CleanupReport(
                 dry_run=True,
@@ -842,6 +849,39 @@ class MarketDataStore:
                 deleted_object_paths=(),
             )
 
+        current_protection = retention_authority.protection_set(as_of_date=as_of_date)
+        if current_protection != protection:
+            raise RuntimeError(
+                "retention protection changed during cleanup; refusing destructive cleanup"
+            )
+
+        for trading_day in expired_dates:
+            retention_authority.assert_deletion_allowed(
+                trading_date=trading_day,
+                as_of_date=as_of_date,
+            )
+        with self._connect() as connection:
+            run_rows = connection.execute(
+                """
+                SELECT run_id
+                FROM market_data_manifests
+                WHERE trading_date IN (SELECT value FROM json_each(?))
+                """,
+                (json.dumps(sorted(expired)),),
+            ).fetchall()
+        for row in run_rows:
+            retention_authority.assert_deletion_allowed(
+                run_id=row["run_id"],
+                as_of_date=as_of_date,
+            )
+        for row in object_rows:
+            path = Path(row["object_path"])
+            if path in eligible_objects:
+                retention_authority.assert_deletion_allowed(
+                    content_hash=row["content_hash"],
+                    as_of_date=as_of_date,
+                )
+
         deleted_days: list[str] = []
         for target in targets:
             safe_target = self.assert_safe_delete_target(
@@ -851,10 +891,10 @@ class MarketDataStore:
                 shutil.rmtree(safe_target)
                 deleted_days.append(str(safe_target))
         with self._connect() as connection:
-            for trading_date in expired:
+            for trading_date_value in expired:
                 connection.execute(
                     "DELETE FROM market_data_manifests WHERE trading_date = ?",
-                    (trading_date,),
+                    (trading_date_value,),
                 )
 
         deleted_objects: list[str] = []

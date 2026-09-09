@@ -4,9 +4,13 @@ const path = require('path');
 const root = path.resolve(__dirname, '../..');
 const read = name => fs.readFileSync(path.join(root, name), 'utf8');
 const current = read('docs/CURRENT_STATE.md');
-for (const term of ['2026-09-07', 'R18', 'MODEL_NOT_APPROVED', 'historical', 'PIT', 'execution', 'freshness']) {
+for (const term of ['2026-09-08', 'R18', 'MODEL_NOT_APPROVED', 'historical', 'PIT', 'execution', 'freshness']) {
   assert(current.includes(term), `current summary missing ${term}`);
 }
+assert(
+  current.includes('2026-09-07') || current.includes('supersedes the 2026-09-07'),
+  'current summary must preserve provenance of the prior 2026-09-07 checkpoint'
+);
 for (const file of ['docs/BUILD_STATUS.md', 'docs/VALIDATION.md', 'TREND_FORGE_ARCHITECTURE.md',
   'docs/ARCHITECTURE.md', 'docs/fable/remaining_build/README.md',
   'docs/fable/remaining_build/REMAINING_PROJECT_BUILD_FILES.md', 'fileindex.md', 'GATES.md',
