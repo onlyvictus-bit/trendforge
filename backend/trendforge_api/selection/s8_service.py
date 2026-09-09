@@ -36,7 +36,7 @@ from .s8_persist_run import (
 from .store import get_selection_payload, latest_selection_payload
 from ..scanners.native_core import NativeCoreRunV1, build_native_core_run
 from ..retention_publication import RetentionEvidenceRoot
-from ..s8_retention import persist_protected_s8
+from ..s8_retention import evidence_roots_from_bundle, persist_protected_s8
 
 
 def _exact_r1_evidence(
@@ -50,26 +50,7 @@ def _exact_r1_evidence(
         raise ValueError("WAIT_RHIST03_R1_BUNDLE_HASH_MISMATCH")
     if bundle.trading_date.isoformat() != r5.trading_date:
         raise ValueError("WAIT_RHIST03_R1_TRADING_DATE_MISMATCH")
-
-    roots: list[RetentionEvidenceRoot] = []
-    seen: set[str] = set()
-    for source in sorted(bundle.source_records, key=lambda row: row.source_key):
-        # last_good_hash is the exact content-addressed MarketDataStore object.
-        # normalized_content_hash can represent an in-flight/valid-empty result
-        # that R1 records for lineage but that was never installed as an object.
-        digest = source.last_good_hash
-        if digest is None or digest in seen:
-            continue
-        seen.add(digest)
-        roots.append(
-            RetentionEvidenceRoot(
-                role=f"R1_SOURCE_{len(roots) + 1:04d}",
-                content_hash=digest,
-            )
-        )
-    if not roots:
-        raise ValueError("WAIT_RHIST03_R1_EVIDENCE_HASHES_MISSING")
-    return bundle, tuple(roots)
+    return bundle, evidence_roots_from_bundle(bundle)
 
 
 @dataclass(frozen=True)
@@ -208,6 +189,7 @@ def build_and_persist_current_s8(
         native_core=native_core,
         tradability_batch=tradability_batch,
         built_at=built_at,
+        bundle=r1_bundle,
         activation_ready=activation_ready,
     )
     return persist_protected_s8(

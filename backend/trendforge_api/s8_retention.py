@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -17,6 +18,45 @@ from .retention_publication import (
 
 MARKET_DB_ENV = "TRENDFORGE_MARKET_DATA_DB_PATH"
 ARTIFACT_TYPE = "S8_DECISION_VERSION"
+CASH_SOURCE_KEY = "nse_bhavcopy_eod"
+_HASH_PATTERN = re.compile(r"[0-9a-f]{64}")
+
+
+def _source_role(source_key: str) -> str:
+    normalized = "".join(
+        character if character.isalnum() else "_" for character in source_key.upper()
+    )
+    return f"R1_SOURCE_{normalized}"
+
+
+def evidence_roots_from_bundle(bundle: Any) -> tuple[RetentionEvidenceRoot, ...]:
+    """Return exact object-backed R1 roots without consulting current/latest data."""
+
+    roots: list[RetentionEvidenceRoot] = []
+    cash_root_found = False
+    for source in sorted(
+        getattr(bundle, "source_records", ()), key=lambda row: str(row.source_key)
+    ):
+        digest = getattr(source, "last_good_hash", None)
+        if digest is None:
+            continue
+        normalized = str(digest).casefold()
+        if not _HASH_PATTERN.fullmatch(normalized):
+            raise ValueError(
+                f"WAIT_RHIST03_INVALID_EVIDENCE_HASH:{source.source_key}"
+            )
+        source_key = str(source.source_key)
+        roots.append(
+            RetentionEvidenceRoot(
+                role=_source_role(source_key),
+                content_hash=normalized,
+            )
+        )
+        if source_key == CASH_SOURCE_KEY:
+            cash_root_found = True
+    if not cash_root_found:
+        raise ValueError("WAIT_RHIST03_CASH_EVIDENCE_ROOT_REQUIRED")
+    return tuple(roots)
 
 
 def _market_db_contains_roots(
