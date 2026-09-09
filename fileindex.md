@@ -32,6 +32,28 @@ Use it to understand:
 
 **Important:** declarations, registry entries and UI labels are not proof of runtime activation. The system-brain document uses `VERIFIED RUNTIME-CONNECTED`, `DECLARED BUT NOT PROVEN ACTIVE`, `FIXTURE/TEST ONLY` and `NOT VERIFIED` to preserve that distinction.
 
+### Trading brain / stock-picking strategy-engine reference
+
+**File:** [`docs/TRENDFORGE_TRADING_BRAIN_STRATEGY_ENGINE_REFERENCE.md`](docs/TRENDFORGE_TRADING_BRAIN_STRATEGY_ENGINE_REFERENCE.md)
+
+**Purpose:** plain-English future-build reference for the actual TrendForge opportunity-thinking engine across equity intraday, equity swing, reversal, event/ownership and commodities.
+
+Use it to understand:
+
+- why `INSTRUMENT != OPPORTUNITY != DECISION VERSION`,
+- why TrendForge must not become one universal bullish stock score,
+- the discovery-brain -> strategy-router -> strategy-specific-opportunity flow,
+- how one instrument can simultaneously carry continuation, reversal, swing and event opportunities,
+- the intended independent equity swing, equity intraday continuation, reversal, event/ownership and commodity brains,
+- commodity contract identity, expiry/roll/tender/OI/liquidity requirements,
+- why ranking occurs only inside comparable groups,
+- how safety, tradability, liquidity, events and cost remain separate from direction,
+- how R-HIST acts as the point-in-time notebook for the trading brain,
+- how outcomes, frozen ML datasets and model versions must retain exact historical evidence,
+- the TF-10 through TF-25 future build relationship for the trading brain.
+
+**Important:** this document describes intended architecture and future build boundaries. It does not claim that intraday or commodity strategies are already end-to-end complete or that trading/model/execution is authorized. Current runtime evidence and `docs/CURRENT_STATE.md` remain authoritative.
+
 ---
 
 ## 2. Current code/readiness summary
@@ -104,14 +126,15 @@ For any important change:
 
 1. Read `docs/CURRENT_STATE.md`.
 2. Read the relevant section of `docs/TRENDFORGE_SYSTEM_BRAIN_AND_IMPLEMENTATION_ROADMAP_2026-09-08.md`.
-3. Inspect the current owning code and its producer/consumer contracts; do not trust documentation blindly.
-4. Identify the affected source, feature, discovery reason, opportunity/strategy, gate, publication and historical-outcome paths.
-5. Reproduce the problem on the current revision.
-6. Add adversarial tests.
-7. Implement the smallest architecture-consistent fix.
-8. Run focused and full pinned regression tests.
-9. Verify UI/API behavior if exposed.
-10. Update current readiness/capability documentation with observed results.
+3. For strategy/opportunity work, also read `docs/TRENDFORGE_TRADING_BRAIN_STRATEGY_ENGINE_REFERENCE.md`.
+4. Inspect the current owning code and its producer/consumer contracts; do not trust documentation blindly.
+5. Identify the affected source, feature, discovery reason, opportunity/strategy, gate, publication and historical-outcome paths.
+6. Reproduce the problem on the current revision.
+7. Add adversarial tests.
+8. Implement the smallest architecture-consistent fix.
+9. Run focused and full pinned regression tests.
+10. Verify UI/API behavior if exposed.
+11. Update current readiness/capability documentation with observed results.
 
 ### Future implementation order
 
