@@ -1,4 +1,4 @@
-"""R-HIST-03D red tests for semantic artifact retention through the canonical authority."""
+"""R-HIST-03D tests for semantic artifact retention through the canonical authority."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ from trendforge_api.historical_retention import HistoricalRetentionAuthority
 from trendforge_api.retention_producer import DurableRetentionRegistrar, RetentionOutboxStatus
 from trendforge_api.selection import r18_governance as governance
 from trendforge_api.selection import r18_store
-
 
 NOW = datetime(2026, 9, 9, 10, 0, tzinfo=UTC)
 H1 = "1" * 64
@@ -76,9 +75,7 @@ def test_profile_retention_uses_artifact_hash_not_fake_market_object(tmp_path, m
 
     authority = HistoricalRetentionAuthority(db_path=storage.DB_PATH)
     authority.initialize_schema()
-    result = DurableRetentionRegistrar(
-        db_path=storage.DB_PATH, authority=authority
-    ).dispatch(event_id)
+    result = DurableRetentionRegistrar(db_path=storage.DB_PATH, authority=authority).dispatch(event_id)
     assert result.status is RetentionOutboxStatus.APPLIED
 
     with storage.connect() as conn:
@@ -109,6 +106,8 @@ def test_authority_rejects_tampered_semantic_artifact_before_registration(tmp_pa
         row = conn.execute("SELECT event_id FROM historical_retention_outbox").fetchone()
         assert row is not None
         event_id = row["event_id"]
+        # Simulate out-of-band physical corruption after proving normal SQL is guarded.
+        conn.execute("DROP TRIGGER rhist03d_guard_strategy_profile_versions_update")
         conn.execute(
             "UPDATE strategy_profile_versions SET payload_json='{}' WHERE profile_id=? AND profile_version=?",
             (profile.profile_id, profile.profile_version),
@@ -123,9 +122,7 @@ def test_authority_rejects_tampered_semantic_artifact_before_registration(tmp_pa
     assert result.last_error is not None
     assert "artifact" in result.last_error.lower() or "hash" in result.last_error.lower()
     with storage.connect() as conn:
-        assert conn.execute(
-            "SELECT COUNT(*) FROM historical_retention_references"
-        ).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM historical_retention_references").fetchone()[0] == 0
 
 
 def test_legacy_market_object_event_identity_is_unchanged_without_artifact_hash():
