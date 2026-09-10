@@ -92,7 +92,11 @@ def test_profile_retention_uses_artifact_hash_not_fake_market_object(tmp_path, m
         assert reference["content_hash"] is None
         assert reference["artifact_hash"] == profile.content_hash
         assert conn.execute(
-            "SELECT COUNT(*) FROM market_data_objects WHERE content_hash=?",
+            "SELECT COUNT(*) FROM historical_retention_outbox WHERE content_hash=?",
+            (profile.content_hash,),
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM historical_retention_references WHERE content_hash=?",
             (profile.content_hash,),
         ).fetchone()[0] == 0
 
