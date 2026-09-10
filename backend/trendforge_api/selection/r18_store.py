@@ -6,6 +6,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .. import storage
+from .r18_history_finalization import (
+    assert_rhist03d_upgrade_safe,
+    finalize_rhist03d_artifact,
+    rhist03d_preflight_inventory,
+    verify_governed_rhist03d_artifact,
+)
 from .r18_history_store import (
     apply_schema as apply_rhist03d_schema,
     get_governed_frozen_dataset,
