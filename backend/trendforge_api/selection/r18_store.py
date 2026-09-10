@@ -14,7 +14,6 @@ from .r18_history_finalization import (
 )
 from .r18_history_store import (
     apply_schema as apply_rhist03d_schema,
-    get_governed_frozen_dataset,
     persist_audit_record,
     persist_frozen_dataset,
     persist_governed_model,
@@ -25,6 +24,18 @@ from .r18_history_store import (
 
 MIGRATION_VERSION = "0014_r18_model_governance"
 TABLES = ("ml_model_registry", "ml_evaluation_reports", "ml_promotion_reviews", "ml_drift_events")
+
+
+def get_governed_frozen_dataset(
+    dataset_id: str, dataset_version: str
+) -> dict[str, Any] | None:
+    """Pure fail-closed governed read; never repairs or backfills history."""
+    try:
+        return verify_governed_rhist03d_artifact(
+            "ML_DATASET", dataset_id, dataset_version, verify_parents=True
+        )
+    except (RuntimeError, ValueError, KeyError):
+        return None
 
 
 def schema_status() -> dict[str, Any]:
