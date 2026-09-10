@@ -12,7 +12,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -54,21 +54,37 @@ def _normalized_material(
     *,
     computed_field: str,
 ) -> dict[str, Any]:
-    """Return the canonical logical representation used by builder and validator.
+    """Return validated canonical material without constructing an invalid model.
 
-    Pydantic field names are normalized to their public aliases and defaults are
-    materialized. The object's own computed identity field is excluded so the
-    identity never hashes itself.
+    The previous implementation used ``model_construct``. That bypassed Pydantic
+    validation and left nested dictionaries unconverted, so builders could hash a
+    different logical object from the one later checked by normal model validation.
+    Here every supplied/default field is validated through its declared field type
+    before JSON-mode serialization. The object's own computed identity is excluded.
+    Required fields that are deliberately computed by the caller (for example
+    ``member_id``) may be absent at this stage and are therefore skipped; final
+    public-model construction still enforces all required fields and validators.
     """
-    draft_values = dict(values)
-    draft_values.pop(computed_field, None)
-    draft_values.pop(to_camel(computed_field), None)
-    draft = model_type.model_construct(**draft_values, **{computed_field: "0" * 64})
-    return draft.model_dump(
-        mode="json",
-        by_alias=True,
-        exclude={computed_field},
-    )
+    source = dict(values)
+    source.pop(computed_field, None)
+    source.pop(to_camel(computed_field), None)
+    material: dict[str, Any] = {}
+    for field_name, field in model_type.model_fields.items():
+        if field_name == computed_field:
+            continue
+        alias = field.alias or to_camel(field_name)
+        if field_name in source:
+            raw = source[field_name]
+        elif alias in source:
+            raw = source[alias]
+        elif field.is_required():
+            continue
+        else:
+            raw = field.get_default(call_default_factory=True)
+        adapter = TypeAdapter(field.annotation)
+        validated = adapter.validate_python(raw)
+        material[alias] = adapter.dump_python(validated, mode="json")
+    return material
 
 
 class FrozenEvidenceRootV1(BaseModel):
