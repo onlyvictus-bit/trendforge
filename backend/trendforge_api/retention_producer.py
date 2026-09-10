@@ -29,6 +29,15 @@ class RetentionOutboxStatus(StrEnum):
     FAILED_BLOCKING = "FAILED_BLOCKING"
 
 
+def _normalize_sha256(value: str | None, *, field_name: str) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if len(normalized) != 64 or any(c not in "0123456789abcdef" for c in normalized):
+        raise ValueError(f"{field_name} must be a 64-character SHA256 hex digest")
+    return normalized
+
+
 @dataclass(frozen=True, slots=True)
 class RetentionEvidenceIntent:
     artifact_type: str
@@ -38,6 +47,7 @@ class RetentionEvidenceIntent:
     run_id: str | None = None
     trading_date: date | None = None
     content_hash: str | None = None
+    artifact_hash: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
@@ -46,25 +56,35 @@ class RetentionEvidenceIntent:
             if not value:
                 raise ValueError(f"{name} must be non-empty")
             object.__setattr__(self, name, value)
-        if not (self.run_id or self.trading_date or self.content_hash):
-            raise ValueError("retention intent requires run_id, trading_date, or content_hash")
         if self.run_id is not None:
             run_id = self.run_id.strip()
             if not run_id:
                 raise ValueError("run_id cannot be blank")
             object.__setattr__(self, "run_id", run_id)
-        if self.content_hash is not None:
-            normalized = self.content_hash.strip().lower()
-            if len(normalized) != 64 or any(c not in "0123456789abcdef" for c in normalized):
-                raise ValueError("content_hash must be a 64-character SHA256 hex digest")
-            object.__setattr__(self, "content_hash", normalized)
+        object.__setattr__(
+            self,
+            "content_hash",
+            _normalize_sha256(self.content_hash, field_name="content_hash"),
+        )
+        object.__setattr__(
+            self,
+            "artifact_hash",
+            _normalize_sha256(self.artifact_hash, field_name="artifact_hash"),
+        )
+        market_mode = bool(self.run_id or self.trading_date or self.content_hash)
+        artifact_mode = self.artifact_hash is not None
+        if market_mode == artifact_mode:
+            raise ValueError(
+                "retention intent requires exactly one evidence identity mode: "
+                "market locator or artifact_hash"
+            )
         created_at = self.created_at
         if created_at.tzinfo is None or created_at.utcoffset() is None:
             raise ValueError("created_at must be timezone-aware")
         object.__setattr__(self, "created_at", created_at.astimezone(UTC))
 
     def canonical_payload(self) -> dict[str, str | None]:
-        return {
+        payload: dict[str, str | None] = {
             "artifactId": self.artifact_id,
             "artifactType": self.artifact_type,
             "artifactVersion": self.artifact_version,
@@ -74,6 +94,11 @@ class RetentionEvidenceIntent:
             "runId": self.run_id,
             "tradingDate": self.trading_date.isoformat() if self.trading_date else None,
         }
+        # Compatibility law: legacy 03A/03B/03C payload bytes and identities must
+        # remain unchanged when no typed semantic artifact hash is present.
+        if self.artifact_hash is not None:
+            payload["artifactHash"] = self.artifact_hash
+        return payload
 
     @property
     def payload_json(self) -> str:
@@ -85,15 +110,8 @@ class RetentionEvidenceIntent:
 
     @property
     def lineage_digest(self) -> str:
-        identity = {
-            "artifactId": self.artifact_id,
-            "artifactType": self.artifact_type,
-            "artifactVersion": self.artifact_version,
-            "contentHash": self.content_hash,
-            "referenceType": self.reference_type.value,
-            "runId": self.run_id,
-            "tradingDate": self.trading_date.isoformat() if self.trading_date else None,
-        }
+        identity = self.canonical_payload().copy()
+        identity.pop("createdAt")
         canonical = json.dumps(identity, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -132,6 +150,17 @@ class DurableRetentionRegistrar:
         self.db_path = Path(db_path)
         self.authority = authority or HistoricalRetentionAuthority(db_path=self.db_path)
 
+    @staticmethod
+    def _ensure_column(
+        conn: sqlite3.Connection,
+        table: str,
+        column: str,
+        declaration: str,
+    ) -> None:
+        columns = {str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+
     def initialize_schema(self, connection: sqlite3.Connection | None = None) -> None:
         owns = connection is None
         conn = connection or sqlite3.connect(self.db_path)
@@ -148,6 +177,7 @@ class DurableRetentionRegistrar:
                     run_id TEXT,
                     trading_date TEXT,
                     content_hash TEXT,
+                    artifact_hash TEXT,
                     payload_json TEXT NOT NULL,
                     payload_hash TEXT NOT NULL,
                     status TEXT NOT NULL,
@@ -157,6 +187,12 @@ class DurableRetentionRegistrar:
                     last_error TEXT
                 )
                 """
+            )
+            self._ensure_column(
+                conn,
+                "historical_retention_outbox",
+                "artifact_hash",
+                "TEXT",
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_retention_outbox_status_created "
@@ -191,9 +227,9 @@ class DurableRetentionRegistrar:
                 """
                 INSERT INTO historical_retention_outbox (
                     event_id, reference_id, artifact_type, artifact_id, artifact_version,
-                    reference_type, run_id, trading_date, content_hash, payload_json,
-                    payload_hash, status, attempts, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+                    reference_type, run_id, trading_date, content_hash, artifact_hash,
+                    payload_json, payload_hash, status, attempts, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
                 """,
                 (
                     intent.event_id,
@@ -205,6 +241,7 @@ class DurableRetentionRegistrar:
                     intent.run_id,
                     intent.trading_date.isoformat() if intent.trading_date else None,
                     intent.content_hash,
+                    intent.artifact_hash,
                     intent.payload_json,
                     intent.payload_hash,
                     RetentionOutboxStatus.PENDING.value,
@@ -244,7 +281,12 @@ class DurableRetentionRegistrar:
                 reference_type=RetentionReferenceType(row["reference_type"]),
                 content_hash=row["content_hash"],
                 run_id=row["run_id"],
-                trading_date=date.fromisoformat(row["trading_date"]) if row["trading_date"] else None,
+                trading_date=date.fromisoformat(row["trading_date"])
+                if row["trading_date"]
+                else None,
+                artifact_id=row["artifact_id"] if row["artifact_hash"] else None,
+                artifact_version=row["artifact_version"] if row["artifact_hash"] else None,
+                artifact_hash=row["artifact_hash"],
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
             self.authority.register(reference)
@@ -306,7 +348,7 @@ class DurableRetentionRegistrar:
         if actual_hash != row["payload_hash"]:
             raise RuntimeError(f"retention outbox payload hash mismatch: {event_id}")
         payload = json.loads(payload_json)
-        expected = {
+        expected: dict[str, str | None] = {
             "artifactId": row["artifact_id"],
             "artifactType": row["artifact_type"],
             "artifactVersion": row["artifact_version"],
@@ -316,6 +358,8 @@ class DurableRetentionRegistrar:
             "runId": row["run_id"],
             "tradingDate": row["trading_date"],
         }
+        if row["artifact_hash"] is not None:
+            expected["artifactHash"] = row["artifact_hash"]
         if payload != expected:
             raise RuntimeError(f"retention outbox payload columns disagree: {event_id}")
         return row
