@@ -81,9 +81,9 @@ def _normalized_material(
             continue
         else:
             raw = field.get_default(call_default_factory=True)
-        adapter = TypeAdapter(field.annotation)
+        adapter: TypeAdapter[Any] = TypeAdapter(field.annotation)
         validated = adapter.validate_python(raw)
-        material[alias] = adapter.dump_python(validated, mode="json")
+        material[alias] = adapter.dump_python(validated, mode="json", by_alias=True)
     return material
 
 
