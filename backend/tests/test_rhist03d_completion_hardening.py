@@ -15,9 +15,8 @@ from trendforge_api.retention_producer import (
 )
 from trendforge_api.selection import r18_governance as governance
 from trendforge_api.selection import r18_history as history
-from trendforge_api.selection import r18_history_finalization as finalization
+from trendforge_api.selection import r18_history_completion as completion
 from trendforge_api.selection import r18_store
-
 
 NOW = datetime(2026, 9, 10, 12, 0, tzinfo=UTC)
 DECISION = NOW - timedelta(days=8)
@@ -128,10 +127,7 @@ def test_semantic_identity_rejects_non_string_mapping_keys():
 def test_member_identity_normalizes_hash_case_and_set_like_input_order():
     first = _member(
         input_hashes=(H5, H6),
-        evidence_roots=(
-            {"role": "A", "contentHash": H5},
-            {"role": "B", "contentHash": H6},
-        ),
+        evidence_roots=({"role": "A", "contentHash": H5}, {"role": "B", "contentHash": H6}),
     )
     second = _member(
         decision_version_hash=H1.upper(),
@@ -139,10 +135,7 @@ def test_member_identity_normalizes_hash_case_and_set_like_input_order():
         feature_manifest_hash=H3.upper(),
         formula_set_hash=H4.upper(),
         input_hashes=(H6.upper(), H5.upper()),
-        evidence_roots=(
-            {"role": "B", "contentHash": H6.upper()},
-            {"role": "A", "contentHash": H5.upper()},
-        ),
+        evidence_roots=({"role": "B", "contentHash": H6.upper()}, {"role": "A", "contentHash": H5.upper()}),
     )
     assert second.decision_version_hash == H1
     assert second.input_hashes == first.input_hashes
@@ -223,9 +216,7 @@ def test_legacy_sqlite_lock_keeps_existing_blocking_semantics(tmp_path):
     assert result.status is RetentionOutboxStatus.FAILED_BLOCKING
 
 
-def test_preflight_detects_pre_fix_applied_typed_reference_even_without_old_outbox(
-    tmp_path, monkeypatch
-):
+def test_preflight_detects_pre_fix_applied_typed_reference_even_without_old_outbox(tmp_path, monkeypatch):
     _set_db(tmp_path, monkeypatch)
     with storage.connect() as conn:
         conn.execute(
@@ -233,19 +224,7 @@ def test_preflight_detects_pre_fix_applied_typed_reference_even_without_old_outb
             "reference_id,reference_type,content_hash,run_id,trading_date,artifact_id,"
             "artifact_version,artifact_hash,permanent,retain_until,created_at) "
             "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-            (
-                "old-profile-ref",
-                "STRATEGY_PROFILE",
-                H1,
-                None,
-                None,
-                None,
-                None,
-                None,
-                1,
-                None,
-                NOW.isoformat(),
-            ),
+            ("old-profile-ref", "STRATEGY_PROFILE", H1, None, None, None, None, None, 1, None, NOW.isoformat()),
         )
         conn.commit()
     inventory = r18_store.rhist03d_preflight_inventory()
@@ -253,7 +232,7 @@ def test_preflight_detects_pre_fix_applied_typed_reference_even_without_old_outb
     assert inventory["stopRequired"] is True
 
 
-def test_authoritative_parent_availability_cannot_be_backdated(monkeypatch, tmp_path):
+def test_authoritative_parent_availability_cannot_be_backdated(tmp_path, monkeypatch):
     _set_db(tmp_path, monkeypatch)
     decision = {
         "schemaVersion": "trendforge.r16-pit.v1",
@@ -266,41 +245,30 @@ def test_authoritative_parent_availability_cannot_be_backdated(monkeypatch, tmp_
         "setupPolicyId": "SWING_BREAKOUT_BREAKDOWN_V1",
         "sourceBarHashes": [H5],
         "sourceFeatureHashes": {"s8": H3},
-        "geometryPolicyVersion": "R16_GEOMETRY_V1",
-        "targetPolicyVersion": "R16_1R_2R_V1",
-        "availabilityPolicyVersion": "NSE_EOD_DERIVED_1800_IST_V1",
-        "labelPolicyVersion": "R16_NEXT_SESSION_TRIGGER_FILL_V1",
-        "gapPolicyVersion": "R16_NO_CHASE_GAP_V1",
-        "costModelVersion": "R16_NSE_CASH_COST_V1",
     }
-    decision_hash = finalization.r16_payload_hash(decision)
-    publication = SimpleNamespace(
-        evidence_roots=(SimpleNamespace(content_hash=H5),)
-    )
+    decision_hash = completion.r16_payload_hash(decision)
+    publication = SimpleNamespace(evidence_roots=(SimpleNamespace(content_hash=H5),))
 
     def _verified(_conn, record_type, record_id):
         assert record_type == "DECISION_VERSION"
         assert record_id == "D100v1"
         return SimpleNamespace(), decision, publication
 
-    monkeypatch.setattr(finalization, "verified_r16_record", _verified)
     payload = {
-        "members": [
-            {
-                "decisionVersionId": "D100v1",
-                "decisionVersionHash": decision_hash,
-                "decisionAt": DECISION.isoformat(),
-                "decisionDataCutoff": DECISION.isoformat(),
-                "maxFeatureAvailableAt": (DECISION - timedelta(seconds=1)).isoformat(),
-                "profileId": "PRF-R16-NSE-CASH-EOD-SWING",
-                "profileVersion": "1.0.0",
-                "timeframe": "EOD",
-                "publicState": "WATCH",
-                "setupId": "SWING_BREAKOUT_BREAKDOWN_V1",
-                "inputHashes": [H5],
-                "evidenceRoots": [{"role": "DECISION", "contentHash": H5}],
-            }
-        ]
+        "members": [{
+            "decisionVersionId": "D100v1",
+            "decisionVersionHash": decision_hash,
+            "decisionAt": DECISION.isoformat(),
+            "decisionDataCutoff": DECISION.isoformat(),
+            "maxFeatureAvailableAt": (DECISION - timedelta(seconds=1)).isoformat(),
+            "profileId": "PRF-R16-NSE-CASH-EOD-SWING",
+            "profileVersion": "1.0.0",
+            "timeframe": "EOD",
+            "publicState": "WATCH",
+            "setupId": "SWING_BREAKOUT_BREAKDOWN_V1",
+            "inputHashes": [H5],
+            "evidenceRoots": [{"role": "DECISION", "contentHash": H5}],
+        }]
     }
     with pytest.raises(RuntimeError, match="AVAILABILITY|CUTOFF|FEATURE"):
-        finalization._verify_dataset_r16_parents(payload)
+        completion.verify_dataset_r16_parents(payload, verifier=_verified)
