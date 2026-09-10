@@ -6,10 +6,12 @@ history on read and never grants promotion or execution authority.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Callable
 
 from .. import storage
+from ..historical_retention import RetentionReferenceType
+from ..retention_producer import DurableRetentionRegistrar, RetentionEvidenceIntent
 from ..r16_retention import verified_record as verified_r16_record
 from .r16_pit import _payload_hash as r16_payload_hash
 
@@ -20,7 +22,7 @@ IMMUTABLE_ARTIFACT_TABLES = (
     "strategy_profile_versions",
     "governance_audit_records",
 )
-FULLY_IMMUTABLE_TABLES = ("ml_frozen_dataset_members",)
+FULLY_IMMUTABLE_TABLES = ("ml_frozen_dataset_members", "r18_retention_supersessions")
 
 
 def _columns(conn: sqlite3.Connection, table: str) -> tuple[str, ...]:
@@ -77,6 +79,21 @@ def install_rhist03d_db_guards() -> None:
         if "r18_retention_links" not in names:
             raise RuntimeError("WAIT_RHIST03D_TABLE_MISSING:r18_retention_links")
         _install_transition_guard(conn, "r18_retention_links")
+        for operation in ("UPDATE", "DELETE"):
+            conn.execute(
+                f"CREATE TRIGGER IF NOT EXISTS rhist03d_superseded_outbox_{operation.lower()} "
+                f"BEFORE {operation} ON historical_retention_outbox "
+                "WHEN EXISTS (SELECT 1 FROM r18_retention_supersessions "
+                "WHERE old_event_id=OLD.event_id) "
+                "BEGIN SELECT RAISE(ABORT, 'R-HIST-03D immutable superseded event'); END"
+            )
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS rhist03d_superseded_reference_insert "
+            "BEFORE INSERT ON historical_retention_references "
+            "WHEN EXISTS (SELECT 1 FROM r18_retention_supersessions "
+            "WHERE old_reference_id=NEW.reference_id) "
+            "BEGIN SELECT RAISE(ABORT, 'R-HIST-03D superseded reference'); END"
+        )
         conn.commit()
 
 
@@ -87,13 +104,17 @@ def rhist03d_upgrade_inventory() -> dict[str, Any]:
         old_events = conn.execute(
             f"SELECT status,COUNT(*) AS n FROM historical_retention_outbox "
             f"WHERE reference_type IN ({typed}) AND artifact_hash IS NULL "
+            "AND artifact_type='R18_' || reference_type "
             "AND content_hash IS NOT NULL GROUP BY status",
             TYPED_REFERENCE_TYPES,
         ).fetchall()
         old_refs = conn.execute(
-            f"SELECT COUNT(*) FROM historical_retention_references "
+            f"SELECT COUNT(*) FROM historical_retention_references AS r "
             f"WHERE reference_type IN ({typed}) AND artifact_hash IS NULL "
-            "AND content_hash IS NOT NULL",
+            "AND content_hash IS NOT NULL AND ("
+            "reference_type IN ('MODEL_VERSION','STRATEGY_PROFILE') OR EXISTS ("
+            "SELECT 1 FROM historical_retention_outbox AS e WHERE e.reference_id=r.reference_id "
+            "AND e.artifact_type='R18_' || e.reference_type))",
             TYPED_REFERENCE_TYPES,
         ).fetchone()[0]
     by_status = {str(row["status"]): int(row["n"]) for row in old_events}
@@ -113,6 +134,147 @@ def assert_rhist03d_upgrade_safe() -> dict[str, Any]:
     if inventory["stopRequired"]:
         raise RuntimeError("WAIT_RHIST03D_PREFIX_APPLIED_TYPED_IDENTITY_REQUIRES_MIGRATION")
     return inventory
+
+
+def _old_typed_intent(row: sqlite3.Row) -> RetentionEvidenceIntent:
+    if (
+        row["reference_type"] not in TYPED_REFERENCE_TYPES
+        or row["artifact_type"] != "R18_" + row["reference_type"]
+        or row["artifact_hash"] is not None or row["content_hash"] is None
+        or row["run_id"] is not None or row["trading_date"] is not None
+    ):
+        raise RuntimeError("WAIT_RHIST03D_NOT_PREFIX_SEMANTIC_EVENT")
+    intent = RetentionEvidenceIntent(
+        artifact_type=row["artifact_type"], artifact_id=row["artifact_id"],
+        artifact_version=row["artifact_version"],
+        reference_type=RetentionReferenceType(row["reference_type"]),
+        content_hash=row["content_hash"], created_at=datetime.fromisoformat(row["created_at"]),
+    )
+    if (row["event_id"], row["reference_id"], row["payload_json"], row["payload_hash"]) != (
+        intent.event_id, intent.reference_id, intent.payload_json, intent.payload_hash,
+    ):
+        raise RuntimeError("WAIT_RHIST03D_PREFIX_EVENT_IDENTITY_MISMATCH")
+    return intent
+
+
+def _corrected_intent(old: RetentionEvidenceIntent) -> RetentionEvidenceIntent:
+    return RetentionEvidenceIntent(
+        artifact_type=old.artifact_type, artifact_id=old.artifact_id,
+        artifact_version=old.artifact_version, reference_type=old.reference_type,
+        artifact_hash=old.content_hash, created_at=old.created_at,
+    )
+
+
+def resolve_retention_link(
+    conn: sqlite3.Connection, artifact_type: str, artifact_id: str, artifact_version: str,
+) -> dict[str, Any] | None:
+    """Resolve immutable supersession evidence; never update the original link."""
+    row = conn.execute(
+        "SELECT * FROM r18_retention_links WHERE artifact_type=? AND artifact_id=? AND artifact_version=?",
+        (artifact_type, artifact_id, artifact_version),
+    ).fetchone()
+    if row is None:
+        return None
+    link = dict(row)
+    recovery = conn.execute(
+        "SELECT * FROM r18_retention_supersessions WHERE old_event_id=?", (link["event_id"],)
+    ).fetchone()
+    if recovery is None:
+        return link
+    registrar = DurableRetentionRegistrar(db_path=storage.DB_PATH)
+    old_row = registrar._load_verified_row(conn, link["event_id"])
+    old = _old_typed_intent(old_row)
+    corrected = _corrected_intent(old)
+    expected = {
+        "old_event_id": old.event_id, "old_reference_id": old.reference_id,
+        "old_payload_hash": old.payload_hash,
+        "new_event_id": corrected.event_id, "new_reference_id": corrected.reference_id,
+        "new_payload_hash": corrected.payload_hash,
+        "artifact_type": artifact_type, "artifact_id": artifact_id,
+        "artifact_version": artifact_version, "artifact_hash": link["artifact_hash"],
+    }
+    if (
+        any(recovery[key] != value for key, value in expected.items())
+        or old.reference_type.value != artifact_type or old.artifact_id != artifact_id
+        or old.artifact_version != artifact_version or old.content_hash != link["artifact_hash"]
+        or link["reference_id"] != old.reference_id
+        or old_row["status"] not in ("PENDING", "FAILED_BLOCKING")
+        or not recovery["reviewed_by"].strip() or not recovery["reason"].strip()
+        or conn.execute("SELECT 1 FROM historical_retention_references WHERE reference_id=?", (old.reference_id,)).fetchone()
+    ):
+        raise RuntimeError("WAIT_RHIST03D_SUPERSESSION_PROOF_MISMATCH")
+    new_row = registrar._load_verified_row(conn, corrected.event_id)
+    if (
+        new_row["payload_json"] != corrected.payload_json
+        or new_row["payload_hash"] != corrected.payload_hash
+        or new_row["reference_id"] != corrected.reference_id
+    ):
+        raise RuntimeError("WAIT_RHIST03D_SUPERSESSION_EVENT_MISMATCH")
+    return {**link, "event_id": corrected.event_id, "reference_id": corrected.reference_id}
+
+
+def supersede_rhist03d_event(
+    event_id: str, *, reviewed_by: str, reason: str,
+) -> dict[str, Any]:
+    """Explicit recovery of a non-APPLIED pre-fix event; E1 and its link survive."""
+    from .r18_history_store import _artifact_mapping, verify_stored_rhist03d_artifact
+
+    if not reviewed_by.strip() or not reason.strip():
+        raise ValueError("RHIST03D_SUPERSESSION_REVIEW_REQUIRED")
+    conn = storage.connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        assert_rhist03d_upgrade_safe()
+        registrar = DurableRetentionRegistrar(db_path=storage.DB_PATH)
+        old_row = registrar._load_verified_row(conn, event_id)
+        old = _old_typed_intent(old_row)
+        if old_row["status"] not in ("PENDING", "FAILED_BLOCKING"):
+            raise RuntimeError("WAIT_RHIST03D_PREFIX_APPLIED_REQUIRES_REVIEW")
+        kind = old.reference_type.value
+        verify_stored_rhist03d_artifact(kind, old.artifact_id, old.artifact_version)
+        existing = conn.execute(
+            "SELECT * FROM r18_retention_supersessions WHERE old_event_id=?", (event_id,)
+        ).fetchone()
+        if existing is not None:
+            resolve_retention_link(conn, kind, old.artifact_id, old.artifact_version)
+            return dict(existing)
+        link = resolve_retention_link(conn, kind, old.artifact_id, old.artifact_version)
+        table, id_col, version_col, hash_col, _, _ = _artifact_mapping(kind)
+        where = f"{id_col}=?" + (f" AND {version_col}=?" if version_col else "")
+        params = (old.artifact_id, old.artifact_version) if version_col else (old.artifact_id,)
+        artifact = conn.execute(f"SELECT * FROM {table} WHERE {where}", params).fetchone()
+        if (
+            link is None or link["event_id"] != event_id
+            or link["reference_id"] != old.reference_id or link["artifact_hash"] != old.content_hash
+            or link["publication_state"] != "PENDING_RETENTION"
+            or artifact is None or artifact[hash_col] != old.content_hash
+            or artifact["publication_state"] != "PENDING_RETENTION"
+            or conn.execute("SELECT 1 FROM historical_retention_references WHERE reference_id=?", (old.reference_id,)).fetchone()
+        ):
+            raise RuntimeError("WAIT_RHIST03D_PREFIX_ARTIFACT_OR_LINK_REQUIRES_REVIEW")
+        corrected = _corrected_intent(old)
+        registrar.enqueue(corrected, connection=conn)
+        evidence = {
+            "old_event_id": old.event_id, "old_reference_id": old.reference_id,
+            "old_payload_hash": old.payload_hash,
+            "new_event_id": corrected.event_id, "new_reference_id": corrected.reference_id,
+            "new_payload_hash": corrected.payload_hash,
+            "artifact_type": kind, "artifact_id": old.artifact_id,
+            "artifact_version": old.artifact_version, "artifact_hash": old.content_hash,
+            "reviewed_by": reviewed_by.strip(), "reason": reason.strip(),
+            "recorded_at": datetime.now(UTC).isoformat(),
+        }
+        conn.execute(
+            "INSERT INTO r18_retention_supersessions(" + ",".join(evidence) + ") VALUES(" +
+            ",".join("?" for _ in evidence) + ")", tuple(evidence.values()),
+        )
+        conn.commit()
+        return evidence
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _parse_aware(value: Any, code: str) -> datetime:
@@ -256,4 +418,6 @@ __all__ = (
     "rhist03d_upgrade_inventory",
     "r16_payload_hash",
     "verify_dataset_r16_parents",
+    "resolve_retention_link",
+    "supersede_rhist03d_event",
 )

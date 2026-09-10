@@ -6,6 +6,18 @@ activation authority, or production certification. File A retains build order,
 public-state definitions and acceptance ceilings. Read this page before dated
 entries in BUILD_STATUS, VALIDATION, architecture notes or remaining-build guides.
 
+## PR #6 repair under validation - 2026-09-10
+
+An isolated local patch based on PR head `6de1e14973edcf62b61c9b6a1441214ace656ec4`
+repairs the three CI failures and implements controlled immutable supersession
+and finalizer/registration crash/concurrency protection. The original 03C
+checkpoint below remains historical evidence, not the status of the new patch.
+See [the execution record](fable/RHIST03D_PR6_REPAIR_2026-09-10.md) and the newest
+VALIDATION entry. Final local regression passed: 1699 tests, zero failures/skips;
+compile, Ruff and frontend passed; normalized Mypy delta versus 03C is zero.
+Exact-head GitHub CI after publication is pending. 03D is IN PROGRESS; 03E/03F remain LOCKED; LIVE-DATA-VERIFIED and
+PRODUCTION-ACCEPTED remain NO. No live migration or authority change occurred.
+
 ## R-HIST-03C implementation checkpoint - 2026-09-09
 
 The existing NSE cash EOD R16 producer now freezes hypotheses against an exact,

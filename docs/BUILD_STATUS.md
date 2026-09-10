@@ -5,6 +5,26 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-10 - PR #6 local repair and controlled 03D recovery
+
+Local changes based on PR head `6de1e14973edcf62b61c9b6a1441214ace656ec4`
+repair the three supplied CI failures and add the requested controlled
+supersession/crash/concurrency acceptance. E1 and its link remain preserved;
+deterministic E2 and immutable review evidence own the corrected retention
+proof. Already APPLIED pre-fix semantic history requires migration review.
+Concurrent finalization/registration is idempotent, late failures cannot undo
+APPLIED, and stored payloads must match their indexed ID/version.
+
+The existing explicit R18 schema owner adds `r18_retention_supersessions` and
+guards. This has only been applied to scratch databases. See the implementation,
+test-first findings and operator boundary in
+[the execution record](fable/RHIST03D_PR6_REPAIR_2026-09-10.md).
+Final local regression: **1699 passed, zero failures/skips, one warning**;
+compile, Ruff and frontend pass. Mypy remains at 512 legacy errors in 70 files,
+with zero new normalized diagnostics versus actual 03C source. Commit/push and
+exact-head CI after this repair remain pending. 03D is IN PROGRESS, 03E/03F remain LOCKED, and
+LIVE-DATA-VERIFIED / PRODUCTION-ACCEPTED remain NO. No authority ceiling changed.
+
 ## 2026-09-09 - R-HIST-03C outcomes and revision retention
 
 Implemented on the existing `feat/rhist03-producer-wiring` branch / PR #6,

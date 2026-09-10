@@ -9,6 +9,7 @@ from typing import Any
 
 from .. import storage
 from . import r18_history_completion as _completion
+from .r18_history_completion import supersede_rhist03d_event
 from .r18_history_finalization import (
     finalize_rhist03d_artifact as _base_finalize_rhist03d_artifact,
     verify_governed_rhist03d_artifact as _base_verify_governed_rhist03d_artifact,
@@ -107,6 +108,7 @@ __all__ = (
     "rhist03d_integrity_status",
     "rhist03d_preflight_inventory",
     "rhist03d_schema_status",
+    "supersede_rhist03d_event",
     "verify_governed_rhist03d_artifact",
     "verify_stored_rhist03d_artifact",
 )

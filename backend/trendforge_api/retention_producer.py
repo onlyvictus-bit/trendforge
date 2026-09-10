@@ -264,19 +264,24 @@ class DurableRetentionRegistrar:
         message = str(exc).lower()
         return "locked" in message or "busy" in message
 
-    def dispatch(self, event_id: str) -> RetentionPublicationReceipt:
+    def dispatch(self, event_id: str, *, fault_point: str | None = None) -> RetentionPublicationReceipt:
         """Apply one intent; typed SQLite contention stays safely retryable."""
         self.initialize_schema()
         with sqlite3.connect(self.db_path) as conn:
             row = self._load_verified_row(conn, event_id)
+            if (
+                row["artifact_type"] == "R18_" + row["reference_type"]
+                and row["reference_type"] in ("ML_DATASET", "MODEL_VERSION", "STRATEGY_PROFILE", "AUDIT")
+                and row["artifact_hash"] is None
+            ):
+                raise RuntimeError("WAIT_RHIST03D_PREFIX_EVENT_REQUIRES_SUPERSESSION")
             if row["status"] == RetentionOutboxStatus.APPLIED.value:
                 return self._receipt(conn, event_id)
             if row["status"] == RetentionOutboxStatus.FAILED_BLOCKING.value:
                 raise RuntimeError(f"retention event is blocking: {event_id}: {row['last_error']}")
-            attempts = int(row["attempts"]) + 1
             conn.execute(
-                "UPDATE historical_retention_outbox SET attempts = ? WHERE event_id = ?",
-                (attempts, event_id),
+                "UPDATE historical_retention_outbox SET attempts = attempts + 1 WHERE event_id = ?",
+                (event_id,),
             )
             conn.commit()
 
@@ -304,14 +309,19 @@ class DurableRetentionRegistrar:
             )
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute(
-                    "UPDATE historical_retention_outbox SET status = ?, last_error = ? WHERE event_id = ?",
+                    "UPDATE historical_retention_outbox SET status = ?, last_error = ? WHERE event_id = ?"
+                    + (" AND status='PENDING'" if row["artifact_hash"] else ""),
                     (status.value, error, event_id),
                 )
                 conn.commit()
                 return self._receipt(conn, event_id)
 
+        if fault_point == "AFTER_AUTHORITY_REGISTERED":
+            raise RuntimeError("INJECTED_AFTER_AUTHORITY_REGISTERED")
         with sqlite3.connect(self.db_path) as conn:
             verified = self._load_verified_row(conn, event_id)
+            if verified["artifact_hash"] and verified["status"] == RetentionOutboxStatus.APPLIED.value:
+                return self._receipt(conn, event_id)
             now = datetime.now(UTC).isoformat()
             conn.execute(
                 "UPDATE historical_retention_outbox "
@@ -328,7 +338,9 @@ class DurableRetentionRegistrar:
         with sqlite3.connect(self.db_path) as conn:
             rows = conn.execute(
                 "SELECT event_id FROM historical_retention_outbox "
-                "WHERE status = ? ORDER BY created_at, event_id LIMIT ?",
+                "WHERE status = ? AND NOT (artifact_hash IS NULL AND artifact_type='R18_' || reference_type "
+                "AND reference_type IN ('ML_DATASET','MODEL_VERSION','STRATEGY_PROFILE','AUDIT')) "
+                "ORDER BY created_at, event_id LIMIT ?",
                 (RetentionOutboxStatus.PENDING.value, limit),
             ).fetchall()
         return tuple(self.dispatch(str(row[0])) for row in rows)

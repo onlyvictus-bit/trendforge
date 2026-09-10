@@ -7,12 +7,15 @@ a parallel model registry or retention database.
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from pydantic import ValidationError
 
 from trendforge_api import storage
 from trendforge_api.selection import r18_governance as governance
+from trendforge_api.selection import r18_history_store as history_store
 from trendforge_api.selection import r18_store
 
 
@@ -252,12 +255,25 @@ def test_feature_manifest_or_member_evidence_tamper_is_detected():
     verify = _required(governance, "verify_frozen_dataset_manifest")
     manifest = _dataset()
     verify(manifest, available_evidence_hashes={H5, H6})
-    payload = manifest.model_dump(mode="json")
+    payload = manifest.model_dump(mode="json", by_alias=True)
     payload["featureManifestHash"] = "f" * 64
     with pytest.raises(ValueError, match="DATASET_HASH_MISMATCH|FEATURE_MANIFEST"):
         verify(payload, available_evidence_hashes={H5, H6})
     with pytest.raises(ValueError, match="EVIDENCE.*MISSING"):
         verify(manifest, available_evidence_hashes={H5})
+
+
+def test_conflicting_feature_manifest_alias_and_name_are_rejected():
+    manifest = _dataset()
+    payload = manifest.model_dump(mode="json", by_alias=False)
+    payload["featureManifestHash"] = "f" * 64
+    with pytest.raises(ValidationError) as caught:
+        type(manifest).model_validate(payload)
+    assert any(
+        error["type"] == "extra_forbidden"
+        and error["loc"] == ("feature_manifest_hash",)
+        for error in caught.value.errors()
+    )
 
 
 def test_source_and_outcome_corrections_create_new_dataset_without_rewriting_old():
@@ -456,16 +472,38 @@ def test_governed_read_is_pure_and_legacy_rows_are_not_backfilled(tmp_path, monk
         assert conn.total_changes == 0
 
 
-def test_corrupt_dataset_payload_or_retention_link_is_refused_on_read(tmp_path, monkeypatch):
+@pytest.mark.parametrize("operation", ["UPDATE", "DELETE"])
+def test_dataset_sql_tamper_is_blocked(tmp_path, monkeypatch, operation):
     _set_db(tmp_path, monkeypatch)
     _required(r18_store, "apply_rhist03d_schema")()
-    persist = _required(r18_store, "persist_frozen_dataset")
-    verify_stored = _required(r18_store, "verify_stored_rhist03d_artifact")
     dataset = _dataset()
-    persist(dataset)
+    r18_store.persist_frozen_dataset(dataset)
+    statement = (
+        "UPDATE ml_frozen_datasets SET payload_json='{}' WHERE dataset_id=?"
+        if operation == "UPDATE"
+        else "DELETE FROM ml_frozen_datasets WHERE dataset_id=?"
+    )
+    with storage.connect() as conn:
+        with pytest.raises(sqlite3.IntegrityError, match="R-HIST-03D immutable artifact"):
+            conn.execute(statement, (dataset.dataset_id,))
+    assert r18_store.verify_stored_rhist03d_artifact(
+        "ML_DATASET", dataset.dataset_id, dataset.dataset_version
+    ) == dataset.model_dump(mode="json", by_alias=True)
+
+
+def test_pre_guard_corrupt_dataset_payload_is_refused_on_read(tmp_path, monkeypatch):
+    _set_db(tmp_path, monkeypatch)
+    # Model a historical database before the public facade installed its guards.
+    history_store.apply_schema()
+    dataset = _dataset()
+    history_store.persist_frozen_dataset(dataset)
+    verify_stored = r18_store.verify_stored_rhist03d_artifact
+    assert verify_stored("ML_DATASET", dataset.dataset_id, dataset.dataset_version)
     with storage.connect() as conn:
         conn.execute("UPDATE ml_frozen_datasets SET payload_json='{}' WHERE dataset_id=?", (dataset.dataset_id,))
         conn.commit()
+    # Installing protection must not bless or repair already corrupted bytes.
+    r18_store.apply_rhist03d_schema()
     with pytest.raises(ValueError, match="CORRUPT|HASH"):
         verify_stored("ML_DATASET", dataset.dataset_id, dataset.dataset_version)
 

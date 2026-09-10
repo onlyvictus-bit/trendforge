@@ -22,6 +22,10 @@ from ..retention_producer import (
 )
 from ..r16_retention import _payload_hash as r16_payload_hash
 from ..r16_retention import verified_record as verified_r16_record
+from .r18_history_completion import (
+    assert_rhist03d_upgrade_safe as assert_completion_upgrade_safe,
+    resolve_retention_link,
+)
 from .r18_history_store import (
     AUDIT_RETENTION_VERSION,
     verify_stored_rhist03d_artifact,
@@ -154,10 +158,7 @@ def rhist03d_preflight_inventory() -> dict[str, Any]:
 
 
 def assert_rhist03d_upgrade_safe() -> dict[str, Any]:
-    inventory = rhist03d_preflight_inventory()
-    if inventory["stopRequired"]:
-        raise RuntimeError("WAIT_RHIST03D_PREFIX_APPLIED_TYPED_IDENTITY_REQUIRES_REVIEW")
-    return inventory
+    return assert_completion_upgrade_safe()
 
 
 def _verify_dataset_r16_parents(payload: dict[str, Any]) -> None:
@@ -292,11 +293,9 @@ def _verify_parents(artifact_type: str, payload: dict[str, Any]) -> None:
 
 def _verify_retention_proof(locator: RHist03DArtifactLocator, semantic_hash: str) -> None:
     with storage.connect() as conn:
-        link = conn.execute(
-            "SELECT * FROM r18_retention_links WHERE artifact_type=? AND artifact_id=? "
-            "AND artifact_version=?",
-            (locator.artifact_type, locator.artifact_id, locator.artifact_version),
-        ).fetchone()
+        link = resolve_retention_link(
+            conn, locator.artifact_type, locator.artifact_id, locator.artifact_version
+        )
         if link is None or link["artifact_hash"] != semantic_hash:
             raise RuntimeError("WAIT_RHIST03D_RETENTION_LINK_MISSING_OR_MISMATCH")
         event = conn.execute(
@@ -314,7 +313,9 @@ def _verify_retention_proof(locator: RHist03DArtifactLocator, semantic_hash: str
             created_at=datetime.fromisoformat(str(event["created_at"])),
         )
         if (
-            event["reference_id"] != intent.reference_id
+            event["event_id"] != intent.event_id
+            or link["reference_id"] != intent.reference_id
+            or event["reference_id"] != intent.reference_id
             or event["payload_json"] != intent.payload_json
             or event["payload_hash"] != intent.payload_hash
             or event["artifact_hash"] != semantic_hash
@@ -351,11 +352,7 @@ def verify_governed_rhist03d_artifact(
     )
     with storage.connect() as conn:
         row = _artifact_row(conn, locator)
-        link = conn.execute(
-            "SELECT * FROM r18_retention_links WHERE artifact_type=? AND artifact_id=? "
-            "AND artifact_version=?",
-            (artifact_type, artifact_id, artifact_version),
-        ).fetchone()
+        link = resolve_retention_link(conn, artifact_type, artifact_id, artifact_version)
     if row is None or row["publication_state"] != "APPLIED":
         raise RuntimeError("WAIT_RHIST03D_ARTIFACT_NOT_APPLIED")
     if link is None or link["publication_state"] != "APPLIED":
@@ -383,11 +380,7 @@ def finalize_rhist03d_artifact(
     )
     with storage.connect() as conn:
         row = _artifact_row(conn, locator)
-        link = conn.execute(
-            "SELECT * FROM r18_retention_links WHERE artifact_type=? AND artifact_id=? "
-            "AND artifact_version=?",
-            (artifact_type, artifact_id, artifact_version),
-        ).fetchone()
+        link = resolve_retention_link(conn, artifact_type, artifact_id, artifact_version)
     if row is None or link is None:
         raise RuntimeError("WAIT_RHIST03D_ARTIFACT_OR_LINK_MISSING")
     semantic_hash = str(row["semantic_hash"])
@@ -404,8 +397,11 @@ def finalize_rhist03d_artifact(
             verify_parents=verify_parents,
         )
 
-    receipt = DurableRetentionRegistrar(db_path=storage.DB_PATH).dispatch(
-        str(link["event_id"])
+    if fault_point == "BEFORE_DISPATCH":
+        raise RuntimeError("INJECTED_BEFORE_DISPATCH")
+    registrar = DurableRetentionRegistrar(db_path=storage.DB_PATH)
+    receipt = registrar.dispatch(
+        str(link["event_id"]), fault_point=fault_point
     )
     if receipt.status is not RetentionOutboxStatus.APPLIED:
         raise RuntimeError("WAIT_RHIST03D_RETENTION_DISPATCH_BLOCKED")
@@ -422,27 +418,40 @@ def finalize_rhist03d_artifact(
     conn = storage.connect()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        if version_col is None:
-            updated_artifact = conn.execute(
-                f"UPDATE {table} SET publication_state='APPLIED' "
-                f"WHERE {id_col}=? AND publication_state='PENDING_RETENTION'",
-                (artifact_id,),
-            ).rowcount
-        else:
-            updated_artifact = conn.execute(
-                f"UPDATE {table} SET publication_state='APPLIED' "
-                f"WHERE {id_col}=? AND {version_col}=? "
-                "AND publication_state='PENDING_RETENTION'",
-                (artifact_id, artifact_version),
-            ).rowcount
-        updated_link = conn.execute(
-            "UPDATE r18_retention_links SET publication_state='APPLIED' "
-            "WHERE artifact_type=? AND artifact_id=? AND artifact_version=? "
-            "AND artifact_hash=? AND publication_state='PENDING_RETENTION'",
-            (artifact_type, artifact_id, artifact_version, semantic_hash),
-        ).rowcount
-        if updated_artifact != 1 or updated_link != 1:
+        current_row = _artifact_row(conn, locator)
+        current_link = resolve_retention_link(conn, artifact_type, artifact_id, artifact_version)
+        if current_row is None or current_link is None:
+            raise RuntimeError("WAIT_RHIST03D_ARTIFACT_OR_LINK_MISSING")
+        if current_row["publication_state"] != current_link["publication_state"]:
+            raise RuntimeError("WAIT_RHIST03D_SPLIT_PUBLICATION_STATE")
+        if current_row["semantic_hash"] != semantic_hash or current_link["artifact_hash"] != semantic_hash:
             raise RuntimeError("WAIT_RHIST03D_FINALIZE_CAS_MISMATCH")
+        # Another finalizer may have committed while this caller proved parents.
+        # Re-read under the writer lock and accept only the exact complete pair.
+        if current_row["publication_state"] != "APPLIED":
+            updated_link = conn.execute(
+                "UPDATE r18_retention_links SET publication_state='APPLIED' "
+                "WHERE artifact_type=? AND artifact_id=? AND artifact_version=? "
+                "AND artifact_hash=? AND publication_state='PENDING_RETENTION'",
+                (artifact_type, artifact_id, artifact_version, semantic_hash),
+            ).rowcount
+            if fault_point == "AFTER_LINK_APPLIED":
+                raise RuntimeError("INJECTED_AFTER_LINK_APPLIED")
+            if version_col is None:
+                updated_artifact = conn.execute(
+                    f"UPDATE {table} SET publication_state='APPLIED' "
+                    f"WHERE {id_col}=? AND publication_state='PENDING_RETENTION'",
+                    (artifact_id,),
+                ).rowcount
+            else:
+                updated_artifact = conn.execute(
+                    f"UPDATE {table} SET publication_state='APPLIED' "
+                    f"WHERE {id_col}=? AND {version_col}=? "
+                    "AND publication_state='PENDING_RETENTION'",
+                    (artifact_id, artifact_version),
+                ).rowcount
+            if updated_artifact != 1 or updated_link != 1:
+                raise RuntimeError("WAIT_RHIST03D_FINALIZE_CAS_MISMATCH")
         if fault_point == "BEFORE_LOCAL_COMMIT":
             raise RuntimeError("INJECTED_BEFORE_LOCAL_COMMIT")
         conn.commit()

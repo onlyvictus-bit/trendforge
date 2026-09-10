@@ -238,6 +238,38 @@ A green CI after these fixes removes the current regression set; it does not by 
 - full 03A/03B/03C regression preservation;
 - exact-head CI verification at the final 03D acceptance commit.
 
+## Latest local repair checkpoint - head 6de1e149 baseline
+
+PR #6 was re-resolved at `6de1e14973edcf62b61c9b6a1441214ace656ec4`, base
+`f99e7eb3e764b3fb43aa55432abcdf78cd68191e`. CI run `34486533849` had the three
+remaining failures (1671 passes): ambiguous alias/name tamper input, a corruption
+test blocked by the intended SQL guard, and the undeclared EIA XLS dependency.
+All three are repaired locally without weakening semantic validation or guards.
+
+The same repair also implements the requested explicit E1-to-E2 supersession
+and crash/concurrency matrix. E1/link identity is preserved; immutable reviewer,
+reason and old/new hash linkage is appended; only corrected E2 governs. Applied
+pre-fix semantic history stops for migration review. Concurrent finalizers and
+identical authority registrations converge; conflicting registrations fail;
+late dispatch failures cannot downgrade APPLIED. Wrong indexed ID/version is
+rejected. Legacy market evidence retains its prior identity domain.
+
+Final local evidence on the prepared patch:
+
+- Backend: **1699 passed, zero failed, zero skipped, one warning**, 904.25 seconds.
+- Compile and Ruff: pass. Frontend: 220/220 primary checks and all additional suites pass.
+- Mypy: actual accepted 03C source `2079336768907cf9f0668a8798cd631007c6e74f`
+  and repaired source each report 512 errors in 70 files; normalized error/note
+  multiset has zero additions and zero removals. Mypy is not clean.
+- EIA official XLS: eight populated records dated 2026-09-04 with xlrd 2.0.2;
+  masking the dependency reproduces WAIT_SCHEMA_MISMATCH on the identical bytes.
+
+The [execution record](fable/RHIST03D_PR6_REPAIR_2026-09-10.md) contains the
+test-first findings, additive schema/recovery operation and complete boundary.
+These are local results; no new commit/push or GitHub CI run is claimed. Separate
+publication approval and exact-head CI remain required. No live database was
+migrated. 03D remains IN PROGRESS, and 03E/03F remain LOCKED.
+
 ## Stage boundary
 
 Current intended order remains:

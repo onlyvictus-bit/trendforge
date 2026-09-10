@@ -5,6 +5,52 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-10 - PR #6 repair verification
+
+Baseline: `6de1e14973edcf62b61c9b6a1441214ace656ec4`, with the original three
+failures confirmed from CI run `34486533849`. Two R18 failures reproduced
+locally. Additional failing tests exposed missing recovery/crash points,
+legacy-event misclassification, concurrent finalizer and dispatch races,
+wrong indexed identity acceptance and concurrent authority registration.
+
+Checks run from the isolated checkout's `backend` directory, using the existing
+Python 3.14.3 environment and user-approved isolated `xlrd==2.0.2`:
+
+```sh
+python -m compileall -q trendforge_api tests
+python -m pytest -q -p no:cacheprovider tests/test_rhist03d_ml_history.py
+python -m pytest -q -p no:cacheprovider tests/test_rhist03d_recovery.py tests/test_rhist03d_artifact_retention.py tests/test_retention_producer.py tests/test_retention_evidence_safety.py
+python -m pytest -q -p no:cacheprovider --tb=short -rs --durations=8
+python -m ruff check trendforge_api tests
+python -m mypy trendforge_api --ignore-missing-imports --no-incremental
+```
+
+Each pytest invocation uses its own explicit writable scratch `--basetemp`.
+No production database or source cache was migrated. The same local environment
+checked actual 03C source at `2079336768907cf9f0668a8798cd631007c6e74f` for a
+normalized per-file diagnostic multiset comparison (source coordinates and
+embedded line references removed; errors and notes retained).
+
+Observed checkpoints: repaired ML suite 28 passed; five original 03D suites
+54 passed; expanded 03D matrix 72 passed; registration/retention regression
+48 passed; final forced race checks 3 passed. Mypy: 512 errors in 70 files on
+both revisions, zero new/removed normalized diagnostics on final repaired
+source. Ruff/compile and frontend npm test passed after documentation updates.
+The final full backend run on repaired source finished with **1699 passed,
+zero failed, zero skipped, one Starlette deprecation warning**, in 904.25 seconds.
+Earlier interrupted runs are not completion evidence. The final source passed
+compilation and Ruff; frontend passed 220/220 primary checks and every additional
+suite, including documentation contracts.
+
+Official EIA XLS: 104448 bytes with OLE signature, eight populated numeric
+records dated 2026-09-04 with xlrd 2.0.2. Masking xlrd against the identical
+workbook reproduces WAIT_SCHEMA_MISMATCH. The CSV route also parsed eight rows,
+but returned a null parsed date; CSV freshness is not verified by this result.
+
+Post-publication exact-head CI remains pending. See
+[the execution record](fable/RHIST03D_PR6_REPAIR_2026-09-10.md). 03D remains
+IN PROGRESS; LIVE-DATA-VERIFIED (03D): NO; PRODUCTION-ACCEPTED: NO.
+
 ## 2026-09-09 - R-HIST-03C local verification evidence
 
 Repository baseline: `fc236893b1504b857513fb896b8cb89050e17ffd` (tested 03B),

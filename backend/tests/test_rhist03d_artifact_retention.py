@@ -10,6 +10,7 @@ from trendforge_api import storage
 from trendforge_api.historical_retention import HistoricalRetentionAuthority
 from trendforge_api.retention_producer import DurableRetentionRegistrar, RetentionOutboxStatus
 from trendforge_api.selection import r18_governance as governance
+from trendforge_api.selection import r18_history_store as history_store
 from trendforge_api.selection import r18_store
 
 NOW = datetime(2026, 9, 9, 10, 0, tzinfo=UTC)
@@ -22,11 +23,14 @@ H6 = "6" * 64
 H7 = "7" * 64
 
 
-def _set_db(tmp_path, monkeypatch):
+def _set_db(tmp_path, monkeypatch, *, pre_guard=False):
     monkeypatch.setattr(storage, "DB_PATH", tmp_path / "rhist03d-artifact.db")
     storage._INITIALIZED_DB_PATHS.clear()
     storage.init_db()
-    r18_store.apply_rhist03d_schema()
+    if pre_guard:
+        history_store.apply_schema()
+    else:
+        r18_store.apply_rhist03d_schema()
 
 
 def _profile():
@@ -99,20 +103,20 @@ def test_profile_retention_uses_artifact_hash_not_fake_market_object(tmp_path, m
 
 
 def test_authority_rejects_tampered_semantic_artifact_before_registration(tmp_path, monkeypatch):
-    _set_db(tmp_path, monkeypatch)
+    _set_db(tmp_path, monkeypatch, pre_guard=True)
     profile = _profile()
     assert r18_store.persist_strategy_profile(profile) is True
     with storage.connect() as conn:
         row = conn.execute("SELECT event_id FROM historical_retention_outbox").fetchone()
         assert row is not None
         event_id = row["event_id"]
-        # Simulate out-of-band physical corruption after proving normal SQL is guarded.
-        conn.execute("DROP TRIGGER rhist03d_guard_strategy_profile_versions_update")
+        # Corruption predates installation of the production immutability guards.
         conn.execute(
             "UPDATE strategy_profile_versions SET payload_json='{}' WHERE profile_id=? AND profile_version=?",
             (profile.profile_id, profile.profile_version),
         )
         conn.commit()
+    r18_store.apply_rhist03d_schema()
 
     result = DurableRetentionRegistrar(
         db_path=storage.DB_PATH,
@@ -123,6 +127,23 @@ def test_authority_rejects_tampered_semantic_artifact_before_registration(tmp_pa
     assert "artifact" in result.last_error.lower() or "hash" in result.last_error.lower()
     with storage.connect() as conn:
         assert conn.execute("SELECT COUNT(*) FROM historical_retention_references").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("column", ["profile_id", "profile_version"])
+def test_pre_guard_index_identity_must_match_verified_payload(tmp_path, monkeypatch, column):
+    _set_db(tmp_path, monkeypatch, pre_guard=True)
+    profile = _profile()
+    history_store.persist_strategy_profile(profile)
+    with storage.connect() as conn:
+        conn.execute(f"UPDATE strategy_profile_versions SET {column}='wrong'")
+        conn.commit()
+    r18_store.apply_rhist03d_schema()
+    with pytest.raises(ValueError, match="CORRUPT_INDEXED_IDENTITY"):
+        r18_store.verify_stored_rhist03d_artifact(
+            "STRATEGY_PROFILE",
+            "wrong" if column == "profile_id" else profile.profile_id,
+            "wrong" if column == "profile_version" else profile.profile_version,
+        )
 
 
 def test_legacy_market_object_event_identity_is_unchanged_without_artifact_hash():

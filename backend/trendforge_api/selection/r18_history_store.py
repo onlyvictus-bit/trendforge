@@ -28,6 +28,7 @@ TABLES = (
     "strategy_profile_versions",
     "governance_audit_records",
     "r18_retention_links",
+    "r18_retention_supersessions",
 )
 _T = TypeVar("_T", bound=BaseModel)
 
@@ -174,6 +175,22 @@ def apply_schema() -> dict[str, Any]:
                 publication_state TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 PRIMARY KEY(artifact_type,artifact_id,artifact_version)
+            );
+            CREATE TABLE IF NOT EXISTS r18_retention_supersessions (
+                old_event_id TEXT PRIMARY KEY,
+                old_reference_id TEXT NOT NULL UNIQUE,
+                old_payload_hash TEXT NOT NULL,
+                new_event_id TEXT NOT NULL UNIQUE,
+                new_reference_id TEXT NOT NULL UNIQUE,
+                new_payload_hash TEXT NOT NULL,
+                artifact_type TEXT NOT NULL,
+                artifact_id TEXT NOT NULL,
+                artifact_version TEXT NOT NULL,
+                artifact_hash TEXT NOT NULL,
+                reviewed_by TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                recorded_at TEXT NOT NULL,
+                UNIQUE(artifact_type,artifact_id,artifact_version)
             );
             """
         )
@@ -668,6 +685,10 @@ def verify_stored_rhist03d_artifact(
         verified = model_type.model_validate(payload)
     except (ValidationError, ValueError) as exc:
         raise ValueError("CORRUPT_SEMANTIC_ARTIFACT") from exc
+    if getattr(verified, id_col) != artifact_id or (
+        version_col is not None and getattr(verified, version_col) != artifact_version
+    ):
+        raise ValueError("CORRUPT_INDEXED_IDENTITY")
     declared = (
         getattr(verified, "dataset_hash", None)
         or getattr(verified, "model_hash", None)

@@ -421,9 +421,18 @@ class HistoricalRetentionAuthority:
                     artifact_id, artifact_version, artifact_hash,
                     permanent, retain_until, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(reference_id) DO NOTHING
                 """,
                 (reference.reference_id, *self._reference_values(reference)),
             )
+            # Another registrar may insert after our initial read. Its complete
+            # immutable value must agree; a duplicate key alone is not proof.
+            persisted = connection.execute(
+                "SELECT * FROM historical_retention_references WHERE reference_id = ?",
+                (reference.reference_id,),
+            ).fetchone()
+            if persisted is None or self._from_row(persisted) != reference:
+                raise ValueError("retention reference_id is immutable and cannot be repointed")
         return reference
 
     @staticmethod
