@@ -9,9 +9,8 @@ Retention Authority reference, and required historical parents are all proven.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from .. import storage
@@ -312,7 +311,7 @@ def _verify_retention_proof(locator: RHist03DArtifactLocator, semantic_hash: str
             artifact_version=locator.artifact_version,
             reference_type=RetentionReferenceType(locator.artifact_type),
             artifact_hash=semantic_hash,
-            created_at=__import__("datetime").datetime.fromisoformat(str(event["created_at"])),
+            created_at=datetime.fromisoformat(str(event["created_at"])),
         )
         if (
             event["reference_id"] != intent.reference_id
