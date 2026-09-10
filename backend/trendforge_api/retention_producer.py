@@ -73,7 +73,13 @@ class RetentionEvidenceIntent:
         )
         market_mode = bool(self.run_id or self.trading_date or self.content_hash)
         artifact_mode = self.artifact_hash is not None
-        if market_mode == artifact_mode:
+        if not market_mode and not artifact_mode:
+            # Preserve the original 03A validation contract for legacy callers/tests.
+            raise ValueError(
+                "retention intent requires run_id, trading_date, or content_hash, "
+                "or artifact_hash"
+            )
+        if market_mode and artifact_mode:
             raise ValueError(
                 "retention intent requires exactly one evidence identity mode: "
                 "market locator or artifact_hash"
