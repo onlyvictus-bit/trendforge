@@ -5,10 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar
+
+from pydantic import BaseModel, ValidationError
 
 from .. import storage
-from ..historical_retention import RetentionReferenceType
+from ..historical_retention import HistoricalRetentionAuthority, RetentionReferenceType
 from ..retention_producer import DurableRetentionRegistrar, RetentionEvidenceIntent
 from .r18_history import (
     FrozenDatasetManifestV1,
@@ -18,6 +20,7 @@ from .r18_history import (
 )
 
 MIGRATION_VERSION = "0015_rhist03d_learning_history"
+AUDIT_RETENTION_VERSION = "1"
 TABLES = (
     "ml_frozen_datasets",
     "ml_frozen_dataset_members",
@@ -26,6 +29,11 @@ TABLES = (
     "governance_audit_records",
     "r18_retention_links",
 )
+_T = TypeVar("_T", bound=BaseModel)
+
+
+def _columns(conn, table: str) -> set[str]:
+    return {str(row["name"]) for row in conn.execute(f"PRAGMA table_info({table})")}
 
 
 def schema_status() -> dict[str, Any]:
@@ -41,12 +49,31 @@ def schema_status() -> dict[str, Any]:
             "SELECT 1 FROM schema_migrations WHERE version=?",
             (MIGRATION_VERSION,),
         ).fetchone()
+        outbox_columns = (
+            _columns(conn, "historical_retention_outbox")
+            if "historical_retention_outbox" in names
+            else set()
+        )
+        reference_columns = (
+            _columns(conn, "historical_retention_references")
+            if "historical_retention_references" in names
+            else set()
+        )
     present = tuple(name for name in TABLES if name in names)
+    shared_ready = (
+        "artifact_hash" in outbox_columns
+        and {"artifact_id", "artifact_version", "artifact_hash"}.issubset(
+            reference_columns
+        )
+    )
     return {
         "migrationVersion": MIGRATION_VERSION,
-        "applied": bool(migration) and len(present) == len(TABLES),
+        "applied": bool(migration)
+        and len(present) == len(TABLES)
+        and shared_ready,
         "tables": present,
         "missingTables": tuple(name for name in TABLES if name not in names),
+        "sharedTypedRetentionReady": shared_ready,
     }
 
 
@@ -163,6 +190,7 @@ def apply_schema() -> dict[str, Any]:
         conn.commit()
     finally:
         conn.close()
+    HistoricalRetentionAuthority(db_path=storage.DB_PATH).initialize_schema()
     return schema_status()
 
 
@@ -171,7 +199,13 @@ def _require_schema() -> None:
         raise RuntimeError("WAIT_RHIST03D_SCHEMA_NOT_APPLIED")
 
 
-def _encode(model: Any) -> tuple[str, str]:
+def _revalidate(model: _T) -> _T:
+    """Rebuild from fresh data so nested mutation/non-validating copies cannot persist."""
+    payload = model.model_dump(mode="python", by_alias=False)
+    return type(model).model_validate(payload)
+
+
+def _encode(model: BaseModel) -> tuple[str, str]:
     payload = model.model_dump(mode="json", by_alias=True)
     encoded = storage.encode_json(payload)
     return encoded, hashlib.sha256(encoded.encode()).hexdigest()
@@ -192,7 +226,7 @@ def _stage_retention(
         artifact_id=artifact_id,
         artifact_version=artifact_version,
         reference_type=RetentionReferenceType(artifact_type),
-        content_hash=artifact_hash,
+        artifact_hash=artifact_hash,
         created_at=created_at,
     )
     receipt = DurableRetentionRegistrar(db_path=storage.DB_PATH).enqueue(
@@ -234,6 +268,7 @@ def persist_frozen_dataset(
     model: FrozenDatasetManifestV1, *, fault_point: str | None = None
 ) -> dict[str, Any]:
     _require_schema()
+    model = _revalidate(model)
     encoded, content_hash = _encode(model)
     record_id = f"{model.dataset_id}:{model.dataset_version}"
     conn = storage.connect()
@@ -316,6 +351,7 @@ def persist_frozen_dataset(
 
 def persist_strategy_profile(model: StrategyProfileVersionV1) -> bool:
     _require_schema()
+    model = _revalidate(model)
     encoded, stored_hash = _encode(model)
     record_id = f"{model.profile_id}:{model.profile_version}"
     conn = storage.connect()
@@ -369,24 +405,61 @@ def persist_strategy_profile(model: StrategyProfileVersionV1) -> bool:
         conn.close()
 
 
+def _require_dataset_binding(
+    conn,
+    *,
+    dataset_id: str,
+    dataset_version: str,
+    dataset_hash: str,
+) -> None:
+    row = conn.execute(
+        "SELECT publication_state FROM ml_frozen_datasets "
+        "WHERE dataset_id=? AND dataset_version=? AND dataset_hash=?",
+        (dataset_id, dataset_version, dataset_hash),
+    ).fetchone()
+    if not row or row["publication_state"] != "APPLIED":
+        raise ValueError("MODEL_DATASET_BINDING_UNPROVEN")
+    verify_stored_rhist03d_artifact("ML_DATASET", dataset_id, dataset_version)
+
+
 def persist_governed_model(model: GovernedModelVersionV1) -> bool:
     _require_schema()
+    model = _revalidate(model)
     encoded, stored_hash = _encode(model)
     record_id = f"{model.model_id}:{model.model_version}"
     conn = storage.connect()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        for dataset_id, dataset_hash in (
-            (model.training_dataset_id, model.training_dataset_hash),
-            (model.evaluation_dataset_id, model.evaluation_dataset_hash),
+        for dataset_id, dataset_version, dataset_hash in (
+            (
+                model.training_dataset_id,
+                model.training_dataset_version,
+                model.training_dataset_hash,
+            ),
+            (
+                model.evaluation_dataset_id,
+                model.evaluation_dataset_version,
+                model.evaluation_dataset_hash,
+            ),
         ):
-            row = conn.execute(
-                "SELECT dataset_hash FROM ml_frozen_datasets "
-                "WHERE dataset_id=? AND dataset_hash=?",
-                (dataset_id, dataset_hash),
-            ).fetchone()
-            if not row:
-                raise ValueError("MODEL_DATASET_BINDING_UNPROVEN")
+            _require_dataset_binding(
+                conn,
+                dataset_id=dataset_id,
+                dataset_version=dataset_version,
+                dataset_hash=dataset_hash,
+            )
+        if model.holdout_dataset_id is not None:
+            if (
+                model.holdout_dataset_version is None
+                or model.holdout_dataset_hash is None
+            ):
+                raise ValueError("MODEL_HOLDOUT_BINDING_INCOMPLETE")
+            _require_dataset_binding(
+                conn,
+                dataset_id=model.holdout_dataset_id,
+                dataset_version=model.holdout_dataset_version,
+                dataset_hash=model.holdout_dataset_hash,
+            )
         existing = conn.execute(
             "SELECT payload_json FROM ml_governed_model_versions WHERE record_id=?",
             (record_id,),
@@ -436,6 +509,7 @@ def persist_governed_model(model: GovernedModelVersionV1) -> bool:
 
 def persist_audit_record(model: GovernanceAuditRecordV1) -> bool:
     _require_schema()
+    model = _revalidate(model)
     encoded, stored_hash = _encode(model)
     conn = storage.connect()
     try:
@@ -487,7 +561,7 @@ def persist_audit_record(model: GovernanceAuditRecordV1) -> bool:
             conn,
             artifact_type="AUDIT",
             artifact_id=model.audit_id,
-            artifact_version="1",
+            artifact_version=AUDIT_RETENTION_VERSION,
             artifact_hash=model.record_hash,
             created_at=model.reviewed_at,
         )
@@ -513,13 +587,12 @@ def get_governed_frozen_dataset(
         ).fetchone()
     if not row or row["publication_state"] != "APPLIED":
         return None
-    return json.loads(row["payload_json"])
+    return verify_stored_rhist03d_artifact(
+        "ML_DATASET", dataset_id, dataset_version
+    )
 
 
-def verify_stored_rhist03d_artifact(
-    artifact_type: str, artifact_id: str, artifact_version: str
-) -> dict[str, Any]:
-    _require_schema()
+def _artifact_mapping(artifact_type: str):
     mapping = {
         "ML_DATASET": (
             "ml_frozen_datasets",
@@ -527,6 +600,7 @@ def verify_stored_rhist03d_artifact(
             "dataset_version",
             "dataset_hash",
             "content_hash",
+            FrozenDatasetManifestV1,
         ),
         "MODEL_VERSION": (
             "ml_governed_model_versions",
@@ -534,6 +608,7 @@ def verify_stored_rhist03d_artifact(
             "model_version",
             "model_hash",
             "content_hash",
+            GovernedModelVersionV1,
         ),
         "STRATEGY_PROFILE": (
             "strategy_profile_versions",
@@ -541,17 +616,45 @@ def verify_stored_rhist03d_artifact(
             "profile_version",
             "content_hash",
             "stored_content_hash",
+            StrategyProfileVersionV1,
+        ),
+        "AUDIT": (
+            "governance_audit_records",
+            "audit_id",
+            None,
+            "record_hash",
+            "content_hash",
+            GovernanceAuditRecordV1,
         ),
     }
     if artifact_type not in mapping:
         raise ValueError("UNSUPPORTED_RHIST03D_ARTIFACT")
-    table, id_col, version_col, hash_col, stored_hash_col = mapping[artifact_type]
+    return mapping[artifact_type]
+
+
+def verify_stored_rhist03d_artifact(
+    artifact_type: str, artifact_id: str, artifact_version: str
+) -> dict[str, Any]:
+    _require_schema()
+    table, id_col, version_col, hash_col, stored_hash_col, model_type = _artifact_mapping(
+        artifact_type
+    )
     with storage.connect() as conn:
-        row = conn.execute(
-            f"SELECT payload_json,{stored_hash_col},{hash_col} FROM {table} "
-            f"WHERE {id_col}=? AND {version_col}=?",
-            (artifact_id, artifact_version),
-        ).fetchone()
+        if artifact_type == "AUDIT":
+            if artifact_version != AUDIT_RETENTION_VERSION:
+                raise ValueError("ARTIFACT_MISSING")
+            row = conn.execute(
+                f"SELECT payload_json,{stored_hash_col},{hash_col} FROM {table} "
+                f"WHERE {id_col}=?",
+                (artifact_id,),
+            ).fetchone()
+        else:
+            assert version_col is not None
+            row = conn.execute(
+                f"SELECT payload_json,{stored_hash_col},{hash_col} FROM {table} "
+                f"WHERE {id_col}=? AND {version_col}=?",
+                (artifact_id, artifact_version),
+            ).fetchone()
     if not row:
         raise ValueError("ARTIFACT_MISSING")
     actual_content = hashlib.sha256(row["payload_json"].encode()).hexdigest()
@@ -561,11 +664,42 @@ def verify_stored_rhist03d_artifact(
         payload = json.loads(row["payload_json"])
     except json.JSONDecodeError as exc:
         raise ValueError("CORRUPT_PAYLOAD_JSON") from exc
+    try:
+        verified = model_type.model_validate(payload)
+    except (ValidationError, ValueError) as exc:
+        raise ValueError("CORRUPT_SEMANTIC_ARTIFACT") from exc
     declared = (
-        payload.get("datasetHash")
-        or payload.get("modelHash")
-        or payload.get("contentHash")
+        getattr(verified, "dataset_hash", None)
+        or getattr(verified, "model_hash", None)
+        or getattr(verified, "content_hash", None)
+        or getattr(verified, "record_hash", None)
     )
     if declared != row[hash_col]:
         raise ValueError("CORRUPT_INDEXED_HASH")
-    return payload
+
+    if artifact_type == "ML_DATASET":
+        assert isinstance(verified, FrozenDatasetManifestV1)
+        record_id = f"{verified.dataset_id}:{verified.dataset_version}"
+        with storage.connect() as conn:
+            child_rows = conn.execute(
+                "SELECT member_id,member_hash,payload_json,content_hash "
+                "FROM ml_frozen_dataset_members WHERE dataset_record_id=? "
+                "ORDER BY member_id",
+                (record_id,),
+            ).fetchall()
+        if len(child_rows) != verified.member_count:
+            raise ValueError("CORRUPT_DATASET_MEMBER_COUNT")
+        expected = {member.member_id: member for member in verified.members}
+        if set(expected) != {str(row["member_id"]) for row in child_rows}:
+            raise ValueError("CORRUPT_DATASET_MEMBER_SET")
+        for child in child_rows:
+            child_json = str(child["payload_json"])
+            if hashlib.sha256(child_json.encode()).hexdigest() != child["content_hash"]:
+                raise ValueError("CORRUPT_DATASET_MEMBER_CONTENT")
+            member = expected[str(child["member_id"])]
+            if child["member_hash"] != member.member_hash:
+                raise ValueError("CORRUPT_DATASET_MEMBER_HASH")
+            if json.loads(child_json) != member.model_dump(mode="json", by_alias=True):
+                raise ValueError("CORRUPT_DATASET_MEMBER_PAYLOAD")
+
+    return verified.model_dump(mode="json", by_alias=True)
