@@ -74,7 +74,6 @@ class RetentionEvidenceIntent:
         market_mode = bool(self.run_id or self.trading_date or self.content_hash)
         artifact_mode = self.artifact_hash is not None
         if not market_mode and not artifact_mode:
-            # Preserve the original 03A validation contract for legacy callers/tests.
             raise ValueError(
                 "retention intent requires run_id, trading_date, or content_hash, "
                 "or artifact_hash"
@@ -100,8 +99,6 @@ class RetentionEvidenceIntent:
             "runId": self.run_id,
             "tradingDate": self.trading_date.isoformat() if self.trading_date else None,
         }
-        # Compatibility law: legacy 03A/03B/03C payload bytes and identities must
-        # remain unchanged when no typed semantic artifact hash is present.
         if self.artifact_hash is not None:
             payload["artifactHash"] = self.artifact_hash
         return payload
@@ -194,12 +191,7 @@ class DurableRetentionRegistrar:
                 )
                 """
             )
-            self._ensure_column(
-                conn,
-                "historical_retention_outbox",
-                "artifact_hash",
-                "TEXT",
-            )
+            self._ensure_column(conn, "historical_retention_outbox", "artifact_hash", "TEXT")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_retention_outbox_status_created "
                 "ON historical_retention_outbox(status, created_at)"
@@ -265,8 +257,15 @@ class DurableRetentionRegistrar:
             if owns:
                 conn.close()
 
+    @staticmethod
+    def _typed_transient(row: sqlite3.Row, exc: Exception) -> bool:
+        if row["artifact_hash"] is None or not isinstance(exc, sqlite3.OperationalError):
+            return False
+        message = str(exc).lower()
+        return "locked" in message or "busy" in message
+
     def dispatch(self, event_id: str) -> RetentionPublicationReceipt:
-        """Apply one intent. Retry after a crash is safe because authority.register is idempotent."""
+        """Apply one intent; typed SQLite contention stays safely retryable."""
         self.initialize_schema()
         with sqlite3.connect(self.db_path) as conn:
             row = self._load_verified_row(conn, event_id)
@@ -298,11 +297,15 @@ class DurableRetentionRegistrar:
             self.authority.register(reference)
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
+            status = (
+                RetentionOutboxStatus.PENDING
+                if self._typed_transient(row, exc)
+                else RetentionOutboxStatus.FAILED_BLOCKING
+            )
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute(
-                    "UPDATE historical_retention_outbox "
-                    "SET status = ?, last_error = ? WHERE event_id = ?",
-                    (RetentionOutboxStatus.FAILED_BLOCKING.value, error, event_id),
+                    "UPDATE historical_retention_outbox SET status = ?, last_error = ? WHERE event_id = ?",
+                    (status.value, error, event_id),
                 )
                 conn.commit()
                 return self._receipt(conn, event_id)
