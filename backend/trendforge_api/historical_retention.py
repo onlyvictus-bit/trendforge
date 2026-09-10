@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import sqlite3
 from datetime import UTC, date, datetime
@@ -35,6 +37,14 @@ PERMANENT_REFERENCE_TYPES = frozenset(
         RetentionReferenceType.DECISION_VERSION,
         RetentionReferenceType.OUTCOME,
         RetentionReferenceType.REVISION,
+        RetentionReferenceType.ML_DATASET,
+        RetentionReferenceType.MODEL_VERSION,
+        RetentionReferenceType.STRATEGY_PROFILE,
+        RetentionReferenceType.AUDIT,
+    }
+)
+TYPED_ARTIFACT_REFERENCE_TYPES = frozenset(
+    {
         RetentionReferenceType.ML_DATASET,
         RetentionReferenceType.MODEL_VERSION,
         RetentionReferenceType.STRATEGY_PROFILE,
@@ -77,24 +87,45 @@ class RetentionReference(BaseModel):
     content_hash: str | None = None
     run_id: str | None = Field(default=None, max_length=128)
     trading_date: date | None = None
+    artifact_id: str | None = Field(default=None, max_length=256)
+    artifact_version: str | None = Field(default=None, max_length=128)
+    artifact_hash: str | None = None
     permanent: bool = True
     retain_until: date | None = None
     created_at: datetime
 
-    @field_validator("content_hash")
+    @field_validator("content_hash", "artifact_hash")
     @classmethod
     def normalize_hash(cls, value: str | None) -> str | None:
         if value is None:
             return None
         normalized = value.casefold()
         if not _HASH_PATTERN.fullmatch(normalized):
-            raise ValueError("content_hash must be a SHA-256 hex digest")
+            raise ValueError("retention hash must be a SHA-256 hex digest")
         return normalized
 
     @model_validator(mode="after")
     def validate_reference(self) -> RetentionReference:
-        if not any((self.content_hash, self.run_id, self.trading_date)):
-            raise ValueError("retention reference must identify evidence")
+        market_mode = any((self.content_hash, self.run_id, self.trading_date))
+        artifact_fields = (self.artifact_id, self.artifact_version, self.artifact_hash)
+        artifact_mode = any(artifact_fields)
+        if market_mode == artifact_mode:
+            raise ValueError(
+                "retention reference must identify exactly one evidence domain"
+            )
+        if artifact_mode:
+            if not all(artifact_fields):
+                raise ValueError(
+                    "typed retention reference requires artifact_id, artifact_version, and artifact_hash"
+                )
+            if self.reference_type not in TYPED_ARTIFACT_REFERENCE_TYPES:
+                raise ValueError(
+                    "artifact_hash is only valid for typed 03D retention references"
+                )
+        elif self.reference_type in TYPED_ARTIFACT_REFERENCE_TYPES:
+            raise ValueError(
+                "typed 03D retention reference requires artifact identity"
+            )
         if self.permanent and self.retain_until is not None:
             raise ValueError("permanent retention reference cannot have retain_until")
         if not self.permanent and self.retain_until is None:
@@ -119,14 +150,15 @@ class RetentionProtectionSet(BaseModel):
     run_ids: tuple[str, ...] = ()
     content_hashes: tuple[str, ...] = ()
     reference_ids: tuple[str, ...] = ()
+    typed_artifacts: tuple[tuple[str, str, str, str], ...] = ()
 
 
 class HistoricalRetentionAuthority:
     """Fail-closed authority for historical evidence retention.
 
-    This service owns retention references and computes immutable protection sets.
-    It deliberately does not delete files. Deletion remains a separate operation
-    that must consume this authority before it is allowed to remove history.
+    Market evidence and typed semantic R18 artifacts intentionally use separate
+    identity domains. The authority owns immutable references but does not delete
+    files or grant any model, strategy, promotion, or execution authority.
     """
 
     def __init__(self, *, db_path: Path, policy: RetentionPolicy | None = None) -> None:
@@ -141,6 +173,19 @@ class HistoricalRetentionAuthority:
         connection.execute("PRAGMA busy_timeout = 5000")
         connection.execute("PRAGMA journal_mode = WAL")
         return connection
+
+    @staticmethod
+    def _ensure_column(
+        connection: sqlite3.Connection,
+        table: str,
+        column: str,
+        declaration: str,
+    ) -> None:
+        columns = {
+            str(row[1]) for row in connection.execute(f"PRAGMA table_info({table})")
+        }
+        if column not in columns:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
 
     def initialize_schema(self) -> None:
         with self._connect() as connection:
@@ -158,6 +203,9 @@ class HistoricalRetentionAuthority:
                     content_hash TEXT,
                     run_id TEXT,
                     trading_date TEXT,
+                    artifact_id TEXT,
+                    artifact_version TEXT,
+                    artifact_hash TEXT,
                     permanent INTEGER NOT NULL CHECK(permanent IN (0, 1)),
                     retain_until TEXT,
                     created_at TEXT NOT NULL
@@ -172,6 +220,21 @@ class HistoricalRetentionAuthority:
                 CREATE INDEX IF NOT EXISTS idx_retention_trading_date
                 ON historical_retention_references(trading_date);
                 """
+            )
+            for column, declaration in (
+                ("artifact_id", "TEXT"),
+                ("artifact_version", "TEXT"),
+                ("artifact_hash", "TEXT"),
+            ):
+                self._ensure_column(
+                    connection,
+                    "historical_retention_references",
+                    column,
+                    declaration,
+                )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_retention_artifact_hash "
+                "ON historical_retention_references(artifact_hash)"
             )
             connection.execute(
                 """
@@ -192,9 +255,96 @@ class HistoricalRetentionAuthority:
         ).fetchone()
         return row is not None
 
+    def _validate_typed_artifact_exists(
+        self, connection: sqlite3.Connection, reference: RetentionReference
+    ) -> None:
+        assert reference.artifact_id is not None
+        assert reference.artifact_version is not None
+        assert reference.artifact_hash is not None
+        mapping = {
+            RetentionReferenceType.ML_DATASET: (
+                "ml_frozen_datasets",
+                "dataset_id",
+                "dataset_version",
+                "dataset_hash",
+                "content_hash",
+                "datasetHash",
+            ),
+            RetentionReferenceType.MODEL_VERSION: (
+                "ml_governed_model_versions",
+                "model_id",
+                "model_version",
+                "model_hash",
+                "content_hash",
+                "modelHash",
+            ),
+            RetentionReferenceType.STRATEGY_PROFILE: (
+                "strategy_profile_versions",
+                "profile_id",
+                "profile_version",
+                "content_hash",
+                "stored_content_hash",
+                "contentHash",
+            ),
+            RetentionReferenceType.AUDIT: (
+                "governance_audit_records",
+                "audit_id",
+                None,
+                "record_hash",
+                "content_hash",
+                "recordHash",
+            ),
+        }
+        table, id_col, version_col, hash_col, stored_hash_col, payload_hash_key = mapping[
+            reference.reference_type
+        ]
+        if not self._known_table(connection, table):
+            raise ValueError(f"typed artifact table unavailable: {table}")
+        if reference.reference_type is RetentionReferenceType.AUDIT:
+            if reference.artifact_version != "1":
+                raise ValueError("unknown audit artifact version")
+            row = connection.execute(
+                f"SELECT payload_json,{stored_hash_col},{hash_col} FROM {table} WHERE {id_col}=?",
+                (reference.artifact_id,),
+            ).fetchone()
+        else:
+            assert version_col is not None
+            row = connection.execute(
+                f"SELECT payload_json,{stored_hash_col},{hash_col} FROM {table} "
+                f"WHERE {id_col}=? AND {version_col}=?",
+                (reference.artifact_id, reference.artifact_version),
+            ).fetchone()
+        if row is None or row[hash_col] != reference.artifact_hash:
+            raise ValueError("unknown artifact identity; refusing retention reference")
+        payload_json = str(row["payload_json"])
+        if hashlib.sha256(payload_json.encode()).hexdigest() != row[stored_hash_col]:
+            raise ValueError("stored artifact payload hash mismatch")
+        try:
+            payload = json.loads(payload_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError("stored artifact payload is not valid JSON") from exc
+        if payload.get(payload_hash_key) != reference.artifact_hash:
+            raise ValueError("stored artifact semantic hash mismatch")
+
+        # Full semantic verification remains owned by the R18 history store. The
+        # local import avoids a module import cycle at startup.
+        from trendforge_api.selection.r18_history_store import (
+            verify_stored_rhist03d_artifact,
+        )
+
+        verify_stored_rhist03d_artifact(
+            reference.reference_type.value,
+            reference.artifact_id,
+            reference.artifact_version,
+        )
+
     def _validate_evidence_exists(
         self, connection: sqlite3.Connection, reference: RetentionReference
     ) -> None:
+        if reference.artifact_hash is not None:
+            self._validate_typed_artifact_exists(connection, reference)
+            return
+
         if reference.content_hash is not None:
             if not self._known_table(connection, "market_data_objects"):
                 raise ValueError(
@@ -244,6 +394,9 @@ class HistoricalRetentionAuthority:
             reference.content_hash,
             reference.run_id,
             reference.trading_date.isoformat() if reference.trading_date else None,
+            reference.artifact_id,
+            reference.artifact_version,
+            reference.artifact_hash,
             int(reference.permanent),
             reference.retain_until.isoformat() if reference.retain_until else None,
             reference.created_at.isoformat(),
@@ -269,8 +422,9 @@ class HistoricalRetentionAuthority:
                 """
                 INSERT INTO historical_retention_references(
                     reference_id, reference_type, content_hash, run_id, trading_date,
+                    artifact_id, artifact_version, artifact_hash,
                     permanent, retain_until, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (reference.reference_id, *self._reference_values(reference)),
             )
@@ -278,6 +432,7 @@ class HistoricalRetentionAuthority:
 
     @staticmethod
     def _from_row(row: sqlite3.Row) -> RetentionReference:
+        keys = set(row.keys())
         return RetentionReference(
             reference_id=row["reference_id"],
             reference_type=RetentionReferenceType(row["reference_type"]),
@@ -286,6 +441,11 @@ class HistoricalRetentionAuthority:
             trading_date=date.fromisoformat(row["trading_date"])
             if row["trading_date"]
             else None,
+            artifact_id=row["artifact_id"] if "artifact_id" in keys else None,
+            artifact_version=row["artifact_version"]
+            if "artifact_version" in keys
+            else None,
+            artifact_hash=row["artifact_hash"] if "artifact_hash" in keys else None,
             permanent=bool(row["permanent"]),
             retain_until=date.fromisoformat(row["retain_until"])
             if row["retain_until"]
@@ -306,7 +466,21 @@ class HistoricalRetentionAuthority:
         references = self.active_references(as_of_date=as_of_date)
         dates = {ref.trading_date for ref in references if ref.trading_date is not None}
         run_ids = {ref.run_id for ref in references if ref.run_id is not None}
+        # Critical compatibility law: semantic artifact hashes never enter the
+        # market-object content-hash protection namespace.
         hashes = {ref.content_hash for ref in references if ref.content_hash is not None}
+        typed_artifacts = {
+            (
+                ref.reference_type.value,
+                ref.artifact_id,
+                ref.artifact_version,
+                ref.artifact_hash,
+            )
+            for ref in references
+            if ref.artifact_hash is not None
+            and ref.artifact_id is not None
+            and ref.artifact_version is not None
+        }
 
         with self._connect() as connection:
             if dates:
@@ -381,6 +555,7 @@ class HistoricalRetentionAuthority:
             run_ids=tuple(sorted(run_ids)),
             content_hashes=tuple(sorted(hashes)),
             reference_ids=tuple(sorted(ref.reference_id for ref in references)),
+            typed_artifacts=tuple(sorted(typed_artifacts)),
         )
 
     def assert_deletion_allowed(
