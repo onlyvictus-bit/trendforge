@@ -122,10 +122,6 @@ class RetentionReference(BaseModel):
                 raise ValueError(
                     "artifact_hash is only valid for typed 03D retention references"
                 )
-        elif self.reference_type in TYPED_ARTIFACT_REFERENCE_TYPES:
-            raise ValueError(
-                "typed 03D retention reference requires artifact identity"
-            )
         if self.permanent and self.retain_until is not None:
             raise ValueError("permanent retention reference cannot have retain_until")
         if not self.permanent and self.retain_until is None:
