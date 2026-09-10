@@ -8,21 +8,93 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .. import storage
+from . import r18_history_completion as _completion
 from .r18_history_finalization import (
-    assert_rhist03d_upgrade_safe,
-    finalize_rhist03d_artifact,
-    rhist03d_preflight_inventory,
-    verify_governed_rhist03d_artifact,
+    finalize_rhist03d_artifact as _base_finalize_rhist03d_artifact,
+    verify_governed_rhist03d_artifact as _base_verify_governed_rhist03d_artifact,
 )
 from .r18_history_store import (
-    apply_schema as apply_rhist03d_schema,
+    apply_schema as _apply_rhist03d_schema,
     persist_audit_record,
     persist_frozen_dataset,
     persist_governed_model,
     persist_strategy_profile,
-    schema_status as rhist03d_schema_status,
+    schema_status as _rhist03d_schema_status,
     verify_stored_rhist03d_artifact,
 )
+
+
+def apply_rhist03d_schema() -> dict[str, Any]:
+    result = _apply_rhist03d_schema()
+    _completion.install_rhist03d_db_guards()
+    return {**result, "dbImmutabilityGuards": True}
+
+
+def rhist03d_schema_status() -> dict[str, Any]:
+    result = _rhist03d_schema_status()
+    with storage.connect() as conn:
+        triggers = {
+            str(row["name"])
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'rhist03d_guard_%'"
+            )
+        }
+    return {**result, "dbImmutabilityGuards": bool(triggers)}
+
+
+def rhist03d_preflight_inventory() -> dict[str, Any]:
+    return _completion.rhist03d_upgrade_inventory()
+
+
+def assert_rhist03d_upgrade_safe() -> dict[str, Any]:
+    return _completion.assert_rhist03d_upgrade_safe()
+
+
+def verify_governed_rhist03d_artifact(
+    artifact_type: str,
+    artifact_id: str,
+    artifact_version: str,
+    *,
+    verify_parents: bool = True,
+) -> dict[str, Any]:
+    payload = _base_verify_governed_rhist03d_artifact(
+        artifact_type,
+        artifact_id,
+        artifact_version,
+        verify_parents=verify_parents,
+    )
+    if verify_parents and artifact_type == "ML_DATASET":
+        _completion.verify_dataset_r16_parents(payload)
+    return payload
+
+
+def finalize_rhist03d_artifact(
+    artifact_type: str,
+    artifact_id: str,
+    artifact_version: str,
+    *,
+    fault_point: str | None = None,
+    verify_parents: bool = True,
+) -> dict[str, Any]:
+    """Finalize only after the strengthened 03D preflight/PIT proof succeeds."""
+    assert_rhist03d_upgrade_safe()
+    if verify_parents and artifact_type == "ML_DATASET":
+        payload = verify_stored_rhist03d_artifact(
+            artifact_type, artifact_id, artifact_version
+        )
+        _completion.verify_dataset_r16_parents(payload)
+    return _base_finalize_rhist03d_artifact(
+        artifact_type,
+        artifact_id,
+        artifact_version,
+        fault_point=fault_point,
+        verify_parents=verify_parents,
+    )
+
+
+def rhist03d_integrity_status() -> dict[str, Any]:
+    return _completion.rhist03d_integrity_status()
+
 
 __all__ = (
     "apply_rhist03d_schema",
@@ -32,6 +104,7 @@ __all__ = (
     "persist_frozen_dataset",
     "persist_governed_model",
     "persist_strategy_profile",
+    "rhist03d_integrity_status",
     "rhist03d_preflight_inventory",
     "rhist03d_schema_status",
     "verify_governed_rhist03d_artifact",
