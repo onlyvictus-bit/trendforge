@@ -16,7 +16,7 @@ from pydantic.alias_generators import to_camel
 from .contracts import stable_id
 from .r16_pit import R16FrozenHypothesisV1, R16ObservationV1
 
-POLICY_VERSION = "R16_EXACT_CELL_POLICY_V1"
+POLICY_VERSION = "R16_EXACT_CELL_POLICY_V2_AMBIGUITY_SEPARATE"
 BOOTSTRAP_SEED = 1601
 BOOTSTRAP_RESAMPLES = 1000
 MODEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True, frozen=True)
@@ -188,7 +188,7 @@ def _folds(
             for row in hypotheses
             if row.trading_date in test_set and row.hypothesis_id in latest
         ]
-        terminal = [row for row in test_rows if row.status in {"TARGET", "STOP"}]
+        terminal = [row for row in test_rows if row.status in {"TARGET", "STOP"} and not row.intrabar_ambiguous]
         fold_id = stable_id(
             "r16fold", dataset_run_id, exact_cell, str(fold_index),
             _hash(train_dates), _hash(test_dates),
@@ -216,7 +216,7 @@ def _folds(
                     round(sum(row.status == "STOP" for row in terminal) / len(terminal), 6)
                     if terminal else None
                 ),
-                average_net_r=_average(row.net_r for row in test_rows),
+                average_net_r=_average(row.net_r for row in test_rows if not row.intrabar_ambiguous and row.status != "AMBIGUOUS"),
             )
         )
     return tuple(folds)
@@ -251,9 +251,10 @@ def build_metrics(
             for row in cell_hypotheses
             if row.hypothesis_id in latest
         ]
-        counts = Counter(row.status for row in cell_observations)
+        counts = Counter("AMBIGUOUS" if row.intrabar_ambiguous else row.status for row in cell_observations)
+        unambiguous = [row for row in cell_observations if not row.intrabar_ambiguous and row.status != "AMBIGUOUS"]
         eligible = [row for row in cell_hypotheses if row.geometry_status == "READY"]
-        resolved = [row for row in cell_observations if row.status in {"TARGET", "STOP"}]
+        resolved = [row for row in unambiguous if row.status in {"TARGET", "STOP"}]
         eligible_count = len(eligible)
         target_count = counts["TARGET"]
         stop_count = counts["STOP"]
@@ -268,7 +269,7 @@ def build_metrics(
                 ),
                 1 if row.status == "TARGET" else 0,
             )
-            for row in cell_observations
+            for row in unambiguous
             if row.status in {"TARGET", "STOP", "NO_HIT"}
         ]
         low, high, width = _block_bootstrap_interval(bootstrap_rows)
@@ -279,7 +280,7 @@ def build_metrics(
             latest=latest,
         )
         folds_out.extend(folds)
-        average_net = _average(row.net_r for row in cell_observations)
+        average_net = _average(row.net_r for row in unambiguous)
         conclusion = (
             "POSITIVE" if average_net is not None and average_net > 0
             else "NEGATIVE" if average_net is not None and average_net < 0
@@ -335,6 +336,8 @@ def build_metrics(
             "observationSetHash": observation_set_hash,
             "targetCount": target_count,
             "stopCount": stop_count,
+            "ambiguousCount": counts["AMBIGUOUS"],
+            "expiredCount": counts["EXPIRED"],
             "noHitCount": no_hit_count,
             "noEntryCount": counts["NO_ENTRY"],
             "noGeometryCount": counts["NO_GEOMETRY"],
@@ -350,12 +353,12 @@ def build_metrics(
             "noHitIncidence": no_hit_count / eligible_count if eligible_count else None,
             "resolvedOnlyRate": target_count / len(resolved) if resolved else None,
             "resolvedOnlyRateIsSecondaryDiagnostic": True,
-            "averageMfeR": _average(row.mfe_r for row in cell_observations),
-            "averageMaeR": _average(row.mae_r for row in cell_observations),
-            "averageGrossR": _average(row.gross_r for row in cell_observations),
+            "averageMfeR": _average(row.mfe_r for row in unambiguous),
+            "averageMaeR": _average(row.mae_r for row in unambiguous),
+            "averageGrossR": _average(row.gross_r for row in unambiguous),
             "averageNetR": average_net,
             "averageStressedNetR": _average(
-                row.stressed_net_r for row in cell_observations
+                row.stressed_net_r for row in unambiguous
             ),
             "sequentialPaperDrawdownR": _sequential_drawdown(
                 [
@@ -368,7 +371,7 @@ def build_metrics(
                         row.symbol,
                         row.net_r,
                     )
-                    for row in cell_observations
+                    for row in unambiguous
                 ]
             ),
             "profileConclusion": conclusion,

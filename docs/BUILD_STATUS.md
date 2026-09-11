@@ -5,6 +5,93 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-11 - R-HIST-03D accepted; 03E next
+
+03D is IMPLEMENTED + TESTED at `fce62874a61e4e2bb6d939bef6d0811e5a266996`.
+[Exact-head CI 34496385997](https://github.com/onlyvictus-bit/trendforge/actions/runs/34496385997)
+is completed / success: backend 1699 passed, compile/Ruff/frontend passed;
+Mypy remains the accepted non-blocking 512 errors / 70 files, normalized delta 0.
+This supersedes the pending-publication status in the dated local record below.
+03E is NEXT / UNLOCKED under its existing producer-coverage build plan. 03F is
+GATED on 03E's full acceptance. Full R-HIST-03 is NOT COMPLETE. This documentation
+update preserves the 03D acceptance head and requires CI at its own new head.
+Production schema application, live/PIT validation, price-band/freshness work,
+EIA CSV dates, CLI consolidation and legacy typing debt remain separate backlog.
+LIVE-DATA-VERIFIED: NO. PRODUCTION-ACCEPTED: NO. No execution authority changed.
+
+## 2026-09-10 - PR #6 local repair and controlled 03D recovery (historical)
+
+Local changes based on PR head `6de1e14973edcf62b61c9b6a1441214ace656ec4`
+repair the three supplied CI failures and add the requested controlled
+supersession/crash/concurrency acceptance. E1 and its link remain preserved;
+deterministic E2 and immutable review evidence own the corrected retention
+proof. Already APPLIED pre-fix semantic history requires migration review.
+Concurrent finalization/registration is idempotent, late failures cannot undo
+APPLIED, and stored payloads must match their indexed ID/version.
+
+The existing explicit R18 schema owner adds `r18_retention_supersessions` and
+guards. This has only been applied to scratch databases. See the implementation,
+test-first findings and operator boundary in
+[the execution record](fable/RHIST03D_PR6_REPAIR_2026-09-10.md).
+Final local regression: **1699 passed, zero failures/skips, one warning**;
+compile, Ruff and frontend pass. Mypy remains at 512 legacy errors in 70 files,
+with zero new normalized diagnostics versus actual 03C source. Commit/push and
+exact-head CI after this repair remain pending. 03D is IN PROGRESS, 03E/03F remain LOCKED, and
+LIVE-DATA-VERIFIED / PRODUCTION-ACCEPTED remain NO. No authority ceiling changed.
+
+## 2026-09-09 - R-HIST-03C outcomes and revision retention
+
+Implemented on the existing `feat/rhist03-producer-wiring` branch / PR #6,
+continuing `R-HIST-03_PRODUCER_WIRING_BUILD_PLAN.md`; no replacement architecture.
+
+- `r16_retention.py` connects the existing PIT write paths to the existing
+  retention publication/outbox/authority. Frozen hypotheses require the exact
+  S8 publication, version, lineage hash and full persisted-payload SHA-256.
+  Original decision inputs are validated against the parent's protected raw
+  object roots, including normalized OHLCV; newer or corrected bars cannot leak
+  into an earlier hypothesis.
+- Outcomes preserve the original hypothesis hash and their own observation
+  time/path evidence. Explicit revisions preserve exact predecessor hashes;
+  source corrections, outcome changes and interpretation/rebuild versions
+  append without UPDATE/DELETE of historical artifact values. SQL triggers
+  enforce immutability, and replay remains idempotent.
+- Artifact rows, immutable links and retention intent enter the same SQLite
+  transaction. Post-commit failure leaves hidden, replayable rows. Governed
+  readers validate PUBLISHED proof, authority references and evidence bytes;
+  GET/read paths never create retention intent or backfill legacy history.
+- All hypothesis states remain represented, with separate no-entry, expired,
+  censored, data-gap and ambiguous outcomes. Intrabar target/stop ambiguity is
+  excluded from definite win/loss statistics rather than learned as a loss.
+  CONFIRMED history does not grant confirmation or execution authority.
+
+The additive migration is `0023_r16_outcome_revision_retention`. Apply it only
+through the existing explicitly approved producer/admin command, targeting the
+existing research database (substitute its actual path):
+
+```sh
+cd backend
+python -m trendforge_api.cli r16-schema --db-path /path/to/research.sqlite --apply
+```
+
+Keep the existing canonical market-data location configured, including
+`TRENDFORGE_MARKET_DATA_DB_PATH` when it is separate. Every inherited root must
+resolve exactly; there is no latest-data fallback. Newly published S8 artifacts
+carry the full payload seal. Older S8 publications without that seal remain
+unchanged but cannot parent a new governed R16 freeze. Existing unprotected R16
+rows likewise remain in storage but are not exposed as governed history. Do not
+silently stamp present-day hashes onto those older rows; verified historical
+repair requires a separate explicit operation.
+
+Tests were added and observed failing before the safety implementation. Local
+commands/results, including the Mypy baseline comparison, are in VALIDATION.
+The final exact-head CI evidence is recorded on PR #6, not inferred from local
+results or an older green head. No merge is part of this checkpoint.
+
+Remaining order: 03D frozen ML/model/profile/audit producers, 03E registry and
+100% coverage/reconciliation, 03F complete concurrency/crash/golden acceptance,
+then FULL R-HIST-03 gate, then R-HIST-04 archival. None of those stages is marked
+implemented here. LIVE-DATA-VERIFIED: NO. PRODUCTION-ACCEPTED: NO.
+
 ## 2026-09-07 - Atomic research snapshot (next requirement)
 
 The selection refresh now reads `GET /api/v1/selection/snapshot` instead of

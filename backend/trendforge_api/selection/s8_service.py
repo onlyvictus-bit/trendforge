@@ -1,13 +1,15 @@
-"""Single owner for building and persisting the current S8 scan.
+"""Single owner for building and publishing the current S8 scan.
 
-Both the HTTP route and the cash post-commit pipeline call this module.  It
-binds the real S3 projection to S8 and never synthesizes a historical run.
+The write pipeline publishes immutable S8 only after exact historical evidence
+retention is protected. Read-only callers may assemble an ephemeral current
+snapshot but never create retention references or persistence side effects.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from dataclasses import dataclass
+from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from .attention_order import InventoryDiscoveryV1, latest_attention_order
@@ -19,7 +21,10 @@ from .s4_structure_pack import S4StructurePackBatchV1, build_s4_structure_pack
 from .s5_shortlist_enrichment import S5EnrichmentBatchV1, build_s5_enrichment
 from .s6_family_resolution import S6ResolutionBatchV1, build_s6_resolution
 from .s7_state_gates import S7StateBatchV1, build_s7_state
-from .inventory_source_bundle import InventorySourceBundleV1
+from .inventory_source_bundle import (
+    PROFILE_ID as R1_PROFILE_ID,
+    InventorySourceBundleV1,
+)
 from .r14_live import R14CaJoinBatchV1
 from .tradability import TradabilityBatchV1, build_tradability_batch
 from .s8_persist_run import (
@@ -27,15 +32,30 @@ from .s8_persist_run import (
     S8ScanBlobV1,
     build_s8_scan,
     latest_matching_s8,
-    persist_s8_scan,
 )
-from .store import latest_selection_payload
+from .store import get_selection_payload, latest_selection_payload
 from ..scanners.native_core import NativeCoreRunV1, build_native_core_run
+from ..retention_publication import RetentionEvidenceRoot
+from ..s8_retention import evidence_roots_from_bundle, persist_protected_s8
+
+
+def _exact_r1_evidence(
+    r5: R5StructureBatchV1,
+) -> tuple[InventorySourceBundleV1, tuple[RetentionEvidenceRoot, ...]]:
+    payload = get_selection_payload(R1_PROFILE_ID, r5.r1_bundle_id)
+    if payload is None:
+        raise ValueError("WAIT_RHIST03_R1_BUNDLE_MISSING")
+    bundle = InventorySourceBundleV1.model_validate(payload)
+    if bundle.bundle_hash != r5.r1_bundle_hash or bundle.bundle_id != r5.r1_bundle_id:
+        raise ValueError("WAIT_RHIST03_R1_BUNDLE_HASH_MISMATCH")
+    if bundle.trading_date.isoformat() != r5.trading_date:
+        raise ValueError("WAIT_RHIST03_R1_TRADING_DATE_MISMATCH")
+    return bundle, evidence_roots_from_bundle(bundle)
 
 
 @dataclass(frozen=True)
 class CurrentScanAssembly:
-    """One assembly shared by persistence and the read-only snapshot endpoint."""
+    """One assembly shared by the producer and the read-only snapshot endpoint."""
 
     blob: S8ScanBlobV1
     s3: S3CheapDiscoveryBatchV1
@@ -74,11 +94,10 @@ def assemble_current_scan(
     if a3 is None or r2 is None:
         raise ValueError("WAIT_S3_SPINE_NOT_READY")
 
-    # Current projection time is distinct from the persisted R5 decision time.
-    # The snapshot endpoint supplies one captured time for every stage.
     effective_time = built_at or datetime.now(timezone.utc)
     symbols = tuple(
-        str(row.symbol).upper() for row in getattr(r5, "rows", ())
+        str(row.symbol).upper()
+        for row in getattr(r5, "rows", ())
         if getattr(row, "symbol", None)
     )
     tradability = tradability_batch or build_tradability_batch(
@@ -103,8 +122,14 @@ def assemble_current_scan(
     except ValueError:
         s5 = None
     s6 = build_s6_resolution(
-        s4=pack, r5=r5, s5=s5, weather=weather, attention=r2,
-        bundle=bundle, ca_join=ca_join, built_at=effective_time,
+        s4=pack,
+        r5=r5,
+        s5=s5,
+        weather=weather,
+        attention=r2,
+        bundle=bundle,
+        ca_join=ca_join,
+        built_at=effective_time,
         allow_enrichment_fallback=False,
     )
     s7 = build_s7_state(
@@ -131,7 +156,9 @@ def assemble_current_scan(
         prior_payload=prior,
         built_at=effective_time,
     )
-    return CurrentScanAssembly(blob, s3, native, weather, pack, s5, s6, s7, tradability, prior)
+    return CurrentScanAssembly(
+        blob, s3, native, weather, pack, s5, s6, s7, tradability, prior
+    )
 
 
 def build_and_persist_current_s8(
@@ -143,17 +170,45 @@ def build_and_persist_current_s8(
     tradability_batch: TradabilityBatchV1 | None = None,
     built_at: datetime | None = None,
     activation_ready: bool | None = None,
+    market_db_path: Path | None = None,
 ) -> S8ScanBlobV1:
+    r5 = r5_batch or latest_r5_structure_batch()
+    if r5 is None:
+        raise ValueError("WAIT_R5_NOT_READY")
+    trading_date_raw = str(getattr(r5, "trading_date", "") or "").strip()
+    try:
+        evidence_date = date.fromisoformat(trading_date_raw)
+    except ValueError as exc:
+        raise ValueError("WAIT_RHIST03_TRADING_DATE_REQUIRED") from exc
+    r1_bundle, evidence_roots = _exact_r1_evidence(r5)
+
     assembly = assemble_current_scan(
-        r5_batch=r5_batch, discovery=discovery, attention=attention,
-        native_core=native_core, tradability_batch=tradability_batch,
-        built_at=built_at, activation_ready=activation_ready,
+        r5_batch=r5,
+        discovery=discovery,
+        attention=attention,
+        native_core=native_core,
+        tradability_batch=tradability_batch,
+        built_at=built_at,
+        bundle=r1_bundle,
+        activation_ready=activation_ready,
     )
-    return persist_s8_scan(assembly.blob, prior_payload=assembly.prior)
+    return persist_protected_s8(
+        blob=assembly.blob,
+        prior_payload=assembly.prior,
+        evidence_roots=evidence_roots,
+        publication_lineage={
+            "collectorRunId": r1_bundle.collector_run_id,
+            "r1BundleId": r1_bundle.bundle_id,
+            "r1BundleHash": r1_bundle.bundle_hash,
+            "sourceRootCount": len(evidence_roots),
+        },
+        trading_date=evidence_date,
+        market_db_path=market_db_path,
+    )
 
 
 def latest_or_build_current_s8() -> S8ScanBlobV1:
-    """Return a current hash-matched S8 blob, or build the missing one."""
+    """Read-only current snapshot: return persisted match or assemble ephemerally."""
 
     r5 = latest_r5_structure_batch()
     r2 = latest_attention_order()
@@ -164,7 +219,8 @@ def latest_or_build_current_s8() -> S8ScanBlobV1:
     native = build_native_core_run(r5=r5)
     effective_time = datetime.now(timezone.utc)
     symbols = tuple(
-        str(row.symbol).upper() for row in getattr(r5, "rows", ())
+        str(row.symbol).upper()
+        for row in getattr(r5, "rows", ())
         if getattr(row, "symbol", None)
     )
     tradability = build_tradability_batch(
@@ -192,13 +248,17 @@ def latest_or_build_current_s8() -> S8ScanBlobV1:
         and not matched.lineage.missing_stages
     ):
         return matched
-    return build_and_persist_current_s8(
+    return assemble_current_scan(
         r5_batch=r5,
         attention=r2,
         native_core=native,
         tradability_batch=tradability,
         built_at=effective_time,
-    )
+    ).blob
 
 
-__all__ = ["assemble_current_scan", "build_and_persist_current_s8", "latest_or_build_current_s8"]
+__all__ = [
+    "assemble_current_scan",
+    "build_and_persist_current_s8",
+    "latest_or_build_current_s8",
+]
