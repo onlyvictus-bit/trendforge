@@ -5,7 +5,32 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
-## 2026-09-10 - PR #6 repair verification
+## 2026-09-11 - 03D publication and exact-head acceptance
+
+Accepted source commit: `fce62874a61e4e2bb6d939bef6d0811e5a266996`.
+Its Git tree `9295187c49ee7fe5f5005d6ec42a92f94775dcf8` exactly matches the
+locally tested repair. PR #6 remains open and unmerged.
+[CI 34496385997](https://github.com/onlyvictus-bit/trendforge/actions/runs/34496385997)
+completed / success on that head. The GitHub job logs were inspected directly:
+
+| Check | Observed result |
+| --- | --- |
+| Backend job 102935794979 | 1699 passed, zero failures/skips, two dependency warnings; 247.16 seconds |
+| Python compile / Ruff | Passed / All checks passed |
+| Frontend job 102935795027 | Passed; 220/220 primary checks and all additional suites |
+| Dependency install | Exact xlrd 2.0.2 installed |
+| Mypy job 102935794982 | Known non-blocking failure: 512 errors / 70 files |
+| Normalized Mypy delta against accepted 03C | Zero new/removed errors or notes in the same local environment |
+
+The workflow's existing non-blocking Mypy policy was not weakened. Overall CI
+success does not mean Mypy is clean. The same acceptance source was rechecked
+via GitHub on 2026-09-11. Documentation-only follow-up heads require their own
+CI; `fce62874` remains the actual 03D implementation acceptance checkpoint.
+03D: IMPLEMENTED + TESTED. 03E: NEXT / UNLOCKED. 03F: GATED on 03E.
+Full R-HIST-03: NOT COMPLETE. LIVE-DATA-VERIFIED / PRODUCTION-ACCEPTED: NO.
+Only scratch databases were used; no real migration or trading action occurred.
+
+## 2026-09-10 - PR #6 repair verification (historical local checkpoint)
 
 Baseline: `6de1e14973edcf62b61c9b6a1441214ace656ec4`, with the original three
 failures confirmed from CI run `34486533849`. Two R18 failures reproduced

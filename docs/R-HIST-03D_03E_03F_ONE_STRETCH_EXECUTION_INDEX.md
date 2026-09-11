@@ -2,7 +2,7 @@
 
 **Parent authority:** `docs/R-HIST-03_PRODUCER_WIRING_BUILD_PLAN.md`  
 **Purpose:** navigation and hard-gate execution contract for completing the remaining R-HIST-03 stages without redesigning between stages.  
-**Status:** plans ready; 03D/03E/03F runtime implementation not started at creation of this index.
+**Status (2026-09-11):** 03D IMPLEMENTED + TESTED at `fce62874a61e4e2bb6d939bef6d0811e5a266996`, [CI 34496385997](https://github.com/onlyvictus-bit/trendforge/actions/runs/34496385997) PASS. 03E NEXT / UNLOCKED; 03F GATED on 03E acceptance. Full R-HIST-03 NOT COMPLETE. Production/live acceptance remains NO. The stage contracts below retain their original acceptance requirements.
 
 ## Required order
 

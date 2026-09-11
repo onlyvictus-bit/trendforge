@@ -220,7 +220,15 @@ For the newest PR #6 exact head, verify:
 
 If any check fails, stop 03D and investigate the new failure. Do not advance to 03E.
 
-## Remaining 03D production gates after CI repair
+## Historical remaining 03D implementation gates after initial CI repair
+
+**Superseded status (2026-09-11):** the gates below were subsequently implemented
+and tested in the accepted repair at `fce62874a61e4e2bb6d939bef6d0811e5a266996`,
+with successful CI `34496385997`. See CURRENT_STATE.md, VALIDATION.md and the
+Fable execution record for the observed acceptance evidence. 03D is IMPLEMENTED
++ TESTED, 03E NEXT / UNLOCKED, 03F GATED. The older pending statements below
+describe their dated checkpoint. Real database migration and live/production
+acceptance remain separate, unperformed operations.
 
 A green CI after these fixes removes the current regression set; it does not by itself prove the full R-HIST-03D contract complete. The approved production-hardening work still requires at minimum:
 

@@ -5,7 +5,21 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
-## 2026-09-10 - PR #6 local repair and controlled 03D recovery
+## 2026-09-11 - R-HIST-03D accepted; 03E next
+
+03D is IMPLEMENTED + TESTED at `fce62874a61e4e2bb6d939bef6d0811e5a266996`.
+[Exact-head CI 34496385997](https://github.com/onlyvictus-bit/trendforge/actions/runs/34496385997)
+is completed / success: backend 1699 passed, compile/Ruff/frontend passed;
+Mypy remains the accepted non-blocking 512 errors / 70 files, normalized delta 0.
+This supersedes the pending-publication status in the dated local record below.
+03E is NEXT / UNLOCKED under its existing producer-coverage build plan. 03F is
+GATED on 03E's full acceptance. Full R-HIST-03 is NOT COMPLETE. This documentation
+update preserves the 03D acceptance head and requires CI at its own new head.
+Production schema application, live/PIT validation, price-band/freshness work,
+EIA CSV dates, CLI consolidation and legacy typing debt remain separate backlog.
+LIVE-DATA-VERIFIED: NO. PRODUCTION-ACCEPTED: NO. No execution authority changed.
+
+## 2026-09-10 - PR #6 local repair and controlled 03D recovery (historical)
 
 Local changes based on PR head `6de1e14973edcf62b61c9b6a1441214ace656ec4`
 repair the three supplied CI failures and add the requested controlled

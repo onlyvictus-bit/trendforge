@@ -53,6 +53,22 @@ TWINS: found and replaced a second corruption test that dropped a guard in `test
 
 ## Operational and acceptance boundary
 
+### Accepted publication checkpoint - 2026-09-11
+
+The user authorized publication with "COMMIT THE FIX YOU DID LOCALLY TO GITHUB".
+GitHub commit `fce62874a61e4e2bb6d939bef6d0811e5a266996` has the exact tested tree
+`9295187c49ee7fe5f5005d6ec42a92f94775dcf8` (the local commit's identity differs
+because publication used the GitHub connector). CI `34496385997` completed /
+success: 1699 backend tests, compile, Ruff and frontend passed; Mypy retains
+512 legacy errors / 70 files, normalized delta 0. This is the 03D implementation
+acceptance checkpoint. 03D is IMPLEMENTED + TESTED; 03E is NEXT / UNLOCKED;
+03F is GATED on 03E. Full R-HIST-03, live-data and production acceptance are not
+complete. The following local pre-publication record is historical, superseded
+only for publication/CI/stage status by this checkpoint. No real database was
+migrated. Existing operational boundaries still apply.
+
+### Historical local pre-publication record
+
 Apply the existing explicit R18 schema operation to a reviewed target database before recovery; it now includes the additive supersession table/guards. Stop old workers before deploying this recovery-capable code. Inventory first; do not attempt recovery if a pre-fix semantic event/reference was genuinely APPLIED. For an eligible event, invoke the explicit recovery function with a real reviewer and reason, then separately finalize using full parent verification. Never modify the original event/link identity, invent missing evidence or use a governed read to repair history.
 
 Only scratch databases were used. Local repair and validation milestones are complete: full backend, compile, Ruff, frontend and normalized Mypy comparison passed their stated gates. No commit, push, PR metadata edit, production migration or broker action has been performed. Publication requires separate approval. After publication, record the exact new PR head and matching CI run, compare its normalized Mypy diagnostics, and only then evaluate the 03D stage gate. Local self-review verdict: VERIFIED WITH CAVEATS (post-publication exact-head CI and live/production acceptance remain unverified).

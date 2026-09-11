@@ -1,22 +1,30 @@
 # Current code and readiness snapshot
 
-**Reviewed:** 2026-09-09. **Previous reviewed checkpoints preserved:** 2026-09-08 and 2026-09-07. **Code baseline:** R-HIST-03C on `feat/rhist03-producer-wiring` (PR #6), stacked on retention branch `fix/retention-evidence-safety` and TF-01 `19a8c762314cdb7b54556c17c8ae5a46ad7325e8`.
+**Reviewed:** 2026-09-11. **Previous reviewed checkpoints preserved:** 2026-09-09, 2026-09-08 and 2026-09-07. **Code baseline:** accepted R-HIST-03D at `fce62874a61e4e2bb6d939bef6d0811e5a266996` on `feat/rhist03-producer-wiring` (PR #6), stacked on retention branch `fix/retention-evidence-safety` and TF-01 `19a8c762314cdb7b54556c17c8ae5a46ad7325e8`.
 **Role:** current navigation and evidence summary, not a new plan, source registry,
 activation authority, or production certification. File A retains build order,
 public-state definitions and acceptance ceilings. Read this page before dated
 entries in BUILD_STATUS, VALIDATION, architecture notes or remaining-build guides.
 
-## PR #6 repair under validation - 2026-09-10
+## R-HIST-03D acceptance and next stage - 2026-09-11
 
-An isolated local patch based on PR head `6de1e14973edcf62b61c9b6a1441214ace656ec4`
+The published repair based on PR head `6de1e14973edcf62b61c9b6a1441214ace656ec4`
 repairs the three CI failures and implements controlled immutable supersession
 and finalizer/registration crash/concurrency protection. The original 03C
 checkpoint below remains historical evidence, not the status of the new patch.
 See [the execution record](fable/RHIST03D_PR6_REPAIR_2026-09-10.md) and the newest
 VALIDATION entry. Final local regression passed: 1699 tests, zero failures/skips;
 compile, Ruff and frontend passed; normalized Mypy delta versus 03C is zero.
-Exact-head GitHub CI after publication is pending. 03D is IN PROGRESS; 03E/03F remain LOCKED; LIVE-DATA-VERIFIED and
-PRODUCTION-ACCEPTED remain NO. No live migration or authority change occurred.
+The 03D acceptance commit is `fce62874a61e4e2bb6d939bef6d0811e5a266996`.
+[CI 34496385997](https://github.com/onlyvictus-bit/trendforge/actions/runs/34496385997)
+completed successfully at that head: backend 1699 passed, zero failures/skips,
+two dependency warnings; compile, Ruff and frontend passed. Mypy remains an
+explicitly non-blocking legacy failure: 512 errors / 70 files, normalized delta 0.
+R-HIST-03D is IMPLEMENTED + TESTED. R-HIST-03E is NEXT / UNLOCKED; 03F is GATED
+on 03E acceptance. Full R-HIST-03 is NOT COMPLETE. Future documentation commits
+do not replace this accepted code checkpoint; each new head needs its own CI.
+LIVE-DATA-VERIFIED and PRODUCTION-ACCEPTED remain NO. No live migration or
+authority change occurred. Do not reopen 03D without a demonstrated 03D defect.
 
 ## R-HIST-03C implementation checkpoint - 2026-09-09
 
@@ -88,7 +96,7 @@ No single `complete`, `ready`, or percentage-complete field replaces these quest
 | Research assembly | `selection/s8_service.py` connects S3, native guidance, weather, tradability and S4-S7 into saved S8 research. | Individual prerequisites can block the run. The older CLI assembler remains a separate follow-up issue. |
 | Final research state | `selection/s7_state_gates.py` owns public research classification. | Named PRF-003 EOD activation exists but must be observed; no activation setting changed here. |
 | Tradability | `selection/tradability.py` is implemented and integrated. | Price-band geometry/data-operation gaps and the separately identified API timestamp defect are not closed by retention work. |
-| Historical retention | R-HIST-01/02 authority and cleanup protection, 03A outbox, 03B exact S8 roots, and 03C R16 outcome/revision wiring exist on PR #6. | Exact-head gates are separate from local checks. ML/model/profile/audit producers (03D), registry/coverage (03E), complete fault acceptance (03F), archival, live-data reconstruction and production acceptance remain open. |
+| Historical retention | R-HIST-01/02 authority and cleanup protection, 03A outbox, 03B exact S8 roots, 03C R16 outcomes/revisions and 03D frozen ML/model/profile/audit retention are implemented and tested at their recorded checkpoints. | 03D acceptance is `fce62874` / CI `34496385997`. Registry/coverage (03E) is next; complete fault acceptance (03F), archival, live-data reconstruction and production acceptance remain open. |
 | R16 PIT | Dataset/replay/label/metric/storage/service code and UI exist. | 2026-09-01 recorded only one complete S8 date and PIT_NOT_APPROVED. That is a dated observation, not today's database count. |
 | R18 governance | `r18_governance.py`, `r18_store.py`, `r18_service.py` and the Paper/ML renderer exist. | 2026-09-02 recorded MODEL_NOT_APPROVED and WAIT_R18_SCHEMA_NOT_APPLIED. Do not rebuild R18 merely because older notes say it is absent. |
 | OpenAlgo / intraday | R17 fixture-verified read-only shadow components exist. | R9 and R17-G were postponed in the 2026-09-01 handoff. A working live broker session was not observed in this review. |
