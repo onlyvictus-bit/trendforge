@@ -36,7 +36,11 @@ from .s8_persist_run import (
 from .store import get_selection_payload, latest_selection_payload
 from ..scanners.native_core import NativeCoreRunV1, build_native_core_run
 from ..retention_publication import RetentionEvidenceRoot
-from ..s8_retention import evidence_roots_from_bundle, persist_protected_s8
+from ..s8_retention import (
+    evidence_roots_from_bundle,
+    evidence_roots_with_r5_history,
+    persist_protected_s8,
+)
 
 
 def _exact_r1_evidence(
@@ -50,7 +54,9 @@ def _exact_r1_evidence(
         raise ValueError("WAIT_RHIST03_R1_BUNDLE_HASH_MISMATCH")
     if bundle.trading_date.isoformat() != r5.trading_date:
         raise ValueError("WAIT_RHIST03_R1_TRADING_DATE_MISMATCH")
-    return bundle, evidence_roots_from_bundle(bundle)
+    roots = evidence_roots_from_bundle(bundle)
+    roots = evidence_roots_with_r5_history(bundle_roots=roots, r5=r5)
+    return bundle, roots
 
 
 @dataclass(frozen=True)
@@ -192,6 +198,9 @@ def build_and_persist_current_s8(
         bundle=r1_bundle,
         activation_ready=activation_ready,
     )
+    r5_history_root_count = sum(
+        1 for root in evidence_roots if root.role.startswith("R5_HISTORY_")
+    )
     return persist_protected_s8(
         blob=assembly.blob,
         prior_payload=assembly.prior,
@@ -201,6 +210,7 @@ def build_and_persist_current_s8(
             "r1BundleId": r1_bundle.bundle_id,
             "r1BundleHash": r1_bundle.bundle_hash,
             "sourceRootCount": len(evidence_roots),
+            "r5HistoryRootCount": r5_history_root_count,
         },
         trading_date=evidence_date,
         market_db_path=market_db_path,
