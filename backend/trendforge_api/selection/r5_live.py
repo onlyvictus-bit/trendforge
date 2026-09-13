@@ -86,6 +86,9 @@ class R5StructureRowV1(BaseModel):
     claims: tuple[EvidenceClaim, ...] = ()
     facts: tuple[NormalizedFact, ...] = ()
     source_fact_id: str | None = None
+    # Exact immutable source artifacts used to construct this row's closed-bar
+    # evidence. This is source lineage, not a score and not an execution signal.
+    source_artifact_hashes: tuple[str, ...] = ()
     can_support_confirmed: bool = False
 
     @model_validator(mode="after")
@@ -95,6 +98,13 @@ class R5StructureRowV1(BaseModel):
             for claim in self.claims
         ):
             raise ValueError("R5 rows cannot carry confirming claims")
+        if self.source_artifact_hashes != tuple(sorted(set(self.source_artifact_hashes))):
+            raise ValueError("R5 source artifact hashes must be unique and sorted")
+        for digest in self.source_artifact_hashes:
+            if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+                raise ValueError("R5 source artifact hashes must be SHA-256 hex digests")
+        if self.facts and not self.source_artifact_hashes:
+            raise ValueError("R5 facts require exact source artifact lineage")
         if self.structure_state is SelectionState.CONFIRMED:
             if not self.can_support_confirmed:
                 raise ValueError("cannot emit CONFIRMED when can_support_confirmed is False")
@@ -528,6 +538,9 @@ def build_r5_structure_batch(
                 claims=tuple(analysis.claims),
                 facts=(analysis.fact,),
                 source_fact_id=analysis.fact.fact_id,
+                source_artifact_hashes=tuple(
+                    sorted({bar.identity.raw_hash for bar in bars})
+                ),
                 can_support_confirmed=False,
             )
         )
@@ -594,4 +607,3 @@ def persist_r5_structure_batch(value: R5StructureBatchV1) -> R5StructureBatchV1:
 def latest_r5_structure_batch() -> R5StructureBatchV1 | None:
     payload = latest_selection_payload(PROFILE_ID)
     return R5StructureBatchV1.model_validate(payload) if payload is not None else None
-
