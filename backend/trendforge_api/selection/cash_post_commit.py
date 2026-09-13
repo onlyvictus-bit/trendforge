@@ -174,7 +174,9 @@ def _aware_now() -> datetime:
     return datetime.now(UTC)
 
 
-def _r16_stage_state(r16: Mapping[str, Any]) -> tuple[str, str | None, str]:
+def _r16_stage_state(
+    r16: Mapping[str, Any],
+) -> tuple[Literal["COMPLETED", "BLOCKED"], str | None, str]:
     """Translate R16 replay truth into an orchestrator stage without false success."""
 
     replay = r16.get("replay") or {}
