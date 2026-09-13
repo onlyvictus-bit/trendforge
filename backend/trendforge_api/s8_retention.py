@@ -61,6 +61,46 @@ def evidence_roots_from_bundle(bundle: Any) -> tuple[RetentionEvidenceRoot, ...]
     return tuple(roots)
 
 
+def evidence_roots_with_r5_history(
+    *,
+    bundle_roots: tuple[RetentionEvidenceRoot, ...],
+    r5: Any,
+) -> tuple[RetentionEvidenceRoot, ...]:
+    """Merge R1 roots with the exact immutable source artifacts actually used by R5.
+
+    R5 derived facts are not treated as independent market evidence here. The
+    retained roots are the source artifacts from which those facts were built.
+    Every root must later be proven object-backed by ``resolve_market_db_path``.
+    """
+
+    roots = list(bundle_roots)
+    existing_hashes = {
+        root.content_hash for root in roots if root.content_hash is not None
+    }
+    required_hashes: set[str] = set()
+    for row in getattr(r5, "rows", ()):
+        facts = tuple(getattr(row, "facts", ()) or ())
+        hashes = tuple(getattr(row, "source_artifact_hashes", ()) or ())
+        if facts and not hashes:
+            raise ValueError(
+                f"WAIT_RHIST03_R5_SOURCE_LINEAGE_MISSING:{getattr(row, 'symbol', 'UNKNOWN')}"
+            )
+        for digest in hashes:
+            normalized = str(digest).casefold()
+            if not _HASH_PATTERN.fullmatch(normalized):
+                raise ValueError("WAIT_RHIST03_INVALID_R5_EVIDENCE_HASH")
+            required_hashes.add(normalized)
+
+    for digest in sorted(required_hashes - existing_hashes):
+        roots.append(
+            RetentionEvidenceRoot(
+                role=f"R5_HISTORY_{digest.upper()}",
+                content_hash=digest,
+            )
+        )
+    return tuple(roots)
+
+
 def _market_db_contains_roots(
     db_path: Path, evidence_roots: tuple[RetentionEvidenceRoot, ...]
 ) -> bool:
@@ -104,7 +144,7 @@ def resolve_market_db_path(
         if _market_db_contains_roots(resolved, evidence_roots):
             return resolved
     raise RuntimeError(
-        "WAIT_RHIST03_MARKET_LINEAGE_UNBOUND: exact R1 evidence hashes are not "
+        "WAIT_RHIST03_MARKET_LINEAGE_UNBOUND: exact R1/R5 evidence hashes are not "
         "present in an approved market-data DB"
     )
 
