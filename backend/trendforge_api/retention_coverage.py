@@ -585,6 +585,87 @@ def _r18_proof(
     )
 
 
+def _external_inverse(
+    conn: sqlite3.Connection,
+    specs: tuple[ProducerSpec, ...],
+    market_db_paths: Iterable[str | Path],
+    research_resolved: Path,
+) -> list[dict[str, str]]:
+    """Flag authority references in EXTERNAL market/evidence stores that no
+    research outbox event owns.
+
+    The same-store :func:`_inverse` cannot see these rows at all: S8/R16
+    dispatch registers market-mode references through
+    ``HistoricalRetentionAuthority`` in the market database while the outbox
+    lives in the research database. Every external reference must therefore
+    resolve to a research outbox ``reference_id``; anything else is an
+    unexplained retention orphan. Read-only; never mutates either store.
+
+    A declared market path without a references table contributes no
+    findings: with no authority rows present nothing can escape. A path that
+    is the research database itself is skipped to avoid double counting.
+    """
+    owned = {
+        str(row["reference_id"])
+        for row in conn.execute(
+            "SELECT reference_id FROM historical_retention_outbox"
+        ).fetchall()
+    } if _exists(conn, "historical_retention_outbox") else set()
+    wanted = {s.reference_type.value for s in specs}
+    findings: list[dict[str, str]] = []
+    seen: set[Path] = {research_resolved}
+    for candidate in market_db_paths:
+        path = Path(candidate).expanduser().resolve(strict=False)
+        if path in seen or not path.is_file():
+            if path not in seen and path.suffix == ".db":
+                findings.append(
+                    _finding(
+                        "REGISTRY",
+                        "*",
+                        "*",
+                        CoverageStatus.REGISTRY_ERROR,
+                        f"MARKET_STORE_UNAVAILABLE:{path.name}",
+                    )
+                )
+            seen.add(path)
+            continue
+        seen.add(path)
+        market = _connect(path)
+        try:
+            if not _exists(market, "historical_retention_references"):
+                continue
+            for row in market.execute(
+                "SELECT reference_id,reference_type,artifact_id,artifact_version "
+                "FROM historical_retention_references"
+            ).fetchall():
+                reference_id = str(row["reference_id"])
+                if str(row["reference_type"]) not in wanted:
+                    findings.append(
+                        _finding(
+                            CoverageStatus.UNKNOWN_PRODUCER.value,
+                            str(row["artifact_id"] or reference_id),
+                            str(row["artifact_version"] or "unknown"),
+                            CoverageStatus.UNKNOWN_PRODUCER,
+                            f"EXTERNAL_AUTHORITY_REFERENCE:{reference_id}@{path.name}",
+                        )
+                    )
+                    continue
+                if reference_id not in owned:
+                    findings.append(
+                        _finding(
+                            CoverageStatus.UNKNOWN_PRODUCER.value,
+                            str(row["artifact_id"] or reference_id),
+                            str(row["artifact_version"] or "unknown"),
+                            CoverageStatus.RETENTION_ORPHAN,
+                            f"EXTERNAL_AUTHORITY_REFERENCE:{reference_id}@{path.name}",
+                        )
+                    )
+        finally:
+            market.rollback()
+            market.close()
+    return findings
+
+
 def _inverse(
     conn: sqlite3.Connection,
     specs: tuple[ProducerSpec, ...],
@@ -811,8 +892,16 @@ def audit_coverage(
     db_path: Path | None = None,
     artifact_types: Iterable[str] | None = None,
     audit_at: datetime | None = None,
+    market_db_paths: Iterable[str | Path] | None = None,
 ) -> dict[str, Any]:
-    """Read-only 03E audit. ``reportHash`` excludes the observation timestamp."""
+    """Read-only 03E audit. ``reportHash`` excludes the observation timestamp.
+
+    ``market_db_paths`` optionally declares the external market/evidence
+    stores whose authority references must each resolve to a research outbox
+    event. When omitted, only the research database is audited and external
+    references are out of view; pass the participating stores explicitly for
+    acceptance. Never mutates any store.
+    """
     path = Path(db_path or storage.DB_PATH).expanduser().resolve(strict=False)
     specs = _selected(artifact_types)
     findings = [
@@ -857,6 +946,10 @@ def audit_coverage(
                 else _publication_proof(conn, path, artifact)
             )
         findings.extend(_inverse(conn, specs, {a.key for a in artifacts}))
+        if market_db_paths:
+            findings.extend(
+                _external_inverse(conn, specs, market_db_paths, path.resolve(strict=False))
+            )
     finally:
         conn.rollback()
         conn.close()

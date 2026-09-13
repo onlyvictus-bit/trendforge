@@ -366,7 +366,7 @@ def run_existing_cash_pipeline(context: CashPipelineRunContext) -> CashPipelineE
     matrix = latest_source_use_matrix()
     if matrix is None or permission_fp != context.prior_permission_fingerprint:
         matrix = persist_source_use_matrix(build_source_use_matrix())
-        c0_state = "COMPLETED"
+        c0_state: Literal["COMPLETED", "REUSED", "SKIPPED", "BLOCKED", "FAILED"] = "COMPLETED"
         c0_detail = "Compiler/contracts changed or no matrix existed; permissions rebuilt"
     else:
         c0_state = "REUSED"
@@ -389,7 +389,7 @@ def run_existing_cash_pipeline(context: CashPipelineRunContext) -> CashPipelineE
     )
     if mwpl_content:
         mwpl = persist_mwpl(assess_mwpl(mwpl_content))
-        b_state = "COMPLETED"
+        b_state: Literal["COMPLETED", "REUSED", "SKIPPED", "BLOCKED", "FAILED"] = "COMPLETED"
         b_detail = f"New official MWPL artifact assessed: {mwpl.state}"
     else:
         b_state = "REUSED" if mwpl.persisted else "SKIPPED"

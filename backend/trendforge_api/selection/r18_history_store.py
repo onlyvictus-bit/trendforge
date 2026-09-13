@@ -689,12 +689,11 @@ def verify_stored_rhist03d_artifact(
         version_col is not None and getattr(verified, version_col) != artifact_version
     ):
         raise ValueError("CORRUPT_INDEXED_IDENTITY")
-    declared = (
-        getattr(verified, "dataset_hash", None)
-        or getattr(verified, "model_hash", None)
-        or getattr(verified, "content_hash", None)
-        or getattr(verified, "record_hash", None)
-    )
+    # The declared hash is the artifact's OWN semantic hash for its mapped
+    # hash column. A fixed or-chain is wrong here: a model-bound strategy
+    # profile carries a foreign model_hash, and an audit can carry a foreign
+    # dataset_hash — either would shadow the artifact's own hash.
+    declared = getattr(verified, hash_col, None)
     if declared != row[hash_col]:
         raise ValueError("CORRUPT_INDEXED_HASH")
 
