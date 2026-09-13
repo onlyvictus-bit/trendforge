@@ -147,6 +147,34 @@ def test_official_history_bootstrap_rejects_oversize_before_parse(
     assert list_raw_bars("RELIANCE", through=date(2026, 8, 14)) == []
 
 
+def test_official_history_bootstrap_store_failure_never_writes_bar(
+    tmp_path, monkeypatch
+) -> None:
+    _identity(tmp_path, monkeypatch, DAY2, FETCH2)
+    store = MarketDataStore(root=tmp_path / "market-data", db_path=storage.DB_PATH)
+    store.initialize_schema()
+    monkeypatch.setattr(
+        cash_a4_history,
+        "_official_cash_urls",
+        lambda day: [f"https://fixture.invalid/{day.isoformat()}.csv"],
+    )
+    monkeypatch.setattr(
+        source_resolver,
+        "fetch_url",
+        lambda _url, _timeout: (200, {"content-type": "text/csv"}, DAY1),
+    )
+
+    def fail_install(*_args, **_kwargs):
+        raise RuntimeError("fixture object-store failure")
+
+    monkeypatch.setattr(store, "install_object", fail_install)
+    stats = ensure_official_raw_history(
+        date(2026, 8, 14), days=2, timeout_seconds=1, store=store
+    )
+    assert int(stats["days_failed"]) >= 1
+    assert list_raw_bars("RELIANCE", through=date(2026, 8, 14)) == []
+
+
 def test_a4_future_ca_is_hidden_and_visible_ca_opens_new_series(
     tmp_path, monkeypatch
 ) -> None:
