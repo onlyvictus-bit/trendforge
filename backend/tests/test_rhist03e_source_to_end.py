@@ -154,7 +154,7 @@ def _context(day: date) -> ParameterContext:
 
 
 def test_source_to_s8_retains_exact_r5_history_before_r16(tmp_path: Path, monkeypatch) -> None:
-    """Prove the real source/R1/R5 evidence set is the one protected by S8."""
+    """Prove exact source -> R5 -> S8 retention -> R16 hash continuity."""
 
     store = MarketDataStore(
         root=tmp_path / "market-data",
@@ -261,6 +261,7 @@ def test_source_to_s8_retains_exact_r5_history_before_r16(tmp_path: Path, monkey
     assert used_bar_ids <= set(closed_by_id)
     used_hashes = {closed_by_id[bar_id].identity.raw_hash for bar_id in used_bar_ids}
     assert len(used_hashes) >= 21
+    assert set(reliance.source_artifact_hashes) == used_hashes
 
     # Read the immutable S8 publication itself. 03E must not accept an S8/R16
     # chain whose R5 historical inputs were never protected by that S8 decision.
@@ -271,6 +272,12 @@ def test_source_to_s8_retains_exact_r5_history_before_r16(tmp_path: Path, monkey
             "WHERE artifact_type='S8_DECISION_VERSION' AND artifact_id=?",
             (execution.s8_run_id,),
         ).fetchone()
+        hypothesis_rows = conn.execute(
+            "SELECT payload_json FROM pit_hypotheses "
+            "WHERE source_s8_run_id=? AND symbol='RELIANCE' "
+            "ORDER BY horizon_sessions",
+            (execution.s8_run_id,),
+        ).fetchall()
     finally:
         conn.close()
     assert publication is not None
@@ -286,4 +293,16 @@ def test_source_to_s8_retains_exact_r5_history_before_r16(tmp_path: Path, monkey
         f"missing={sorted(used_hashes - retained_hashes)}"
     )
 
+    # R16 intentionally freezes only bars strictly before the decision trading
+    # date. Every frozen horizon must nevertheless reproduce that exact subset,
+    # and must point to this exact S8 run rather than latest/current state.
     assert states["R16"].state == "COMPLETED"
+    assert len(hypothesis_rows) == 3
+    expected_r16_hashes = {
+        bar.artifact_hash for bar in raw_bars if bar.trade_date < TRADE_DATE
+    } & used_hashes
+    assert len(expected_r16_hashes) >= 20
+    for row in hypothesis_rows:
+        payload = json.loads(row["payload_json"])
+        assert payload["sourceS8RunId"] == execution.s8_run_id
+        assert set(payload["sourceBarHashes"]) == expected_r16_hashes
