@@ -95,7 +95,14 @@ def test_two_phase_publication_requires_protection_then_artifact(tmp_path: Path)
     assert len(authority.references) == 1
     published = store.mark_published(staged.publication_id)
     assert published.status is RetentionPublicationStatus.PUBLISHED
-    assert store.coverage()["coverage"] == 1.0
+
+    # R-HIST-03E: a publication row is proof, not the denominator. This
+    # standalone fixture has no authoritative S8/R16/R18 artifact population,
+    # so the compatibility coverage API must fail closed rather than report 100%.
+    coverage = store.coverage()
+    assert coverage["coverage"] == 0.0
+    assert coverage["verdict"] == "FAIL"
+    assert coverage["_deprecated"] is True
 
 
 def test_same_artifact_cannot_repoint_lineage(tmp_path: Path) -> None:
@@ -106,7 +113,10 @@ def test_same_artifact_cannot_repoint_lineage(tmp_path: Path) -> None:
 
 
 def test_authority_failure_never_publishes(tmp_path: Path) -> None:
-    store, _ = _store(tmp_path, authority=FakeAuthority(fail=RuntimeError("missing evidence")))
+    store, _ = _store(
+        tmp_path,
+        authority=FakeAuthority(fail=RuntimeError("missing evidence")),
+    )
     staged = store.stage_owned(_request())
     blocked = store.finalize(staged.publication_id)
     assert blocked.status is RetentionPublicationStatus.FAILED_BLOCKING
