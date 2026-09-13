@@ -103,8 +103,6 @@ class R5StructureRowV1(BaseModel):
         for digest in self.source_artifact_hashes:
             if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
                 raise ValueError("R5 source artifact hashes must be SHA-256 hex digests")
-        if self.facts and not self.source_artifact_hashes:
-            raise ValueError("R5 facts require exact source artifact lineage")
         if self.structure_state is SelectionState.CONFIRMED:
             if not self.can_support_confirmed:
                 raise ValueError("cannot emit CONFIRMED when can_support_confirmed is False")
@@ -158,6 +156,16 @@ class R5StructureBatchV1(BaseModel):
         if any(row.structure_state is SelectionState.CONFIRMED for row in self.rows):
             raise ValueError("R5 live rows cannot be CONFIRMED")
         return self
+
+
+def _require_source_artifact_lineage(
+    rows: tuple[R5StructureRowV1, ...] | list[R5StructureRowV1],
+) -> None:
+    """Reject new R5 writes whose derived facts cannot name their source bytes."""
+
+    for row in rows:
+        if row.facts and not row.source_artifact_hashes:
+            raise ValueError(f"WAIT_RHIST03_R5_SOURCE_LINEAGE_MISSING:{row.symbol}")
 
 
 def _profile(direction: EvidenceDirection) -> StructureProfile | None:
@@ -545,6 +553,7 @@ def build_r5_structure_batch(
             )
         )
 
+    _require_source_artifact_lineage(rows)
     identity_payload = {
         "r1BundleHash": r1.bundle_hash,
         "r2RunHash": r2.run_hash,
@@ -585,6 +594,7 @@ def build_r5_structure_batch(
 
 
 def persist_r5_structure_batch(value: R5StructureBatchV1) -> R5StructureBatchV1:
+    _require_source_artifact_lineage(value.rows)
     stored = value.model_copy(update={"persisted": True})
     persist_selection_payload(
         run_id=stored.run_id,
