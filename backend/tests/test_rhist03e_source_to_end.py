@@ -22,6 +22,7 @@ from trendforge_api.selection.cash_a1_staging import (
 )
 from trendforge_api.selection.cash_a2_identity import (
     build_cash_identity_batch,
+    latest_cash_identity,
     persist_cash_identity,
 )
 from trendforge_api.selection.cash_a4_history import (
@@ -34,8 +35,12 @@ from trendforge_api.selection.cash_post_commit import (
     run_existing_cash_pipeline,
 )
 from trendforge_api.selection.inventory_source_bundle import latest_inventory_source_bundle
+from trendforge_api.selection.r14_live import latest_r14_ca_join
 from trendforge_api.selection.r16_store import apply_r16_schema
-from trendforge_api.selection.r5_live import latest_r5_structure_batch
+from trendforge_api.selection.r5_live import (
+    build_adjusted_closed_bars,
+    latest_r5_structure_batch,
+)
 
 TRADE_DATE = date(2026, 8, 14)
 SYMBOLS = ("RELIANCE", "TCS", "INFY", "HDFCBANK")
@@ -232,11 +237,29 @@ def test_source_to_s8_retains_exact_r5_history_before_r16(tmp_path: Path, monkey
         for bar_id in fact.payload.get("bar_ids", ())
     }
     assert len(used_bar_ids) >= 21
-    used_hashes = {
-        bar.artifact_hash
-        for bar in list_raw_bars("RELIANCE", through=TRADE_DATE)
-        if bar.bar_id in used_bar_ids
-    }
+
+    # R5 facts name adjusted ClosedBar IDs, while cash_raw_session_bars stores
+    # canonical raw-bar IDs. Rebuild with the same accepted R5 helper so this
+    # probe compares exact identities instead of guessing an ID translation.
+    identity = latest_cash_identity()
+    ca_join = latest_r14_ca_join()
+    assert identity is not None
+    assert ca_join is not None
+    instrument = next(
+        row.instrument for row in identity.rows if row.instrument.symbol == "RELIANCE"
+    )
+    ca_row = next(row for row in ca_join.rows if row.symbol == "RELIANCE")
+    raw_bars = list_raw_bars("RELIANCE", through=TRADE_DATE)
+    closed_bars, waits = build_adjusted_closed_bars(
+        instrument=instrument,
+        raw_bars=raw_bars,
+        decision_at=r5.decision_at,
+        ca_row=ca_row,
+    )
+    assert waits == ()
+    closed_by_id = {bar.identity.bar_id: bar for bar in closed_bars}
+    assert used_bar_ids <= set(closed_by_id)
+    used_hashes = {closed_by_id[bar_id].identity.raw_hash for bar_id in used_bar_ids}
     assert len(used_hashes) >= 21
 
     # Read the immutable S8 publication itself. 03E must not accept an S8/R16
