@@ -11,6 +11,7 @@ it does not own bars or CA vintages. R14 is the later official CA join.
 from __future__ import annotations
 
 import hashlib
+import sqlite3
 import time
 from datetime import UTC, date, datetime, timedelta
 from statistics import median
@@ -346,7 +347,7 @@ def ensure_official_raw_history(
                 extension="csv",
                 media_type="text/csv",
             )
-        except (OSError, ValueError):
+        except (OSError, RuntimeError, ValueError, sqlite3.Error):
             stats["days_failed"] = int(stats["days_failed"]) + 1
             continue
         if object_ref.content_hash != artifact:
