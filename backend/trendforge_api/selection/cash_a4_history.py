@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from .. import storage
+from ..market_data_store import MarketDataStore
 from .cash_a2_identity import CashIdentityBatch, latest_cash_identity
 from .contracts import stable_id
 from .series_layers import MarketSeriesRef, open_adjusted_series, raw_series
@@ -28,6 +29,7 @@ from .series_layers import MarketSeriesRef, open_adjusted_series, raw_series
 MODEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 BASELINE_WINDOW = 20
 OFFICIAL_HISTORY_BARS = 21
+OFFICIAL_HISTORY_MAX_BYTES = 5 * 1024 * 1024
 HISTORY_PROBE_SYMBOL = "RELIANCE"
 
 
@@ -208,6 +210,7 @@ def list_raw_bars(symbol: str, *, through: date) -> list[CashRawSessionBar]:
         conn.close()
     return [CashRawSessionBar.model_validate(storage.decode_json(row["payload_json"])) for row in rows]
 
+
 def list_raw_bars_by_symbol(
     symbols: set[str], *, through: date, from_date: date | None = None
 ) -> dict[str, list[CashRawSessionBar]]:
@@ -242,6 +245,7 @@ def list_raw_bars_by_symbol(
         output[bar.symbol.upper()].append(bar)
     return output
 
+
 def _official_cash_urls(day: date) -> list[str]:
     from ..source_resolver import direct_download_candidates
 
@@ -266,8 +270,14 @@ def ensure_official_raw_history(
     *,
     days: int = OFFICIAL_HISTORY_BARS,
     timeout_seconds: int = 20,
+    store: MarketDataStore | None = None,
 ) -> dict[str, int | str | bool]:
-    """Fill missing official cash session bars behind last-good. Never overwrites."""
+    """Fill missing official cash session bars behind last-good. Never overwrites.
+
+    Bootstrap bytes are content-addressed before bars are written. They become
+    retention-protected only if a later S8 decision references them through its
+    R5_HISTORY_* evidence roots; unused bootstrap objects remain unowned.
+    """
     existing = list_raw_bars(HISTORY_PROBE_SYMBOL, through=through)
     if len(existing) >= days:
         return {"skipped": True, "reason": "history already meets structure window"}
@@ -278,6 +288,11 @@ def ensure_official_raw_history(
     from ..source_resolver import fetch_url
     from urllib.error import HTTPError, URLError
 
+    object_store = store or MarketDataStore(
+        root=storage.DB_PATH.parent / "market-data",
+        db_path=storage.DB_PATH,
+    )
+    object_store.initialize_schema()
     instrument_by_symbol = {
         row.instrument.symbol: row.instrument.instrument_id for row in identity.rows
     }
@@ -308,6 +323,10 @@ def ensure_official_raw_history(
                 continue
             if status >= 400 or not payload:
                 continue
+            if len(payload) > OFFICIAL_HISTORY_MAX_BYTES:
+                stats["days_failed"] = int(stats["days_failed"]) + 1
+                content = None
+                break
             content = payload
             break
         if content is None:
@@ -321,6 +340,18 @@ def ensure_official_raw_history(
             stats["days_failed"] = int(stats["days_failed"]) + 1
             continue
         artifact = hashlib.sha256(content).hexdigest()
+        try:
+            object_ref = object_store.install_object(
+                content,
+                extension="csv",
+                media_type="text/csv",
+            )
+        except (OSError, ValueError):
+            stats["days_failed"] = int(stats["days_failed"]) + 1
+            continue
+        if object_ref.content_hash != artifact:
+            stats["days_failed"] = int(stats["days_failed"]) + 1
+            continue
         for row in parsed.get("output", {}).get("rows") or []:
             symbol = str(row.get("symbol") or "").upper()
             instrument_id = instrument_by_symbol.get(symbol)
