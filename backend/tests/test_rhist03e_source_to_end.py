@@ -32,6 +32,7 @@ from trendforge_api.selection.cash_a4_history import (
 )
 from trendforge_api.selection.cash_post_commit import (
     CashPipelineRunContext,
+    _r16_stage_state,
     run_existing_cash_pipeline,
 )
 from trendforge_api.selection.inventory_source_bundle import latest_inventory_source_bundle
@@ -153,8 +154,41 @@ def _context(day: date) -> ParameterContext:
     )
 
 
+def test_r16_stage_state_wait_is_blocked_with_reason() -> None:
+    state, output_id, detail = _r16_stage_state(
+        {
+            "replay": {
+                "state": "WAIT",
+                "datasetRunCount": 0,
+                "rejectedS8": [{"runId": "s8-fixture", "reason": "WAIT_FIXTURE"}],
+            }
+        }
+    )
+    assert state == "BLOCKED"
+    assert output_id is None
+    assert "WAIT_FIXTURE" in detail
+    assert "hypotheses=0" in detail
+
+
+def test_r16_stage_state_complete_requires_dataset_run_id() -> None:
+    state, output_id, detail = _r16_stage_state(
+        {
+            "dataset": {"runId": "dataset-fixture"},
+            "replay": {
+                "state": "COMPLETE",
+                "datasetRunCount": 1,
+                "hypothesisCount": 3,
+                "observationsAppended": 0,
+            },
+        }
+    )
+    assert state == "COMPLETED"
+    assert output_id == "dataset-fixture"
+    assert "3 frozen hypotheses" in detail
+
+
 def test_source_to_s8_retains_exact_r5_history_before_r16(tmp_path: Path, monkeypatch) -> None:
-    """Prove exact source -> R5 -> S8 retention -> R16 hash continuity."""
+    """Prove exact source -> R5 -> S8 retention and truthful R16 boundary state."""
 
     store = MarketDataStore(
         root=tmp_path / "market-data",
@@ -293,16 +327,10 @@ def test_source_to_s8_retains_exact_r5_history_before_r16(tmp_path: Path, monkey
         f"missing={sorted(used_hashes - retained_hashes)}"
     )
 
-    # R16 intentionally freezes only bars strictly before the decision trading
-    # date. Every frozen horizon must nevertheless reproduce that exact subset,
-    # and must point to this exact S8 run rather than latest/current state.
-    assert states["R16"].state == "COMPLETED"
-    assert len(hypothesis_rows) == 3
-    expected_r16_hashes = {
-        bar.artifact_hash for bar in raw_bars if bar.trade_date < TRADE_DATE
-    } & used_hashes
-    assert len(expected_r16_hashes) >= 20
-    for row in hypothesis_rows:
-        payload = json.loads(row["payload_json"])
-        assert payload["sourceS8RunId"] == execution.s8_run_id
-        assert set(payload["sourceBarHashes"]) == expected_r16_hashes
+    # This fixture intentionally has only the cash source, so it is not yet an
+    # R16-eligible full-lineage fixture. The boundary must report that truth.
+    assert states["R16"].state == "BLOCKED"
+    assert states["R16"].output_id is None
+    assert "R16 WAIT:" in states["R16"].detail
+    assert "hypotheses=0" in states["R16"].detail
+    assert len(hypothesis_rows) == 0
