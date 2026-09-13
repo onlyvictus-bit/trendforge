@@ -10,7 +10,11 @@ from pathlib import Path
 from typing import Any, Iterable, Protocol
 
 from .historical_retention import RetentionReferenceType
-from .retention_producer import DurableRetentionRegistrar, RetentionEvidenceIntent, RetentionOutboxStatus
+from .retention_producer import (
+    DurableRetentionRegistrar,
+    RetentionEvidenceIntent,
+    RetentionOutboxStatus,
+)
 
 
 class RetentionPublicationStatus(StrEnum):
@@ -38,7 +42,9 @@ class RetentionEvidenceRoot:
         object.__setattr__(self, "run_id", run_id)
         if self.content_hash is not None:
             digest = self.content_hash.casefold()
-            if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+            if len(digest) != 64 or any(
+                ch not in "0123456789abcdef" for ch in digest
+            ):
                 raise ValueError("content_hash must be a SHA-256 hex digest")
             object.__setattr__(self, "content_hash", digest)
         if not any((self.run_id, self.trading_date, self.content_hash)):
@@ -124,8 +130,18 @@ class RetentionPublicationReceipt:
 
 
 class _Registrar(Protocol):
-    def initialize_schema(self, connection: sqlite3.Connection | None = None) -> None: ...
-    def enqueue(self, intent: RetentionEvidenceIntent, *, connection: sqlite3.Connection | None = None): ...
+    def initialize_schema(
+        self,
+        connection: sqlite3.Connection | None = None,
+    ) -> None: ...
+
+    def enqueue(
+        self,
+        intent: RetentionEvidenceIntent,
+        *,
+        connection: sqlite3.Connection | None = None,
+    ): ...
+
     def dispatch(self, event_id: str): ...
 
 
@@ -144,7 +160,11 @@ class RetentionPublicationStore:
         conn.execute("PRAGMA busy_timeout = 5000")
         return conn
 
-    def initialize_schema(self, *, connection: sqlite3.Connection | None = None) -> None:
+    def initialize_schema(
+        self,
+        *,
+        connection: sqlite3.Connection | None = None,
+    ) -> None:
         owns = connection is None
         conn = connection or self._connect()
         try:
@@ -211,7 +231,9 @@ class RetentionPublicationStore:
                 or existing["lineage_json"] != request.lineage_json
                 or existing["reference_type"] != request.reference_type.value
             ):
-                raise ValueError("retention publication identity is immutable and cannot be repointed")
+                raise ValueError(
+                    "retention publication identity is immutable and cannot be repointed"
+                )
             return self._receipt(existing)
 
         connection.execute(
@@ -259,7 +281,11 @@ class RetentionPublicationStore:
                     root.role,
                     pending.event_id,
                     pending.reference_id,
-                    json.dumps(root.canonical(), sort_keys=True, separators=(",", ":")),
+                    json.dumps(
+                        root.canonical(),
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
                 ),
             )
         row = connection.execute(
@@ -269,7 +295,10 @@ class RetentionPublicationStore:
         assert row is not None
         return self._receipt(row)
 
-    def stage_owned(self, request: RetentionPublicationRequest) -> RetentionPublicationReceipt:
+    def stage_owned(
+        self,
+        request: RetentionPublicationRequest,
+    ) -> RetentionPublicationReceipt:
         self.initialize_schema()
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
@@ -292,7 +321,8 @@ class RetentionPublicationStore:
             }:
                 return self._receipt(row)
             members = conn.execute(
-                "SELECT event_id FROM historical_retention_publication_members WHERE publication_id = ? ORDER BY evidence_role",
+                "SELECT event_id FROM historical_retention_publication_members "
+                "WHERE publication_id = ? ORDER BY evidence_role",
                 (publication_id,),
             ).fetchall()
         applied = 0
@@ -322,7 +352,13 @@ class RetentionPublicationStore:
                 SET status = ?, applied_count = ?, updated_at = ?, last_error = ?
                 WHERE publication_id = ?
                 """,
-                (status.value, applied, datetime.now(UTC).isoformat(), error, publication_id),
+                (
+                    status.value,
+                    applied,
+                    datetime.now(UTC).isoformat(),
+                    error,
+                    publication_id,
+                ),
             )
             conn.commit()
             row = conn.execute(
@@ -343,10 +379,18 @@ class RetentionPublicationStore:
             if row["status"] == RetentionPublicationStatus.PUBLISHED.value:
                 return self._receipt(row)
             if row["status"] != RetentionPublicationStatus.PROTECTED_PENDING_ARTIFACT.value:
-                raise RuntimeError("artifact cannot publish before exact retention protection")
+                raise RuntimeError(
+                    "artifact cannot publish before exact retention protection"
+                )
             conn.execute(
-                "UPDATE historical_retention_publications SET status = ?, updated_at = ?, last_error = NULL WHERE publication_id = ?",
-                (RetentionPublicationStatus.PUBLISHED.value, datetime.now(UTC).isoformat(), publication_id),
+                "UPDATE historical_retention_publications "
+                "SET status = ?, updated_at = ?, last_error = NULL "
+                "WHERE publication_id = ?",
+                (
+                    RetentionPublicationStatus.PUBLISHED.value,
+                    datetime.now(UTC).isoformat(),
+                    publication_id,
+                ),
             )
             conn.commit()
             row = conn.execute(
@@ -366,16 +410,24 @@ class RetentionPublicationStore:
             RetentionPublicationStatus.PROTECTED_PENDING_ARTIFACT.value,
             RetentionPublicationStatus.PUBLISHED.value,
         }:
-            raise RuntimeError("immutable publication is not retention-protected; fail closed")
+            raise RuntimeError(
+                "immutable publication is not retention-protected; fail closed"
+            )
         return self._receipt(row)
 
     def assert_published(self, publication_id: str) -> RetentionPublicationReceipt:
         receipt = self.assert_protected(publication_id)
         if receipt.status is not RetentionPublicationStatus.PUBLISHED:
-            raise RuntimeError("retention is protected but artifact publication is incomplete")
+            raise RuntimeError(
+                "retention is protected but artifact publication is incomplete"
+            )
         return receipt
 
-    def reconcile_pending(self, *, limit: int = 100) -> tuple[RetentionPublicationReceipt, ...]:
+    def reconcile_pending(
+        self,
+        *,
+        limit: int = 100,
+    ) -> tuple[RetentionPublicationReceipt, ...]:
         if limit <= 0:
             raise ValueError("limit must be positive")
         self.initialize_schema()
@@ -385,34 +437,41 @@ class RetentionPublicationStore:
                 SELECT publication_id FROM historical_retention_publications
                 WHERE status = ? ORDER BY created_at, publication_id LIMIT ?
                 """,
-                (RetentionPublicationStatus.PENDING_RETENTION.value, int(limit)),
+                (
+                    RetentionPublicationStatus.PENDING_RETENTION.value,
+                    int(limit),
+                ),
             ).fetchall()
         return tuple(self.finalize(row["publication_id"]) for row in rows)
 
-    def coverage(self, *, artifact_types: Iterable[str] | None = None) -> dict[str, Any]:
-        self.initialize_schema()
-        requested = tuple(sorted(set(artifact_types or ())))
-        where = ""
-        params: tuple[Any, ...] = ()
-        if requested:
-            placeholders = ",".join("?" for _ in requested)
-            where = f" WHERE artifact_type IN ({placeholders})"
-            params = requested
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT status, COUNT(*) AS count FROM historical_retention_publications"
-                + where
-                + " GROUP BY status",
-                params,
-            ).fetchall()
-        counts = {row["status"]: int(row["count"]) for row in rows}
-        total = sum(counts.values())
-        protected = counts.get(RetentionPublicationStatus.PUBLISHED.value, 0)
+    def coverage(
+        self,
+        *,
+        artifact_types: Iterable[str] | None = None,
+    ) -> dict[str, Any]:
+        """Compatibility view over the authoritative R-HIST-03E coverage oracle.
+
+        The former implementation used publication rows as both numerator and
+        denominator and could therefore report a false 100% when a governed
+        artifact never reached publication. Acceptance callers must use the
+        authoritative governed-artifact denominator in ``retention_coverage``.
+        """
+        from .retention_coverage import audit_coverage
+
+        report = audit_coverage(
+            db_path=self.db_path,
+            artifact_types=artifact_types,
+        )
         return {
-            "totalMandatoryArtifacts": total,
-            "protectedMandatoryArtifacts": protected,
-            "coverage": (protected / total) if total else 1.0,
-            "countsByStatus": counts,
+            "totalMandatoryArtifacts": report["expectedCount"],
+            "protectedMandatoryArtifacts": report["coveredCount"],
+            "coverage": report["coverage"],
+            "countsByStatus": report["countsByStatus"],
+            "verdict": report["verdict"],
+            "orphanCount": report["orphanCount"],
+            "blockingCount": report["blockingCount"],
+            "_deprecated": True,
+            "_use": "trendforge_api.retention_coverage.audit_coverage",
         }
 
     @staticmethod
