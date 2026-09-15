@@ -184,6 +184,72 @@ Scenario outcomes:
 Harness fix (Type A, test-only): `_build_chain` no longer persists (pure builders);
 `_persist_upto(chain, target)` stages prerequisites honoring the model→APPLIED-dataset
 binding law. No production-code change. 03E checkpoints stand unmodified.
+
+M1 code-head CI: commit `049fdac`, PR-head run `34989717719` (`pull_request`,
+head `049fdac`) — overall SUCCESS: backend **1751 passed** (1736 + 15 new),
+compile/Ruff/frontend passed; typecheck the accepted non-blocking legacy failure.
+
+## M2 evidence (2026-09-15, local, scratch DBs only, uncommitted)
+
+New files (tests only, except one minimal production hardening):
+
+```text
+backend/tests/test_rhist03f_concurrency.py   11 scenarios (F_RACE_01..08, F_IO_01/02/03/05)
+backend/tests/test_rhist03f_tamper.py        18 scenarios (F_TAMPER_* unit classes)
+backend/trendforge_api/retention_publication.py  1-claim fix in finalize()
+```
+
+Focused: concurrency + tamper → **29 passed in ~23s**.
+Regression (finalize neighbors + all 03F): **177 passed, 0 failures in ~423s**.
+Ruff + compile clean.
+
+### Defect found and repaired (Type B)
+
+`RetentionPublicationStore.finalize()` claimed `PROTECTED_PENDING_ARTIFACT` when
+`applied == len(members)`, ignoring the staged `required_count`. A lost member
+row therefore lowered the protection bar instead of blocking (proven by
+F_TAMPER_06 red: PROTECTED with applied 1/2). Governed reads and coverage still
+refused via the deep verifier (`PUBLICATION_MEMBER_MISMATCH`), so no false
+health escaped — but the local claim was wrong.
+
+Fix (1 claim, `retention_publication.py`): protection additionally requires
+`applied == required_count`. Legitimate flows always satisfy it (stage writes
+both atomically; no production delete path exists).
+
+TWINS: project-wide search for lenient member counting — the deep verifier
+(`r16_retention.py:195`) already enforces the strict triple
+(members/roots/required/applied); `mark_published` gates on status only, sound
+once the claim is fixed. No second occurrence.
+
+### Scenario outcomes (M2)
+
+| ID | Result |
+|----|--------|
+| F_RACE_01/02 | PROVEN — barrier-aligned duplicate dispatch/register converge: APPLIED, 1 semantic ref, PASS |
+| F_RACE_03 | PROVEN — same-lineage racers: exactly one wins; loser ValueError/IntegrityError; stored row immutable |
+| F_RACE_04 | PROVEN — reconciler vs dispatcher converge; 1 ref |
+| F_RACE_05 | PROVEN — locked dispatch raises loudly (no silent catch pre-authority); PENDING + attempts preserved; retry converges |
+| F_RACE_06 | PROVEN — concurrent finalizers converge via CAS path; 1 ref; PASS |
+| F_RACE_07 | PROVEN — audits sampled mid-transition are coherent (FAIL or PASS, counts consistent) |
+| F_RACE_08 | PROVEN — independent events keep own identities under aligned races |
+| F_IO_01 | PROVEN — locked artifact txn: no partial row, no outbox row, EMPTY; works after release |
+| F_IO_03 | PROVEN — unavailable authority: FAILED_BLOCKING, never APPLIED, coverage non-PASS |
+| F_IO_05 | PROVEN — ghost evidence dispatch fails closed (`refusing unknown run_id`); inverse proof reports RETENTION_ORPHAN FAIL |
+| F_TAMPER_01/02/09/10 | PROVEN — outbox payload/column/version/type tampers blocked before authority |
+| F_TAMPER_05/08/11/12/38/43 | PROVEN two-layer — naive writes blocked by immutability triggers (IntegrityError, state intact); past dropped triggers, identity/payload/member verifiers refuse (CORRUPT_*/MISMATCH) |
+| auxiliary columns | PROVEN ineffective-or-blocked — cutoff/predecessor column lies past dropped triggers do not reach governed readers (verified sealed payload wins); payload rewrites detected |
+| F_TAMPER_06/07 | PROVEN — member removal now FAILED_BLOCKING (repaired); ghost-swap FAILED_BLOCKING; coverage never PASS |
+| F_TAMPER_42 | PROVEN — same-version semantic rewrite rejected (PROFILE_VERSION_IMMUTABLE) |
+
+Test-harness fixes (Type A, no production impact): barrier-reuse/starvation in
+RACE_04/08 replaced with start-gate + work-queue; RACE_03 rebuilt as a true
+same-lineage race; RACE_05/IO_05 asserts pinned to lawful behavior (loud
+retryable raise; FAILED_BLOCKING receipt, not an exception).
+
+Remaining for M3: pipeline-level tamper probes (R16 parent, market bytes),
+cross-store matrix, cleanup safety, historical-invention negative, golden
+restart, false-pass search, full regression, code-head + doc-head CI, PR
+metadata refresh, FULL R-HIST-03 gate.
 - M1: full source→R18 golden + F_CRASH_05..09 + F_REPLAY_03..05 + golden restart.
 - M2: concurrency (F_RACE), storage failures (F_IO), tamper matrix, dual-oracle proof.
 - M3: cross-store, cleanup safety, invention-negative, full regression, code-head CI,
