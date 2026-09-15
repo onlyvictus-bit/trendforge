@@ -147,6 +147,43 @@ Scenario outcomes:
 
 No defect exposed by M0; 03E checkpoints stand unmodified. Statuses above are the
 only matrix rows leaving MISSING; all other rows remain M1–M3 scope.
+
+M0 code-head CI: commit `4794b9c`, PR-head run `34980119941` (`pull_request`,
+head `4794b9c`) — overall SUCCESS: backend **1736 passed** (1726 + 10 new),
+2 warnings, 316.75s; compile PASS; Ruff PASS; frontend PASS; typecheck the
+accepted non-blocking legacy failure. PR #6 head == `4794b9c`.
+
+## M1 evidence (2026-09-15, local, scratch DBs only, uncommitted)
+
+New files (tests only, zero production-code change):
+
+```text
+backend/tests/test_rhist03f_r18_recovery.py    11 scenarios
+backend/tests/test_rhist03f_pipeline_recovery.py  4 scenarios (real pipeline reuse)
+```
+
+Focused: `test_rhist03f_r18_recovery.py` + `test_rhist03f_crash_recovery.py` →
+**21 passed in ~11s**. `test_rhist03f_pipeline_recovery.py` → **4 passed in ~86s**.
+
+Scenario outcomes:
+
+| ID | Result |
+|----|--------|
+| F_GOLDEN_S8R16 | PROVEN — real 22-day pipeline graph (1 S8 + 9 decisions + 9 outcomes, all PUBLISHED) PASS on both oracles, reportHash stable, restart-stable |
+| F_CRASH_05a/b | PROVEN — AFTER_LINK_APPLIED / BEFORE_LOCAL_COMMIT roll back atomically; re-finalize converges; coverage PASS |
+| F_CRASH_05c | PROVEN — crafted split state raises SPLIT_PUBLICATION_STATE; governed reads refuse; coverage never PASS (canonical path cannot create a split) |
+| F_CRASH_05d | PROVEN — AFTER_OUTBOX_APPLIED leaves APPLIED outbox + PENDING pair (coverage FAIL/PENDING); re-finalize converges |
+| F_CRASH_06a | PROVEN — staged publication survives restart; finalize→publish resumes; re-stage idempotent; zero duplicate members |
+| F_CRASH_06b | PROVEN — real-pipeline S8 crash before mark_published leaves persisted row + PROTECTED protection; resume → exactly one PUBLISHED, members unique |
+| F_CRASH_07 | PROVEN — real-pipeline R16 commit-without-finalize leaves staged rows hidden; `resume_pending_publications` converges; second resume returns 0; no PENDING left in coverage |
+| F_CRASH_08 ×4 | PROVEN — per-type finalize crashes (BEFORE_DISPATCH / AFTER_PARENT_PROOF / AFTER_LINK_APPLIED / BEFORE_LOCAL_COMMIT) recover with identical event/reference/hash IDs, 1 authority ref, idempotent re-finalize |
+| honest accounting | PROVEN — parentless APPLIED dataset/model → LINEAGE_MISSING; profile/audit with unverifiable parent → LINEAGE_BROKEN; never PASS |
+| F_CRASH_09 | PROVEN — restart after persist / dispatch / finalize preserves identities; PASS |
+| F_REPLAY_03/04 | PROVEN — repeat publication finalize and dataset finalize idempotent |
+
+Harness fix (Type A, test-only): `_build_chain` no longer persists (pure builders);
+`_persist_upto(chain, target)` stages prerequisites honoring the model→APPLIED-dataset
+binding law. No production-code change. 03E checkpoints stand unmodified.
 - M1: full source→R18 golden + F_CRASH_05..09 + F_REPLAY_03..05 + golden restart.
 - M2: concurrency (F_RACE), storage failures (F_IO), tamper matrix, dual-oracle proof.
 - M3: cross-store, cleanup safety, invention-negative, full regression, code-head CI,

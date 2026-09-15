@@ -113,6 +113,90 @@ def persist_profile(index: int, *, finalize: bool = True) -> dict[str, str]:
     }
 
 
+FH1 = "1" * 64
+FH2 = "2" * 64
+FH3 = "3" * 64
+FH4 = "4" * 64
+FH5 = "5" * 64
+FH6 = "6" * 64
+
+FDECISION_AT = NOW - timedelta(days=8)
+FLABEL_AT = FDECISION_AT + timedelta(days=3)
+
+
+def dataset_manifest(tag: str):
+    """Build a valid (parentless) frozen-dataset manifest for crash tests.
+
+    Members carry well-formed identity hashes but no live R16 parents, so
+    finalization must use verify_parents=False. Coverage expectations for such
+    fixtures are honest non-PASS; parented PASS is proven by the 03E suite.
+    """
+    member = governance.build_frozen_dataset_member(
+        instrument_id="NSE:INFY:EQ",
+        opportunity_id="INFY:EOD:continuation:SHORT",
+        profile_id="PRF-R16-NSE-CASH-EOD-SWING",
+        profile_version="1.0.0",
+        strategy_id="R16_SWING",
+        strategy_version="1.0.0",
+        setup_id="SWING_BREAKOUT_BREAKDOWN_V1",
+        setup_episode_id="episode-1",
+        timeframe="EOD",
+        horizon="SWING",
+        direction="BEARISH",
+        decision_version_id="D100v1",
+        decision_version_hash=FH1,
+        decision_at=FDECISION_AT,
+        decision_data_cutoff=FDECISION_AT,
+        max_feature_available_at=FDECISION_AT - timedelta(seconds=1),
+        public_state="WATCH",
+        outcome_id="O1",
+        outcome_hash=FH2,
+        outcome_state="TARGET",
+        outcome_available_at=FLABEL_AT,
+        revision_id=None,
+        revision_hash=None,
+        revision_available_at=None,
+        label_available_at=FLABEL_AT,
+        feature_manifest_id="r16-source-features-v1",
+        feature_manifest_hash=FH3,
+        formula_set_version="r16-policy-bundle-v1",
+        formula_set_hash=FH4,
+        input_hashes=(FH5,),
+        evidence_roots=(
+            {"role": "DECISION_MARKET_EVIDENCE", "contentHash": FH5},
+            {"role": "OUTCOME_MARKET_EVIDENCE", "contentHash": FH6},
+        ),
+        split="TRAIN",
+        fold="F1",
+        inclusion_reason="BASE_POPULATION",
+        exclusion_reason=None,
+    )
+    label_cutoff = FLABEL_AT + timedelta(days=1)
+    build_cutoff = FLABEL_AT + timedelta(days=2)
+    return governance.build_frozen_dataset_manifest(
+        dataset_id=f"DS-03F-{tag}",
+        dataset_version="1.0.0",
+        purpose="TRAIN",
+        created_at=build_cutoff,
+        decision_cutoff=FDECISION_AT,
+        label_cutoff=label_cutoff,
+        build_cutoff=build_cutoff,
+        population_policy_id="R16_COMPLETE_BASE_POPULATION",
+        population_policy_version="1.0.0",
+        label_policy_id="R16_LABEL_POLICY",
+        label_policy_version="1.0.0",
+        feature_manifest_id="r16-source-features-v1",
+        feature_manifest_hash=FH3,
+        formula_set_version="r16-policy-bundle-v1",
+        formula_set_hash=FH4,
+        cost_model_version="cost-v1",
+        members=(member.model_dump(mode="python", by_alias=False),),
+        base_population=True,
+        source_population_count=1,
+        code_digest=None,
+    )
+
+
 def outbox_row(db_path: Path, event_id: str) -> dict[str, Any] | None:
     with _connect(db_path) as conn:
         row = conn.execute(
@@ -254,6 +338,7 @@ __all__ = [
     "capture_manifest",
     "count_authority_refs",
     "coverage_report",
+    "dataset_manifest",
     "init_db",
     "link_state",
     "outbox_count",

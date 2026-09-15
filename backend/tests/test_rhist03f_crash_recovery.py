@@ -22,7 +22,6 @@ from trendforge_api.retention_producer import (
     RetentionEvidenceIntent,
     RetentionOutboxStatus,
 )
-from trendforge_api.selection import r18_governance as governance
 from trendforge_api.selection import r18_store
 from trendforge_api.selection.r18_history_finalization import (
     verify_governed_rhist03d_artifact,
@@ -38,6 +37,7 @@ from tests.rhist03f_harness import (
     capture_manifest,
     count_authority_refs,
     coverage_report,
+    dataset_manifest,
     init_db,
     link_state,
     outbox_count,
@@ -49,85 +49,10 @@ from tests.rhist03f_harness import (
 
 H1 = "1" * 64
 H2 = "2" * 64
-H3 = "3" * 64
-H4 = "4" * 64
-H5 = "5" * 64
-H6 = "6" * 64
-
-DECISION_AT = NOW - timedelta(days=8)
-LABEL_AT = DECISION_AT + timedelta(days=3)
 
 
 def _statuses(report: dict) -> set[str]:
     return {str(row["status"]) for row in report["findings"]}
-
-
-def _dataset_manifest(tag: str):
-    member = governance.build_frozen_dataset_member(
-        instrument_id="NSE:INFY:EQ",
-        opportunity_id="INFY:EOD:continuation:SHORT",
-        profile_id="PRF-R16-NSE-CASH-EOD-SWING",
-        profile_version="1.0.0",
-        strategy_id="R16_SWING",
-        strategy_version="1.0.0",
-        setup_id="SWING_BREAKOUT_BREAKDOWN_V1",
-        setup_episode_id="episode-1",
-        timeframe="EOD",
-        horizon="SWING",
-        direction="BEARISH",
-        decision_version_id="D100v1",
-        decision_version_hash=H1,
-        decision_at=DECISION_AT,
-        decision_data_cutoff=DECISION_AT,
-        max_feature_available_at=DECISION_AT - timedelta(seconds=1),
-        public_state="WATCH",
-        outcome_id="O1",
-        outcome_hash=H2,
-        outcome_state="TARGET",
-        outcome_available_at=LABEL_AT,
-        revision_id=None,
-        revision_hash=None,
-        revision_available_at=None,
-        label_available_at=LABEL_AT,
-        feature_manifest_id="r16-source-features-v1",
-        feature_manifest_hash=H3,
-        formula_set_version="r16-policy-bundle-v1",
-        formula_set_hash=H4,
-        input_hashes=(H5,),
-        evidence_roots=(
-            {"role": "DECISION_MARKET_EVIDENCE", "contentHash": H5},
-            {"role": "OUTCOME_MARKET_EVIDENCE", "contentHash": H6},
-        ),
-        split="TRAIN",
-        fold="F1",
-        inclusion_reason="BASE_POPULATION",
-        exclusion_reason=None,
-    )
-    decision_cutoff = DECISION_AT
-    label_cutoff = LABEL_AT + timedelta(days=1)
-    build_cutoff = LABEL_AT + timedelta(days=2)
-    return governance.build_frozen_dataset_manifest(
-        dataset_id=f"DS-03F-{tag}",
-        dataset_version="1.0.0",
-        purpose="TRAIN",
-        created_at=build_cutoff,
-        decision_cutoff=decision_cutoff,
-        label_cutoff=label_cutoff,
-        build_cutoff=build_cutoff,
-        population_policy_id="R16_COMPLETE_BASE_POPULATION",
-        population_policy_version="1.0.0",
-        label_policy_id="R16_LABEL_POLICY",
-        label_policy_version="1.0.0",
-        feature_manifest_id="r16-source-features-v1",
-        feature_manifest_hash=H3,
-        formula_set_version="r16-policy-bundle-v1",
-        formula_set_hash=H4,
-        cost_model_version="cost-v1",
-        members=(member.model_dump(mode="python", by_alias=False),),
-        base_population=True,
-        source_population_count=1,
-        code_digest=None,
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +118,7 @@ def test_F_CRASH_02a_dataset_crash_after_artifact_insert_rolls_back_intent(
     tmp_path, monkeypatch
 ) -> None:
     db_path = init_db(tmp_path, monkeypatch)
-    manifest_model = _dataset_manifest("ROLLBACK")
+    manifest_model = dataset_manifest("ROLLBACK")
 
     with pytest.raises(RuntimeError, match="INJECTED_AFTER_ARTIFACT_INSERT"):
         persist_frozen_dataset(manifest_model, fault_point="AFTER_ARTIFACT_INSERT")
