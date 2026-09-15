@@ -5,6 +5,205 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-15 - R-HIST-03E documentation-head CI and acceptance
+
+Doc SHA: `7905a631ca9f1df6bd71a126496e6bad24db2903` (docs-only over
+`0a514bd`; 5 docs files, +283/−2). CI run: `34935106879`
+(<https://github.com/onlyvictus-bit/trendforge/actions/runs/34935106879>),
+event `pull_request`, `headSha 7905a63...`, generated merge ref actually
+checked: `aef2dc16ff6bf39322a84ab355acebd9c2d64acf`. Overall: SUCCESS.
+
+| Check | Observed result |
+|---|---|
+| Backend job `104271226883` | 1726 passed, 2 warnings, 320.92s |
+| Python compile | PASS |
+| Ruff | All checks passed |
+| Frontend job `104271226982` | PASS (incl. current-state documentation navigation/boundary checks) |
+| Mypy job `104271227036` | Non-blocking failure: 510 errors / 70 files / 277 checked — identical to the code-head run |
+
+Acceptance review against the 33-item gate (registry, denominator, orphans
+both directions incl. cross-store external, transitive lineage incl. `hash_col`
+fix, PENDING/FAILED/legacy separation, bounded restart-safe reconciliation,
+zero-write read-only audit, no backfill, snapshot safety, stable reportHash,
+source→R16→R18 chain, fault injection fail-closed, full backend/compile/Ruff/
+frontend green, honest Mypy, exact-head CI observed): all mandatory items
+evidenced — full matrix in
+[fable/RHIST03E_EXECUTION_2026-09-11.md](fable/RHIST03E_EXECUTION_2026-09-11.md).
+
+R-HIST-03E = IMPLEMENTED + TESTED / ACCEPTED. R-HIST-03F = UNLOCKED / NEXT /
+NOT STARTED. Full R-HIST-03 = NOT COMPLETE. LIVE-DATA-VERIFIED = NO.
+PRODUCTION-ACCEPTED = NO. Execution authority unchanged. 03F work NOT STARTED
+in this task.
+
+## 2026-09-15 - R-HIST-03E code-checkpoint evidence (FINAL DOCUMENTATION-HEAD CI PENDING)
+
+Code SHA: `0a514bd19f8e519e5699c2574ece308851dcada0`
+(`fix(03E): source-to-coverage chain, verifier hash_col, cross-store inverse
+proof`). PR #6 (`feat/rhist03-producer-wiring`), base
+`f99e7eb3e764b3fb43aa55432abcdf78cd68191e`. Scope: 5 files, 940 insertions,
+19 deletions. Parent: `44b26c2`.
+CI run: `34773335360`
+(<https://github.com/onlyvictus-bit/trendforge/actions/runs/34773335360>),
+event `pull_request`, `headSha 0a514bd...`, generated merge ref actually
+checked: `9f382c057ed62e7e645ec9a14dea803775541d8e` (PR `merge_commit_sha`).
+Overall workflow: SUCCESS. Do NOT describe this as a literal raw-head
+checkout, and do NOT reuse it as the final documentation-head run.
+
+| Check | Observed result |
+|---|---|
+| Backend job `103766821100` | 1726 passed, 2 warnings, 302.28s |
+| Python compile | PASS |
+| Ruff | All checks passed |
+| Frontend job `103766821313` | PASS (8s) |
+| Mypy job `103766821246` | Non-blocking failure: 510 errors / 70 files / 277 checked (`continue-on-error: true`); 03D baseline was 512/70, per-file delta not re-measured here |
+| Local independent rerun (Python 3.14.3) | `test_rhist03e_m3a_acceptance.py` + `test_rhist03e_source_to_end.py`: 10 passed, 227.85s, scratch DBs only |
+
+Controlled source-to-end: 22 synthetic trading days × 4 symbols + index-close
+companions through canonical ingestion → A1/A2/A4 → R5 → S8 → retention →
+R16 → R18 (2 datasets, 1 model, 1 profile, 1 audit) → `audit_coverage()`
+PASS (`expectedCount > 0`, `covered == expected`, 1.0, 0 orphans, 0 blocking,
+stable `reportHash`). R16 revisions zero (no legitimate successor in window —
+allowed, not fabricated). Cross-store inverse: paired scratch stores PASS;
+injected external authority orphan FAILs closed with
+`RETENTION_ORPHAN`/`EXTERNAL_AUTHORITY_REFERENCE`, PASS restored after
+removal. Read-only audit (fingerprint equal before/during/after),
+uncommitted-artifact invisibility, PENDING semantics, tamper/delete fail-closed
+all pinned. R18 defect repaired: verifier now uses the mapped `hash_col`
+instead of the `dataset/model/content/record` precedence chain; twin search
+over `selection/*.py` + `trendforge_api/*.py` at `0a514bd` found no second
+occurrence. Known boundaries: TEST DATA ONLY, no production read/write,
+PRODUCTION-SCALE PERFORMANCE VERIFIED: NO, one residual non-blocking diagnostic
+at `selection/cash_post_commit.py:758` (Literal site outside this checkpoint's
+tidy). Full 44-case crosswalk and standing rules live in
+[fable/RHIST03E_EXECUTION_2026-09-11.md](fable/RHIST03E_EXECUTION_2026-09-11.md).
+
+R-HIST-03E: NOT ACCEPTED at this entry — final documentation-head CI still
+pending. R-HIST-03F: GATED. Full R-HIST-03: NOT COMPLETE.
+LIVE-DATA-VERIFIED / PRODUCTION-ACCEPTED: NO. No authority change.
+
+## 2026-09-11 - 03D publication and exact-head acceptance
+
+Accepted source commit: `fce62874a61e4e2bb6d939bef6d0811e5a266996`.
+Its Git tree `9295187c49ee7fe5f5005d6ec42a92f94775dcf8` exactly matches the
+locally tested repair. PR #6 remains open and unmerged.
+[CI 34496385997](https://github.com/onlyvictus-bit/trendforge/actions/runs/34496385997)
+completed / success on that head. The GitHub job logs were inspected directly:
+
+| Check | Observed result |
+| --- | --- |
+| Backend job 102935794979 | 1699 passed, zero failures/skips, two dependency warnings; 247.16 seconds |
+| Python compile / Ruff | Passed / All checks passed |
+| Frontend job 102935795027 | Passed; 220/220 primary checks and all additional suites |
+| Dependency install | Exact xlrd 2.0.2 installed |
+| Mypy job 102935794982 | Known non-blocking failure: 512 errors / 70 files |
+| Normalized Mypy delta against accepted 03C | Zero new/removed errors or notes in the same local environment |
+
+The workflow's existing non-blocking Mypy policy was not weakened. Overall CI
+success does not mean Mypy is clean. The same acceptance source was rechecked
+via GitHub on 2026-09-11. Documentation-only follow-up heads require their own
+CI; `fce62874` remains the actual 03D implementation acceptance checkpoint.
+03D: IMPLEMENTED + TESTED. 03E: NEXT / UNLOCKED. 03F: GATED on 03E.
+Full R-HIST-03: NOT COMPLETE. LIVE-DATA-VERIFIED / PRODUCTION-ACCEPTED: NO.
+Only scratch databases were used; no real migration or trading action occurred.
+
+## 2026-09-10 - PR #6 repair verification (historical local checkpoint)
+
+Baseline: `6de1e14973edcf62b61c9b6a1441214ace656ec4`, with the original three
+failures confirmed from CI run `34486533849`. Two R18 failures reproduced
+locally. Additional failing tests exposed missing recovery/crash points,
+legacy-event misclassification, concurrent finalizer and dispatch races,
+wrong indexed identity acceptance and concurrent authority registration.
+
+Checks run from the isolated checkout's `backend` directory, using the existing
+Python 3.14.3 environment and user-approved isolated `xlrd==2.0.2`:
+
+```sh
+python -m compileall -q trendforge_api tests
+python -m pytest -q -p no:cacheprovider tests/test_rhist03d_ml_history.py
+python -m pytest -q -p no:cacheprovider tests/test_rhist03d_recovery.py tests/test_rhist03d_artifact_retention.py tests/test_retention_producer.py tests/test_retention_evidence_safety.py
+python -m pytest -q -p no:cacheprovider --tb=short -rs --durations=8
+python -m ruff check trendforge_api tests
+python -m mypy trendforge_api --ignore-missing-imports --no-incremental
+```
+
+Each pytest invocation uses its own explicit writable scratch `--basetemp`.
+No production database or source cache was migrated. The same local environment
+checked actual 03C source at `2079336768907cf9f0668a8798cd631007c6e74f` for a
+normalized per-file diagnostic multiset comparison (source coordinates and
+embedded line references removed; errors and notes retained).
+
+Observed checkpoints: repaired ML suite 28 passed; five original 03D suites
+54 passed; expanded 03D matrix 72 passed; registration/retention regression
+48 passed; final forced race checks 3 passed. Mypy: 512 errors in 70 files on
+both revisions, zero new/removed normalized diagnostics on final repaired
+source. Ruff/compile and frontend npm test passed after documentation updates.
+The final full backend run on repaired source finished with **1699 passed,
+zero failed, zero skipped, one Starlette deprecation warning**, in 904.25 seconds.
+Earlier interrupted runs are not completion evidence. The final source passed
+compilation and Ruff; frontend passed 220/220 primary checks and every additional
+suite, including documentation contracts.
+
+Official EIA XLS: 104448 bytes with OLE signature, eight populated numeric
+records dated 2026-09-04 with xlrd 2.0.2. Masking xlrd against the identical
+workbook reproduces WAIT_SCHEMA_MISMATCH. The CSV route also parsed eight rows,
+but returned a null parsed date; CSV freshness is not verified by this result.
+
+Post-publication exact-head CI remains pending. See
+[the execution record](fable/RHIST03D_PR6_REPAIR_2026-09-10.md). 03D remains
+IN PROGRESS; LIVE-DATA-VERIFIED (03D): NO; PRODUCTION-ACCEPTED: NO.
+
+## 2026-09-09 - R-HIST-03C local verification evidence
+
+Repository baseline: `fc236893b1504b857513fb896b8cb89050e17ffd` (tested 03B),
+implementation branch `feat/rhist03-producer-wiring`, existing PR #6. Execution
+used an isolated Python 3.13 environment with this repository's pinned
+`backend/requirements-dev.txt`, including Ruff 0.15.5 and Mypy 1.19.1. Local Node
+was 22; repository CI separately uses Python 3.14 / Node 24. Test fixtures use
+real SQLite, market object bytes, HRA, publication and outbox; they are not live
+trading-data verification.
+
+Safety-first red/green evidence: the first 34 new tests failed before the
+implementation. Worker, rebuild and predecessor-tamper tests also failed before
+their corresponding fixes. The final new file contains 57 adversarial cases.
+
+Commands from `backend`:
+
+```sh
+python -m pytest -q tests/test_r16_retention.py tests/test_r16_pit.py tests/test_s8_retention.py tests/test_retention_producer.py tests/test_retention_publication.py --tb=short
+python -m pytest -q -rs --tb=short
+python -m ruff check trendforge_api tests
+python -m compileall -q trendforge_api tests
+python -m mypy trendforge_api --ignore-missing-imports
+```
+
+Observed focused result: **92 passed, 2 warnings**, comprising 57 new 03C tests
+plus 35 existing R16/retention tests. Full backend: **1,621 passed, 2 skipped,
+2 warnings**. The two existing network-dependent DGCIS and EIA tests skipped
+because this local execution environment could not resolve their hosts. No new
+03C test was skipped. Ruff and compilation passed. `cd frontend && npm test`
+passed, including the existing history/current-state documentation contracts.
+
+Mypy is NOT green: unchanged non-blocking legacy baseline, **512 errors across
+70 files** at this implementation versus **513 errors across 70 files** on the
+original backend. A per-file diagnostic multiset comparison (normalizing source
+line coordinates, including embedded line references) found **zero new
+diagnostics** and one removed old public-state Literal error. The new retention
+module has no Mypy errors. Do not substitute the workflow's non-blocking success
+for a claim of type-check cleanliness.
+
+Coverage includes exact/missing/wrong/tampered S8 parents, real S8 payload
+sealing, refusal to backfill unsealed legacy parents, all non-trade populations,
+separate outcome evidence and time, duplicate replay, immutable revision chains,
+linked rebuild versions, source-correction isolation, read-only fail-closed
+proof checks, old decision/outcome/revision survival through actual cleanup,
+transaction rollback, authority failure, crash after registration before
+acknowledgement, and crash between an outcome and its explicit revision.
+
+This entry records local evidence only. Exact final PR-head backend/Ruff,
+frontend and baseline-aware Mypy results must be verified on PR #6 before
+declaring **R-HIST-03C = IMPLEMENTED + TESTED**. 03D/E/F, the full R-HIST-03 gate,
+R-HIST-04, live-data verification and production acceptance are not implied.
+
 ## 2026-09-07 - Atomic research snapshot (next requirement)
 
 The selection refresh now reads `GET /api/v1/selection/snapshot` instead of
