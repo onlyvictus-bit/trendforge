@@ -6,6 +6,32 @@ activation authority, or production certification. File A retains build order,
 public-state definitions and acceptance ceilings. Read this page before dated
 entries in BUILD_STATUS, VALIDATION, architecture notes or remaining-build guides.
 
+## R-HIST-03E code checkpoint - 2026-09-15 (FINAL DOCUMENTATION-HEAD CI PENDING, NOT YET ACCEPTED)
+
+R-HIST-03E code checkpoint `0a514bd19f8e519e5699c2574ece308851dcada0`
+(`fix(03E): source-to-coverage chain, verifier hash_col, cross-store inverse
+proof`, 5 files, 940 insertions, 19 deletions) on
+`feat/rhist03-producer-wiring` (PR #6, base `fix/retention-evidence-safety` at
+`f99e7eb3e764b3fb43aa55432abcdf78cd68191e`) is IMPLEMENTED + CONTROLLED
+ACCEPTANCE TESTED. PR-head-associated integration CI `34773335360` is SUCCESS:
+it checked merge ref `9f382c057ed62e7e645ec9a14dea803775541d8e`, backend 1726
+passed / compile PASS / Ruff PASS / frontend PASS; Mypy remains the accepted
+non-blocking legacy failure (510 errors / 70 files / 277 checked). Controlled
+source-to-end (22 synthetic days, scratch DBs only) reaches coverage 1.0 with
+zero orphans/blockers and stable reportHash; M3A pins read-only audit,
+snapshot isolation, PENDING semantics, paired-store PASS and cross-store
+external-orphan FAIL-closed with healing. Full evidence, 44-case crosswalk and
+the repaired R18 `hash_col` defect are recorded in
+[fable/RHIST03E_EXECUTION_2026-09-11.md](fable/RHIST03E_EXECUTION_2026-09-11.md)
+and the newest VALIDATION entry.
+
+R-HIST-03E: IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED / FINAL
+DOCUMENTATION-HEAD CI PENDING / NOT YET ACCEPTED. R-HIST-03F: GATED on 03E.
+Full R-HIST-03: NOT COMPLETE. LIVE-DATA-VERIFIED: NO. PRODUCTION-ACCEPTED: NO.
+No broker, execution, strategy-activation, model-approval, live-data or
+production-authority change. This documentation head requires its own CI; the
+`0a514bd` run remains evidence for the code checkpoint only.
+
 ## R-HIST-03D acceptance and next stage - 2026-09-11
 
 The published repair based on PR head `6de1e14973edcf62b61c9b6a1441214ace656ec4`

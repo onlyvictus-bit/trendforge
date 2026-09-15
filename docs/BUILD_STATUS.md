@@ -5,6 +5,19 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-15 - R-HIST-03E code checkpoint recorded; documentation-head CI pending
+
+03E code checkpoint `0a514bd19f8e519e5699c2574ece308851dcada0` is IMPLEMENTED +
+CONTROLLED ACCEPTANCE TESTED. PR-head-associated CI `34773335360`
+(merge ref `9f382c057ed62e7e645ec9a14dea803775541d8e`) is completed / success:
+backend 1726 passed, compile/Ruff/frontend passed; Mypy remains the accepted
+non-blocking 510 errors / 70 files. Controlled source-to-end and M3A evidence,
+the 44-case crosswalk and the repaired R18 `hash_col` defect are recorded in
+the execution record and newest VALIDATION entry. R-HIST-03E is NOT ACCEPTED
+until this documentation head obtains its own green CI. 03F is GATED on 03E.
+Full R-HIST-03 is NOT COMPLETE. LIVE-DATA-VERIFIED: NO. PRODUCTION-ACCEPTED:
+NO. No execution authority changed.
+
 ## 2026-09-11 - R-HIST-03D accepted; 03E next
 
 03D is IMPLEMENTED + TESTED at `fce62874a61e4e2bb6d939bef6d0811e5a266996`.

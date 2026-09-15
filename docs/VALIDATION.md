@@ -5,6 +5,52 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-15 - R-HIST-03E code-checkpoint evidence (FINAL DOCUMENTATION-HEAD CI PENDING)
+
+Code SHA: `0a514bd19f8e519e5699c2574ece308851dcada0`
+(`fix(03E): source-to-coverage chain, verifier hash_col, cross-store inverse
+proof`). PR #6 (`feat/rhist03-producer-wiring`), base
+`f99e7eb3e764b3fb43aa55432abcdf78cd68191e`. Scope: 5 files, 940 insertions,
+19 deletions. Parent: `44b26c2`.
+CI run: `34773335360`
+(<https://github.com/onlyvictus-bit/trendforge/actions/runs/34773335360>),
+event `pull_request`, `headSha 0a514bd...`, generated merge ref actually
+checked: `9f382c057ed62e7e645ec9a14dea803775541d8e` (PR `merge_commit_sha`).
+Overall workflow: SUCCESS. Do NOT describe this as a literal raw-head
+checkout, and do NOT reuse it as the final documentation-head run.
+
+| Check | Observed result |
+|---|---|
+| Backend job `103766821100` | 1726 passed, 2 warnings, 302.28s |
+| Python compile | PASS |
+| Ruff | All checks passed |
+| Frontend job `103766821313` | PASS (8s) |
+| Mypy job `103766821246` | Non-blocking failure: 510 errors / 70 files / 277 checked (`continue-on-error: true`); 03D baseline was 512/70, per-file delta not re-measured here |
+| Local independent rerun (Python 3.14.3) | `test_rhist03e_m3a_acceptance.py` + `test_rhist03e_source_to_end.py`: 10 passed, 227.85s, scratch DBs only |
+
+Controlled source-to-end: 22 synthetic trading days × 4 symbols + index-close
+companions through canonical ingestion → A1/A2/A4 → R5 → S8 → retention →
+R16 → R18 (2 datasets, 1 model, 1 profile, 1 audit) → `audit_coverage()`
+PASS (`expectedCount > 0`, `covered == expected`, 1.0, 0 orphans, 0 blocking,
+stable `reportHash`). R16 revisions zero (no legitimate successor in window —
+allowed, not fabricated). Cross-store inverse: paired scratch stores PASS;
+injected external authority orphan FAILs closed with
+`RETENTION_ORPHAN`/`EXTERNAL_AUTHORITY_REFERENCE`, PASS restored after
+removal. Read-only audit (fingerprint equal before/during/after),
+uncommitted-artifact invisibility, PENDING semantics, tamper/delete fail-closed
+all pinned. R18 defect repaired: verifier now uses the mapped `hash_col`
+instead of the `dataset/model/content/record` precedence chain; twin search
+over `selection/*.py` + `trendforge_api/*.py` at `0a514bd` found no second
+occurrence. Known boundaries: TEST DATA ONLY, no production read/write,
+PRODUCTION-SCALE PERFORMANCE VERIFIED: NO, one residual non-blocking diagnostic
+at `selection/cash_post_commit.py:758` (Literal site outside this checkpoint's
+tidy). Full 44-case crosswalk and standing rules live in
+[fable/RHIST03E_EXECUTION_2026-09-11.md](fable/RHIST03E_EXECUTION_2026-09-11.md).
+
+R-HIST-03E: NOT ACCEPTED at this entry — final documentation-head CI still
+pending. R-HIST-03F: GATED. Full R-HIST-03: NOT COMPLETE.
+LIVE-DATA-VERIFIED / PRODUCTION-ACCEPTED: NO. No authority change.
+
 ## 2026-09-11 - 03D publication and exact-head acceptance
 
 Accepted source commit: `fce62874a61e4e2bb6d939bef6d0811e5a266996`.
