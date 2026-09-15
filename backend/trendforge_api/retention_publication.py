@@ -339,9 +339,16 @@ class RetentionPublicationStore:
                 failures.append(result.last_error or "retention dispatch failed blocking")
             else:
                 failures.append(f"retention event remained {result.status.value}")
+        # 03F: protection requires the full staged requirement, not merely the
+        # surviving members. A lost member row must block, never lower the bar.
+        complete = (
+            applied == len(members)
+            and applied == row["required_count"]
+            and not failures
+        )
         status = (
             RetentionPublicationStatus.PROTECTED_PENDING_ARTIFACT
-            if applied == len(members) and not failures
+            if complete
             else RetentionPublicationStatus.FAILED_BLOCKING
         )
         error = "; ".join(failures)[:4000] if failures else None
