@@ -3,7 +3,7 @@
 **Stage:** R-HIST-03E — prove that every governed immutable artifact is retention-protected  
 **Parent plan:** `docs/R-HIST-03_PRODUCER_WIRING_BUILD_PLAN.md`  
 **Depends on:** R-HIST-03D IMPLEMENTED + TESTED  
-**Status:** IMPLEMENTED + CONTROLLED ACCEPTANCE VERIFIED — FINAL ACCEPTANCE CI PENDING (2026-09-15; code checkpoint 0a514bd; see docs/fable/RHIST03E_EXECUTION_2026-09-11.md)  
+**Status:** IMPLEMENTED + TESTED / ACCEPTED (2026-09-15; code checkpoint 0a514bd, doc head 7905a63; NEXT: R-HIST-03F; see docs/fable/RHIST03E_EXECUTION_2026-09-11.md)  
 **Next after PASS:** R-HIST-03F only  
 **Safety ceiling:** integrity/reconciliation only; no model approval, strategy activation, broker authority, or live-order expansion.
 

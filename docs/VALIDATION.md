@@ -5,6 +5,36 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-15 - R-HIST-03E documentation-head CI and acceptance
+
+Doc SHA: `7905a631ca9f1df6bd71a126496e6bad24db2903` (docs-only over
+`0a514bd`; 5 docs files, +283/−2). CI run: `34935106879`
+(<https://github.com/onlyvictus-bit/trendforge/actions/runs/34935106879>),
+event `pull_request`, `headSha 7905a63...`, generated merge ref actually
+checked: `aef2dc16ff6bf39322a84ab355acebd9c2d64acf`. Overall: SUCCESS.
+
+| Check | Observed result |
+|---|---|
+| Backend job `104271226883` | 1726 passed, 2 warnings, 320.92s |
+| Python compile | PASS |
+| Ruff | All checks passed |
+| Frontend job `104271226982` | PASS (incl. current-state documentation navigation/boundary checks) |
+| Mypy job `104271227036` | Non-blocking failure: 510 errors / 70 files / 277 checked — identical to the code-head run |
+
+Acceptance review against the 33-item gate (registry, denominator, orphans
+both directions incl. cross-store external, transitive lineage incl. `hash_col`
+fix, PENDING/FAILED/legacy separation, bounded restart-safe reconciliation,
+zero-write read-only audit, no backfill, snapshot safety, stable reportHash,
+source→R16→R18 chain, fault injection fail-closed, full backend/compile/Ruff/
+frontend green, honest Mypy, exact-head CI observed): all mandatory items
+evidenced — full matrix in
+[fable/RHIST03E_EXECUTION_2026-09-11.md](fable/RHIST03E_EXECUTION_2026-09-11.md).
+
+R-HIST-03E = IMPLEMENTED + TESTED / ACCEPTED. R-HIST-03F = UNLOCKED / NEXT /
+NOT STARTED. Full R-HIST-03 = NOT COMPLETE. LIVE-DATA-VERIFIED = NO.
+PRODUCTION-ACCEPTED = NO. Execution authority unchanged. 03F work NOT STARTED
+in this task.
+
 ## 2026-09-15 - R-HIST-03E code-checkpoint evidence (FINAL DOCUMENTATION-HEAD CI PENDING)
 
 Code SHA: `0a514bd19f8e519e5699c2574ece308851dcada0`

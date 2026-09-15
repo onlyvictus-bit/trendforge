@@ -6,7 +6,7 @@ activation authority, or production certification. File A retains build order,
 public-state definitions and acceptance ceilings. Read this page before dated
 entries in BUILD_STATUS, VALIDATION, architecture notes or remaining-build guides.
 
-## R-HIST-03E code checkpoint - 2026-09-15 (FINAL DOCUMENTATION-HEAD CI PENDING, NOT YET ACCEPTED)
+## R-HIST-03E code checkpoint - 2026-09-15 (IMPLEMENTED + TESTED / ACCEPTED)
 
 R-HIST-03E code checkpoint `0a514bd19f8e519e5699c2574ece308851dcada0`
 (`fix(03E): source-to-coverage chain, verifier hash_col, cross-store inverse
@@ -25,12 +25,13 @@ the repaired R18 `hash_col` defect are recorded in
 [fable/RHIST03E_EXECUTION_2026-09-11.md](fable/RHIST03E_EXECUTION_2026-09-11.md)
 and the newest VALIDATION entry.
 
-R-HIST-03E: IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED / FINAL
-DOCUMENTATION-HEAD CI PENDING / NOT YET ACCEPTED. R-HIST-03F: GATED on 03E.
+R-HIST-03E: IMPLEMENTED + TESTED / ACCEPTED (code `0a514bd`, doc head `7905a63`,
+doc-head CI `34935106879` SUCCESS — backend 1726 passed, compile/Ruff/frontend
+passed, Mypy non-blocking 510/70). R-HIST-03F: UNLOCKED / NEXT / NOT STARTED.
 Full R-HIST-03: NOT COMPLETE. LIVE-DATA-VERIFIED: NO. PRODUCTION-ACCEPTED: NO.
 No broker, execution, strategy-activation, model-approval, live-data or
-production-authority change. This documentation head requires its own CI; the
-`0a514bd` run remains evidence for the code checkpoint only.
+production-authority change. The `0a514bd` run remains the code-checkpoint
+evidence; `34935106879` is the documentation-head integration evidence.
 
 ## R-HIST-03D acceptance and next stage - 2026-09-11
 

@@ -245,6 +245,45 @@ NOT COMPLETE. LIVE-DATA-VERIFIED: NO. PRODUCTION-ACCEPTED: NO. Execution
 authority unchanged. 03E proves historical-memory integrity (nothing governed
 is silently missing) — NOT trading profitability.
 
+## 2026-09-15 documentation-head CI and final acceptance (commit 2 of 2)
+
+Documentation head `7905a631ca9f1df6bd71a126496e6bad24db2903` (docs-only,
++283/−2 across the 5 canonical surfaces) obtained exact-head CI run
+`34935106879`
+(<https://github.com/onlyvictus-bit/trendforge/actions/runs/34935106879>):
+`pull_request` event, `headSha 7905a63...`, generated merge ref actually
+checked `aef2dc16ff6bf39322a84ab355acebd9c2d64acf` (into base `f99e7eb`).
+Overall workflow: SUCCESS. Backend job `104271226883`: compile PASS, **1726
+passed, 2 warnings in 320.92s**, Ruff all checks passed. Frontend job
+`104271226982`: PASS (including the current-state documentation
+navigation/boundary suites, which exercise these very doc edits). Typecheck job
+`104271227036`: non-blocking failure, **510 errors / 70 files / 277 checked —
+identical counts to the code-head run**, policy unchanged. Mypy wording again:
+Mypy did NOT pass; it remains a non-blocking legacy failure.
+
+With code-checkpoint evidence (`0a514bd` + `34773335360`), documentation-head
+integration evidence (`7905a63` + `34935106879`), the 44-case crosswalk above
+(no MISSING mandatory case for the current population; #4/#18 CODE-recorded,
+#6 FUTURE-ruled), and the 33-item acceptance gate reviewed item by item with
+every mandatory condition evidenced, the final state is:
+
+```text
+R-HIST-03A/B/C/D: ACCEPTED (unchanged)
+R-HIST-03E: IMPLEMENTED + TESTED / ACCEPTED
+R-HIST-03F: UNLOCKED / NEXT / NOT STARTED
+FULL R-HIST-03: NOT COMPLETE
+TF-10+: STILL GATED
+LIVE-DATA-VERIFIED: NO
+PRODUCTION-ACCEPTED: NO
+MODEL APPROVAL / STRATEGY ACTIVATION / BROKER-ORDER AUTHORITY: UNCHANGED
+```
+
+No 03F code was written in this task. No broker, execution, strategy
+activation, model approval, live-data or production-authority change occurred.
+Do not mistake either CI run (`34773335360` code-checkpoint,
+`34935106879` documentation-head) for the other; both checkpoints and both
+runs are preserved above.
+
 `R-HIST-03E` remains **NOT ACCEPTED** at this checkpoint.
 
 The following evidence is still required before acceptance:
