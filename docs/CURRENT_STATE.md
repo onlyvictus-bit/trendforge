@@ -1,10 +1,115 @@
 # Current code and readiness snapshot
 
-**Reviewed:** 2026-09-08. **Previous reviewed checkpoint preserved:** 2026-09-07. **Code baseline:** retention branch `fix/retention-evidence-safety`, layered on TF-01 `19a8c762314cdb7b54556c17c8ae5a46ad7325e8`.
+**Reviewed:** 2026-09-11. **Previous reviewed checkpoints preserved:** 2026-09-09, 2026-09-08 and 2026-09-07. **Code baseline:** accepted R-HIST-03D at `fce62874a61e4e2bb6d939bef6d0811e5a266996` on `feat/rhist03-producer-wiring` (PR #6), stacked on retention branch `fix/retention-evidence-safety` and TF-01 `19a8c762314cdb7b54556c17c8ae5a46ad7325e8`.
 **Role:** current navigation and evidence summary, not a new plan, source registry,
 activation authority, or production certification. File A retains build order,
 public-state definitions and acceptance ceilings. Read this page before dated
 entries in BUILD_STATUS, VALIDATION, architecture notes or remaining-build guides.
+
+## R-HIST-03F checkpoint - 2026-09-17 (IMPLEMENTED + TESTED / ACCEPTED)
+
+M3 code/test checkpoint `2e957082bad34829cf9e7bed1487a69399566f42`
+(`test(03F): complete M3 cross-store and golden recovery acceptance`: 2 new
+test files, 915 insertions, 0 deletions) on `feat/rhist03-producer-wiring`
+(PR #6) is IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED. Zero production-code
+change. PR-head-associated integration CI `35222154939` is SUCCESS: it checked
+merge ref `49e96168950848f7a3dc455a23763b02902b4e9f`, backend 1790 passed /
+compile PASS / Ruff PASS / frontend PASS; Mypy remains the accepted
+non-blocking legacy failure (510 errors / 70 files / 277 checked — NOT A PASS).
+M0 (golden/crash/replay), M1 (R18/pipeline recovery), M2 (concurrency/storage/
+tamper) and M3 (pipeline tamper, cross-store, cleanup, invention-negative,
+golden restart) are all VERIFIED with dual oracles; full evidence is recorded
+in [fable/RHIST03F_EXECUTION_2026-09-15.md](fable/RHIST03F_EXECUTION_2026-09-15.md)
+and the newest VALIDATION entry.
+
+R-HIST-03F: M0 VERIFIED, M1 VERIFIED, M2 VERIFIED, M3 VERIFIED. CODE CHECKPOINT:
+`2e95708` (code-head CI `35222154939` SUCCESS). DOCUMENTATION CHECKPOINT:
+`3d8c292` (doc-head CI `35227327971` SUCCESS on merge ref
+`fd08e39fbbf0ea17da3810307131864737131c8c`: backend 1790 passed, compile/Ruff/
+frontend passed, Mypy the accepted non-blocking 510/70/277 — NOT A PASS). A
+read-only 35-gate final acceptance review returned VERIFIED on the exact
+doc head with the head unmoved. R-HIST-03F is IMPLEMENTED + TESTED / ACCEPTED.
+Full R-HIST-03 is IMPLEMENTED + TESTED / ACCEPTED. LIVE-DATA-VERIFIED: NO.
+PRODUCTION-ACCEPTED: NO. No broker, execution, strategy-activation,
+model-approval, live-data or production-authority change. PR #6 prose is
+refreshed alongside this status. This entry's own commit requires CI at its
+new head before the branch is fully closed.
+
+## R-HIST-03E code checkpoint - 2026-09-15 (IMPLEMENTED + TESTED / ACCEPTED)
+
+R-HIST-03E code checkpoint `0a514bd19f8e519e5699c2574ece308851dcada0`
+(`fix(03E): source-to-coverage chain, verifier hash_col, cross-store inverse
+proof`, 5 files, 940 insertions, 19 deletions) on
+`feat/rhist03-producer-wiring` (PR #6, base `fix/retention-evidence-safety` at
+`f99e7eb3e764b3fb43aa55432abcdf78cd68191e`) is IMPLEMENTED + CONTROLLED
+ACCEPTANCE TESTED. PR-head-associated integration CI `34773335360` is SUCCESS:
+it checked merge ref `9f382c057ed62e7e645ec9a14dea803775541d8e`, backend 1726
+passed / compile PASS / Ruff PASS / frontend PASS; Mypy remains the accepted
+non-blocking legacy failure (510 errors / 70 files / 277 checked). Controlled
+source-to-end (22 synthetic days, scratch DBs only) reaches coverage 1.0 with
+zero orphans/blockers and stable reportHash; M3A pins read-only audit,
+snapshot isolation, PENDING semantics, paired-store PASS and cross-store
+external-orphan FAIL-closed with healing. Full evidence, 44-case crosswalk and
+the repaired R18 `hash_col` defect are recorded in
+[fable/RHIST03E_EXECUTION_2026-09-11.md](fable/RHIST03E_EXECUTION_2026-09-11.md)
+and the newest VALIDATION entry.
+
+R-HIST-03E: IMPLEMENTED + TESTED / ACCEPTED (code `0a514bd`, doc head `7905a63`,
+doc-head CI `34935106879` SUCCESS — backend 1726 passed, compile/Ruff/frontend
+passed, Mypy non-blocking 510/70). R-HIST-03F: UNLOCKED / NEXT / NOT STARTED.
+Full R-HIST-03: NOT COMPLETE. LIVE-DATA-VERIFIED: NO. PRODUCTION-ACCEPTED: NO.
+No broker, execution, strategy-activation, model-approval, live-data or
+production-authority change. The `0a514bd` run remains the code-checkpoint
+evidence; `34935106879` is the documentation-head integration evidence.
+
+## R-HIST-03D acceptance and next stage - 2026-09-11
+
+The published repair based on PR head `6de1e14973edcf62b61c9b6a1441214ace656ec4`
+repairs the three CI failures and implements controlled immutable supersession
+and finalizer/registration crash/concurrency protection. The original 03C
+checkpoint below remains historical evidence, not the status of the new patch.
+See [the execution record](fable/RHIST03D_PR6_REPAIR_2026-09-10.md) and the newest
+VALIDATION entry. Final local regression passed: 1699 tests, zero failures/skips;
+compile, Ruff and frontend passed; normalized Mypy delta versus 03C is zero.
+The 03D acceptance commit is `fce62874a61e4e2bb6d939bef6d0811e5a266996`.
+[CI 34496385997](https://github.com/onlyvictus-bit/trendforge/actions/runs/34496385997)
+completed successfully at that head: backend 1699 passed, zero failures/skips,
+two dependency warnings; compile, Ruff and frontend passed. Mypy remains an
+explicitly non-blocking legacy failure: 512 errors / 70 files, normalized delta 0.
+R-HIST-03D is IMPLEMENTED + TESTED. R-HIST-03E is NEXT / UNLOCKED; 03F is GATED
+on 03E acceptance. Full R-HIST-03 is NOT COMPLETE. Future documentation commits
+do not replace this accepted code checkpoint; each new head needs its own CI.
+LIVE-DATA-VERIFIED and PRODUCTION-ACCEPTED remain NO. No live migration or
+authority change occurred. Do not reopen 03D without a demonstrated 03D defect.
+
+## R-HIST-03C implementation checkpoint - 2026-09-09
+
+The existing NSE cash EOD R16 producer now freezes hypotheses against an exact,
+protected S8 publication ID, artifact version, lineage hash and full payload
+seal. Decision inputs come only from that parent's original hash-bound evidence,
+not a later raw-bar query. Outcome observations and explicit source/outcome/
+interpretation revisions are immutable, separately timed records. Rebuilds link
+new decision versions to their original versions rather than replacing them.
+
+The existing retention publication/outbox/authority owns DECISION_VERSION,
+OUTCOME and REVISION protection. Canonical artifact and intent writes share one
+transaction; governed readers require PUBLISHED proof and perform no retention
+writes. WAIT/WATCH/REJECT/no-entry/expired and other non-trade history remains
+represented. Ambiguous stop/target collisions do not become certain losses in
+metrics. This is historical integrity, not intraday activation or PIT approval.
+
+R-HIST-03A/B were tested before this slice. The 03C local gate and commands are
+recorded in VALIDATION; exact PR-head CI acceptance is recorded separately on
+PR #6 and must be checked for the revision being reviewed. R-HIST-03D/E/F and the
+full R-HIST-03 gate remain open. R-HIST-04 remains plan-only. No live dataset was
+validated and no production, model, strategy or execution permission was added.
+
+Deployment requires the explicit additive `r16-schema --apply` command described
+in BUILD_STATUS. Legacy S8 rows without their original full-payload seal are NOT
+silently backfilled or accepted; legacy R16 rows without publication proof are
+preserved in storage but excluded from governed reads. Missing proof fails to a
+WAIT_RHIST03 reason. A future provenance-verified repair is a separate operation,
+never a read-time reconstruction from current data.
 
 ## Current refresh contract
 
@@ -47,7 +152,7 @@ No single `complete`, `ready`, or percentage-complete field replaces these quest
 | Research assembly | `selection/s8_service.py` connects S3, native guidance, weather, tradability and S4-S7 into saved S8 research. | Individual prerequisites can block the run. The older CLI assembler remains a separate follow-up issue. |
 | Final research state | `selection/s7_state_gates.py` owns public research classification. | Named PRF-003 EOD activation exists but must be observed; no activation setting changed here. |
 | Tradability | `selection/tradability.py` is implemented and integrated. | Price-band geometry/data-operation gaps and the separately identified API timestamp defect are not closed by retention work. |
-| Historical retention | `historical_retention.py` and R-HIST-02 cleanup integration exist on the retention branch. | Producer auto-registration, archive movement, PIT ML datasets, outcome memory, real-data reconstruction and acceptance remain open. |
+| Historical retention | R-HIST-01/02 authority and cleanup protection, 03A outbox, 03B exact S8 roots, 03C R16 outcomes/revisions and 03D frozen ML/model/profile/audit retention are implemented and tested at their recorded checkpoints. | 03D acceptance is `fce62874` / CI `34496385997`. Registry/coverage (03E) is next; complete fault acceptance (03F), archival, live-data reconstruction and production acceptance remain open. |
 | R16 PIT | Dataset/replay/label/metric/storage/service code and UI exist. | 2026-09-01 recorded only one complete S8 date and PIT_NOT_APPROVED. That is a dated observation, not today's database count. |
 | R18 governance | `r18_governance.py`, `r18_store.py`, `r18_service.py` and the Paper/ML renderer exist. | 2026-09-02 recorded MODEL_NOT_APPROVED and WAIT_R18_SCHEMA_NOT_APPLIED. Do not rebuild R18 merely because older notes say it is absent. |
 | OpenAlgo / intraday | R17 fixture-verified read-only shadow components exist. | R9 and R17-G were postponed in the 2026-09-01 handoff. A working live broker session was not observed in this review. |

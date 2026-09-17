@@ -60,7 +60,7 @@ from .use_matrix_c0 import (
 
 
 PIPELINE_CONTRACT = "trendforge.cashPostCommit.v1"
-PIPELINE_VERSION = "a1-c1-r1-r2-r3-r4-r14-r5-r2b-s8-r16-orchestrator-10"
+PIPELINE_VERSION = "a1-c1-r1-r2-r3-r4-r14-r5-r2b-s8-r16-orchestrator-11"
 CASH_SOURCE = "nse_bhavcopy_eod"
 BAN_SOURCE = "nse_fno_ban"
 MWPL_SOURCE = "nse_mwpl_percentages"
@@ -172,6 +172,46 @@ PipelineRunner = Callable[[CashPipelineRunContext], CashPipelineExecution]
 
 def _aware_now() -> datetime:
     return datetime.now(UTC)
+
+
+def _r16_stage_state(
+    r16: Mapping[str, Any],
+) -> tuple[Literal["COMPLETED", "BLOCKED"], str | None, str]:
+    """Translate R16 replay truth into an orchestrator stage without false success."""
+
+    replay = r16.get("replay") or {}
+    dataset = r16.get("dataset") or {}
+    run_id = dataset.get("runId")
+    replay_state = str(replay.get("state") or "").upper()
+    if replay_state != "COMPLETE" or not run_id:
+        rejected = replay.get("rejectedS8") or []
+        first_reason = "no-eligible-S8"
+        if rejected:
+            first = rejected[0]
+            first_reason = (
+                str(first.get("reason") or "rejected-S8")
+                if isinstance(first, Mapping)
+                else str(first)
+            )
+        return (
+            "BLOCKED",
+            None,
+            (
+                f"R16 {replay_state or 'WAIT'}: {first_reason}; "
+                f"datasetRuns={replay.get('datasetRunCount', 0)}; "
+                f"hypotheses={replay.get('hypothesisCount', 0)}; "
+                "trade authority remains false"
+            ),
+        )
+    return (
+        "COMPLETED",
+        str(run_id),
+        (
+            f"{replay.get('hypothesisCount', 0)} frozen hypotheses; "
+            f"{replay.get('observationsAppended', 0)} labels appended; "
+            "trade authority remains false"
+        ),
+    )
 
 
 def _read_content(store: MarketDataStore, source_key: str, trading_date: date) -> bytes | None:
@@ -326,7 +366,7 @@ def run_existing_cash_pipeline(context: CashPipelineRunContext) -> CashPipelineE
     matrix = latest_source_use_matrix()
     if matrix is None or permission_fp != context.prior_permission_fingerprint:
         matrix = persist_source_use_matrix(build_source_use_matrix())
-        c0_state = "COMPLETED"
+        c0_state: Literal["COMPLETED", "REUSED", "SKIPPED", "BLOCKED", "FAILED"] = "COMPLETED"
         c0_detail = "Compiler/contracts changed or no matrix existed; permissions rebuilt"
     else:
         c0_state = "REUSED"
@@ -349,7 +389,7 @@ def run_existing_cash_pipeline(context: CashPipelineRunContext) -> CashPipelineE
     )
     if mwpl_content:
         mwpl = persist_mwpl(assess_mwpl(mwpl_content))
-        b_state = "COMPLETED"
+        b_state: Literal["COMPLETED", "REUSED", "SKIPPED", "BLOCKED", "FAILED"] = "COMPLETED"
         b_detail = f"New official MWPL artifact assessed: {mwpl.state}"
     else:
         b_state = "REUSED" if mwpl.persisted else "SKIPPED"
@@ -640,18 +680,12 @@ def run_existing_cash_pipeline(context: CashPipelineRunContext) -> CashPipelineE
     else:
         try:
             r16 = run_r16_incremental(mode="incremental")
-            dataset = r16.get("dataset") or {}
-            r16_dataset_run_id = dataset.get("runId")
-            replay = r16.get("replay") or {}
+            r16_state, r16_dataset_run_id, r16_detail = _r16_stage_state(r16)
             stages.append(
                 CashPipelineStage(
                     stage_id="R16",
-                    state="COMPLETED",
-                    detail=(
-                        f"{replay.get('hypothesisCount', 0)} frozen hypotheses; "
-                        f"{replay.get('observationsAppended', 0)} labels appended; "
-                        "trade authority remains false"
-                    ),
+                    state=r16_state,
+                    detail=r16_detail,
                     output_id=r16_dataset_run_id,
                 )
             )
@@ -942,7 +976,7 @@ class CashPostCommitOrchestrator:
                 triggers=triggers,
                 detail=(
                     "Identical artifact fingerprint already has complete "
-                    "R1/R2/R3/R4/R14/R5/S8/R16 outputs or an explicit R16 schema block"
+                    "R1/R2/R3/R4/R14/R5/S8/R16 outputs or an explicit R16 block"
                 ),
                 latest_run=previous_run,
             )

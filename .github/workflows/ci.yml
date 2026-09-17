@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+      - name: Python compile
+        run: cd backend && python -m compileall -q trendforge_api tests
       - name: Backend tests
         run: cd backend && python -m pytest -q
       - name: Ruff
