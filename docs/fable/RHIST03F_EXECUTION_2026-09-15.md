@@ -6,12 +6,12 @@ under the master fault-acceptance directive. It is not a trading, model-approval
 ## Status
 
 ```text
-R-HIST-03F = IN PROGRESS (M0 VERIFIED, M1 VERIFIED, M2 VERIFIED, M3 VERIFIED)
+R-HIST-03F = ACCEPTED (M0/M1/M2/M3 VERIFIED, 35-gate read-only review VERIFIED)
 M3 CODE CHECKPOINT = 2e957082bad34829cf9e7bed1487a69399566f42 (pushed)
 M3 CODE-HEAD CI = run 35222154939 SUCCESS
-FINAL DOC-HEAD CI = PENDING
-R-HIST-03F = IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED, NOT YET FORMALLY ACCEPTED
-FULL R-HIST-03 = NOT COMPLETE
+FINAL DOC CHECKPOINT = 3d8c292f3b043d3ce116eb36911a01dd3d1c95a5 (pushed)
+FINAL DOC-HEAD CI = run 35227327971 SUCCESS (merge ref fd08e39fbbf0ea17da3810307131864737131c8c)
+FULL R-HIST-03 = IMPLEMENTED + TESTED / ACCEPTED
 LIVE-DATA-VERIFIED = NO
 PRODUCTION-ACCEPTED = NO
 ```
@@ -414,9 +414,10 @@ NOT prove profitable trading, predictive accuracy, or authorize execution.
 ### Remaining for formal acceptance
 
 ```text
-M3 runtime green (this section)
-→ docs commit + push (PENDING AUTHORIZATION)
-→ exact doc-head CI (PENDING)
-→ final 03F/full R-HIST-03 acceptance (PENDING)
-→ then refresh PR #6 metadata (stale prose still says 03E in progress / 03F gated)
+M3 runtime green (this section)                                   DONE
+→ docs commit + push (3d8c292)                                   DONE
+→ exact doc-head CI (35227327971 SUCCESS)                        DONE
+→ final 03F/full R-HIST-03 acceptance review (35 gates VERIFIED) DONE
+→ refresh PR #6 metadata                                         IN THIS SYNC STEP
+→ final status-head CI on the new head                           PENDING (closes the branch)
 ```

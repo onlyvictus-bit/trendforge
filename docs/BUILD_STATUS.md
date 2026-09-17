@@ -5,6 +5,17 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-17 - R-HIST-03F accepted; FULL R-HIST-03 accepted (final status head CI pending)
+
+Read-only 35-gate final acceptance review on the exact documentation head
+`3d8c292` (head unmoved after its CI): VERIFIED — all 35 gates PASS, dual
+oracles hold, H2 never substituted H1, cleanup duality proven, restart and
+recovery distinct, no authority expansion, known risks explicit. R-HIST-03F is
+IMPLEMENTED + TESTED / ACCEPTED; FULL R-HIST-03 is IMPLEMENTED + TESTED /
+ACCEPTED. LIVE-DATA-VERIFIED: NO. PRODUCTION-ACCEPTED: NO. No execution
+authority changed. This status commit itself requires exact-head CI at its new
+head before the branch is fully closed.
+
 ## 2026-09-17 - R-HIST-03F M0-M3 verified; code-head CI green; formal acceptance pending docs-head CI
 
 M3 code checkpoint `2e957082bad34829cf9e7bed1487a69399566f42`

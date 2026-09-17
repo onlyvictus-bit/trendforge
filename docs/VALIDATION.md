@@ -5,6 +5,30 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-17 - R-HIST-03F / FULL R-HIST-03 final acceptance review (VERIFIED)
+
+Read-only review of the exact documentation head `3d8c292`
+(PR #6 `feat/rhist03-producer-wiring`, base `fix/retention-evidence-safety`;
+remote head confirmed unmoved after CI). Doc-head CI `35227327971`
+(merge ref `fd08e39fbbf0ea17da3810307131864737131c8c`): completed / success —
+backend 1790 passed, 2 warnings; compile/Ruff/frontend passed; Mypy
+non-blocking 510 errors / 70 files / 277 checked (NOT A PASS, zero delta).
+All 35 acceptance gates evaluated individually against executed evidence
+(atomicity 1–6, identity 7–10, coverage truthfulness 11–20, anti-leakage
+21–25, cleanup 26–28, R18 29–31, regression 32–35): every gate PASS, no
+UNKNOWN, no NOT APPLICABLE. No broken-state + PASS coverage ever observed;
+H2 DID NOT SUBSTITUTE H1; valid-but-wrong parent rejected with coveredCount
+−1; governed cleanup byte-identical while eligible stray deletes; restart
+and recovery proven distinct; no live/model/strategy/broker authority change;
+registry-drift, live-data, migration, production-acceptance and Mypy-debt
+risks remain explicit.
+
+FINAL ACCEPTANCE REVIEW: VERIFIED. R-HIST-03A/B/C/D/E/F = ACCEPTED.
+FULL R-HIST-03 = IMPLEMENTED + TESTED / ACCEPTED. LIVE-DATA-VERIFIED = NO.
+PRODUCTION-ACCEPTED = NO. Execution authority unchanged. R-HIST-03 closure is
+at the controlled historical-retention level, not production/live trading.
+This status commit requires its own exact-head CI before branch close.
+
 ## 2026-09-17 - R-HIST-03F M3 code checkpoint + code-head CI (FINAL DOC-HEAD CI PENDING)
 
 Starting M2 SHA: `1734ded7e52fcb57f3c365a744d986a96ad30271`

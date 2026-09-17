@@ -6,7 +6,7 @@ activation authority, or production certification. File A retains build order,
 public-state definitions and acceptance ceilings. Read this page before dated
 entries in BUILD_STATUS, VALIDATION, architecture notes or remaining-build guides.
 
-## R-HIST-03F M3 code checkpoint - 2026-09-17 (IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED, NOT YET FORMALLY ACCEPTED)
+## R-HIST-03F checkpoint - 2026-09-17 (IMPLEMENTED + TESTED / ACCEPTED)
 
 M3 code/test checkpoint `2e957082bad34829cf9e7bed1487a69399566f42`
 (`test(03F): complete M3 cross-store and golden recovery acceptance`: 2 new
@@ -23,13 +23,17 @@ in [fable/RHIST03F_EXECUTION_2026-09-15.md](fable/RHIST03F_EXECUTION_2026-09-15.
 and the newest VALIDATION entry.
 
 R-HIST-03F: M0 VERIFIED, M1 VERIFIED, M2 VERIFIED, M3 VERIFIED. CODE CHECKPOINT:
-`2e95708`. CODE-HEAD CI: `35222154939` SUCCESS. FINAL DOCUMENTATION-HEAD CI:
-PENDING. R-HIST-03F is IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED, NOT YET
-FORMALLY ACCEPTED. Full R-HIST-03: NOT COMPLETE. LIVE-DATA-VERIFIED: NO.
+`2e95708` (code-head CI `35222154939` SUCCESS). DOCUMENTATION CHECKPOINT:
+`3d8c292` (doc-head CI `35227327971` SUCCESS on merge ref
+`fd08e39fbbf0ea17da3810307131864737131c8c`: backend 1790 passed, compile/Ruff/
+frontend passed, Mypy the accepted non-blocking 510/70/277 — NOT A PASS). A
+read-only 35-gate final acceptance review returned VERIFIED on the exact
+doc head with the head unmoved. R-HIST-03F is IMPLEMENTED + TESTED / ACCEPTED.
+Full R-HIST-03 is IMPLEMENTED + TESTED / ACCEPTED. LIVE-DATA-VERIFIED: NO.
 PRODUCTION-ACCEPTED: NO. No broker, execution, strategy-activation,
-model-approval, live-data or production-authority change. Formal acceptance
-requires this documentation head's own exact-head CI first; PR #6 prose still
-describes 03E as in progress and 03F as gated and is refreshed only after that.
+model-approval, live-data or production-authority change. PR #6 prose is
+refreshed alongside this status. This entry's own commit requires CI at its
+new head before the branch is fully closed.
 
 ## R-HIST-03E code checkpoint - 2026-09-15 (IMPLEMENTED + TESTED / ACCEPTED)
 
