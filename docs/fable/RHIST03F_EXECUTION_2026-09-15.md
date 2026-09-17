@@ -6,11 +6,18 @@ under the master fault-acceptance directive. It is not a trading, model-approval
 ## Status
 
 ```text
-R-HIST-03F = IN PROGRESS (M0)
+R-HIST-03F = IN PROGRESS (M0 VERIFIED, M1 VERIFIED, M2 VERIFIED, M3 VERIFIED)
+M3 CODE CHECKPOINT = 2e957082bad34829cf9e7bed1487a69399566f42 (pushed)
+M3 CODE-HEAD CI = run 35222154939 SUCCESS
+FINAL DOC-HEAD CI = PENDING
+R-HIST-03F = IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED, NOT YET FORMALLY ACCEPTED
 FULL R-HIST-03 = NOT COMPLETE
 LIVE-DATA-VERIFIED = NO
 PRODUCTION-ACCEPTED = NO
 ```
+
+(2026-09-17: M0/M1/M2 evidence below is preserved unchanged. M3 evidence is
+appended in the "M3 evidence" section at the end of this record.)
 
 ## Accepted dependencies (preserved, not reopened)
 
@@ -254,3 +261,162 @@ metadata refresh, FULL R-HIST-03 gate.
 - M2: concurrency (F_RACE), storage failures (F_IO), tamper matrix, dual-oracle proof.
 - M3: cross-store, cleanup safety, invention-negative, full regression, code-head CI,
   final docs + PR metadata, doc-head CI, FULL R-HIST-03 gate.
+
+## M3 evidence (2026-09-17, local scratch DBs + exact code-head CI, uncommitted test work checkpointed at `2e95708`)
+
+New files (tests only, zero production-code change):
+
+```text
+backend/tests/test_rhist03f_pipeline_tamper.py    4 scenarios (F_TAMPER_03/04/35/36)
+backend/tests/test_rhist03f_crossstore_cleanup.py 6 scenarios (X1-A/X1-B, F_IO_04, X3, C1, H1)
+```
+
+### M3 code/test checkpoint
+
+```text
+commit:  2e957082bad34829cf9e7bed1487a69399566f42
+message: test(03F): complete M3 cross-store and golden recovery acceptance
+scope:   2 new test files only (915 insertions, 0 deletions)
+         zero production-code change
+         zero documentation change in that checkpoint
+```
+
+Temporary `backend/dbg_audit*.py` scratch probes were deleted before checkpoint
+creation and were never part of the committed deliverable.
+
+### M3 code-head CI (PR-head-associated integration CI)
+
+```text
+GitHub Actions: 35222154939
+  (https://github.com/onlyvictus-bit/trendforge/actions/runs/35222154939)
+PR branch head: 2e957082bad34829cf9e7bed1487a69399566f42
+generated PR merge ref (what GitHub tested): 49e96168950848f7a3dc455a23763b02902b4e9f
+overall: SUCCESS
+```
+
+Do NOT describe this as a literal raw-head checkout: GitHub tested the
+generated PR merge ref containing head `2e95708`. Do NOT reuse it as the
+final documentation-head run.
+
+| Check | Observed result |
+|---|---|
+| Backend tests | 1790 passed, 2 warnings, 410.85s |
+| Python compile | PASS |
+| Ruff | All checks passed |
+| Frontend | PASS (11s) |
+| Mypy | Non-blocking failure (accepted legacy baseline); NOT A PASS |
+
+### Dual-oracle model (every M3 scenario)
+
+```text
+Oracle A: direct persisted-state SQL/file/hash evidence
+Oracle B: R-HIST-03E audit_coverage()
+```
+
+A broken direct state combined with PASS coverage would have been a critical
+defect. No such false PASS was observed. The oracles share the scratch store
+files but exercise independent code paths (raw SQL inspection vs the declared
+verifier); no stronger independence is claimed.
+
+Baseline note: the full-registry baseline verdict on the single-store eligible
+pipeline is FAIL because that builder persists no R18 tables (out-of-scope
+REGISTRY_ERROR blockers). Detection is therefore proven by per-artifact
+COVERED → typed-fail-closed transitions plus covered-count movement, never by
+the top-level verdict alone.
+
+### Scenario outcomes (M3)
+
+| ID | Result |
+|----|--------|
+| F_TAMPER_03 | PROVEN — required historical market object deleted. Direct oracle: object row absent while retained lineage still references the original hash. Coverage oracle: victim S8 COVERED → LINEAGE_BROKEN/LINEAGE_MISSING/MISSING_RETENTION; coveredCount drops; nothing heals. Corrupt graph never reports healthy. |
+| F_TAMPER_04 | PROVEN — stored market bytes corrupted while identity metadata remains (stronger than absence). Direct oracle: actual SHA256 != declared hash AND actual size != recorded size; identity row survives. Coverage: COVERED → LINEAGE_BROKEN/INCONSISTENT_IDENTITY. |
+| F_TAMPER_35 | PROVEN two layers — Layer 1 (prevention): normal SQL mutation rejected by the immutability trigger, even a no-op rewrite. Layer 2 (detection): controlled scratch-only trigger bypass, `sourceS8Hash` corrupted while the retained link seal stays original; deep verification non-PASS. This proves prevention + detection, not merely trigger behavior. |
+| F_TAMPER_36 | PROVEN — valid-but-wrong parent rejected. D1 = legitimate original decision, D2 = separate legitimate valid retained published decision, O1 = outcome legitimately bound to D1. Fault: O1 parent D1 → D2 (sealed join column + payload `hypothesisId` + parent hash). Evidence: D1 valid, D2 valid, O2 unaffected, all decisions remain COVERED, only victim O1 becomes non-COVERED, coveredCount decreases by exactly one. The verifier proves semantic parent correctness, not merely existence of a valid parent. This protects future outcome statistics, win/loss attribution, strategy evaluation, failure memory and ML labels from cross-decision contamination. No trading-profitability claim is made. |
+| C1 | PROVEN both sides — governed evidence after canonical cleanup: file remains, bytes byte-identical, SHA256 unchanged, size unchanged, authority-reference set unchanged. Eligible unreferenced evidence: index row deleted, disk file deleted, object in `deleted_object_paths`. Retention does not mean "never delete anything": governed history stays protected while genuinely eligible unreferenced evidence stays deletable. |
+| H1 | PROVEN — no historical invention. Historical decision references H1; H1 becomes unavailable; a later/current valid H2 exists and is available (proven on disk and in index). Observed: S8 publication remains byte-identical (full row, not just lineage); no publication member or lineage reference rewritten to H2; victim remains non-COVERED; canonical parent resolution raises a fail-closed error. H2 DID NOT substitute H1. Permanent invariant: missing historical evidence must remain missing/broken — never missing → latest/current substitute. Required to avoid look-ahead leakage, revision leakage, false backtest knowledge and false model-training evidence. |
+| X1-A | PROVEN — healthy restart needs no repair. Healthy graph PASS → restart process owners → NO reconciliation → same semantic manifest → same reportHash → same S8 identity → PASS. Durable healthy history survives restart unchanged. |
+| X1-B | PROVEN — PENDING recovery. PENDING event → restart → `reconcile_pending_coverage()` → processed=1 → same event ID → same reference ID → same semantic hash → exactly one authority reference → PASS. Canonical recovery only. |
+| F_IO_04 | PROVEN — declared external market store unavailable fails closed. Declared `.db` path missing, database not recreated by the audit, result non-PASS with typed `MARKET_STORE_UNAVAILABLE` / `REGISTRY_ERROR` finding; PASS restored for the healthy declaration. Rule: declared evidence authority unavailable != ignore and PASS. (Windows holds the live scratch DB open, so the unavailable store is a declared-but-missing path — the identical contract path as rename/delete.) |
+| X3 | PROVEN — external orphan fails the declared audit, heals on legitimate removal. Healthy paired graph PASS; injected real authority reference (valid object hash, no governed owner) → FAIL with `RETENTION_ORPHAN`, orphanCount ≥ 1, `EXTERNAL_AUTHORITY_REFERENCE` evidence; legitimate row removal restores PASS. No synthetic artifact/backfill was created. |
+
+### M3 defect classification
+
+```text
+M3 production correctness defects found: 0
+M3 production files changed: 0
+```
+
+All M3 defects were Type A test/harness/environment issues (test-only repairs,
+never portrayed as product defects):
+
+```text
+- tuple fallback in _declared removed (fail-closed contract assert)
+- global-interpreter site-packages/tests shadowing isolated via venv (no sys.path hack, no conftest)
+- paired-manifest row_factory test repair
+- Windows unavailable-store fixture repair (missing .db path, same contract)
+- external-orphan fixture correction (run_id=None, matching production row shape)
+- F_TAMPER_36 strengthening (unsealed join swap → sealed valid-wrong-parent repoint)
+- full-registry finding-map transition baselines (scoped single-producer PASS unattainable)
+- X1-B pending-recovery test added (X1-A keeps zero-reconciliation restart)
+```
+
+### Environment finding
+
+The global interpreter contained a `site-packages/tests` package shadowing the
+repository `backend/tests` namespace. Verification used an isolated venv with
+`requirements-dev.txt`, matching CI-style backend execution. No `sys.path`
+hack, conftest file or production change was added.
+
+### M3 local test evidence (observed timings, scratch DBs only)
+
+```text
+M3 focused:            10 passed (9 in 326.00s + T03 re-run 1 passed in 42.44s
+                       after a test-only Row-vs-tuple repair)
+full 03F (7 files):    64 passed in 474.16s  (= 10 M0 + 15 M1 + 29 M2 + 10 M3)
+03A–03E neighborhood
+(20 files):            249 passed, 2 warnings in 715.15s
+full backend:          1790 passed, 0 failures, 2 warnings in 1676.38s
+Python compile:        PASS
+Ruff:                  PASS
+Frontend (npm test):   PASS (220/220 + all suites)
+Mypy:                  510 errors / 70 files / 277 checked — NOT A PASS
+                       (identical to accepted baseline; zero production files
+                       touched by M3, so zero new-diagnostic delta possible)
+```
+
+Local verification and GitHub verification are different evidence families:
+
+```text
+Local M3/full regression: 1790 passed
+GitHub PR integration CI: 1790 passed (run 35222154939, merge ref 49e96168...)
+```
+
+### Preserved risks and boundaries
+
+Future governed immutable producers still require explicit producer-registry
+updates and corresponding tests; automatic registry-drift discovery is not
+proven (03E case #6 FUTURE, unchanged). This does not invalidate controlled
+R-HIST-03F acceptance.
+
+```text
+LIVE-DATA-VERIFIED = NO
+PRODUCTION-ACCEPTED = NO
+MODEL APPROVAL = unchanged
+STRATEGY ACTIVATION = unchanged
+BROKER / EXECUTION AUTHORITY = unchanged
+```
+
+Trading significance: 03F proves that crashes, races, retries, tampering,
+cleanup and restart cannot silently rewrite the historical evidence used by
+future backtesting, outcome evaluation, failure memory or ML datasets. It does
+NOT prove profitable trading, predictive accuracy, or authorize execution.
+
+### Remaining for formal acceptance
+
+```text
+M3 runtime green (this section)
+→ docs commit + push (PENDING AUTHORIZATION)
+→ exact doc-head CI (PENDING)
+→ final 03F/full R-HIST-03 acceptance (PENDING)
+→ then refresh PR #6 metadata (stale prose still says 03E in progress / 03F gated)
+```

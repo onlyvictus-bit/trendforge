@@ -5,6 +5,21 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-17 - R-HIST-03F M0-M3 verified; code-head CI green; formal acceptance pending docs-head CI
+
+M3 code checkpoint `2e957082bad34829cf9e7bed1487a69399566f42`
+(test-only: 2 new M3 files, zero production-code change) obtained exact code-head
+CI `35222154939` (merge ref `49e96168950848f7a3dc455a23763b02902b4e9f`):
+completed / success — backend 1790 passed, compile/Ruff/frontend passed;
+Mypy non-blocking 510 errors / 70 files — NOT A PASS. R-HIST-03F is
+IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED (M0/M1/M2/M3 verified, dual
+oracles, no false PASS), NOT YET FORMALLY ACCEPTED. Formal acceptance
+requires this documentation head's own green CI. Full R-HIST-03 is NOT
+COMPLETE. LIVE-DATA-VERIFIED: NO. PRODUCTION-ACCEPTED: NO. No execution
+authority changed. Detailed M3 fault matrix:
+[fable/RHIST03F_EXECUTION_2026-09-15.md](fable/RHIST03F_EXECUTION_2026-09-15.md);
+validation entry: [VALIDATION.md](VALIDATION.md).
+
 ## 2026-09-15 - R-HIST-03E accepted; 03F next
 
 Documentation head `7905a631ca9f1df6bd71a126496e6bad24db2903` (docs-only over

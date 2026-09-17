@@ -5,6 +5,56 @@
 > their recorded checkpoint, not today's code, database, freshness or permissions.
 > File A remains plan authority. Historical counts never grant runtime activation.
 
+## 2026-09-17 - R-HIST-03F M3 code checkpoint + code-head CI (FINAL DOC-HEAD CI PENDING)
+
+Starting M2 SHA: `1734ded7e52fcb57f3c365a744d986a96ad30271`
+(PR #6 `feat/rhist03-producer-wiring`, base `fix/retention-evidence-safety`).
+M3 SHA: `2e957082bad34829cf9e7bed1487a69399566f42`
+(`test(03F): complete M3 cross-store and golden recovery acceptance`).
+Scope: 2 new test files
+(`backend/tests/test_rhist03f_pipeline_tamper.py`,
+`backend/tests/test_rhist03f_crossstore_cleanup.py`), 915 insertions,
+0 deletions. Zero production-code change. Zero production files touched, so
+Mypy carries zero possible new-diagnostic delta from M3.
+CI run: `35222154939`
+(<https://github.com/onlyvictus-bit/trendforge/actions/runs/35222154939>),
+event `pull_request`, `headSha 2e95708...`, generated merge ref actually
+checked: `49e96168950848f7a3dc455a23763b02902b4e9f`. Overall: SUCCESS.
+Do NOT describe this as a literal raw-head checkout, and do NOT reuse it as
+the final documentation-head run.
+
+| Check | Observed result |
+|---|---|
+| Backend | 1790 passed, 2 warnings, 410.85s (CI) / 1790 passed, 2 warnings, 1676.38s (local) |
+| Python compile | PASS (both) |
+| Ruff | All checks passed (both) |
+| Frontend | PASS, 11s (CI) / 220-220 + all suites (local `npm test`) |
+| Mypy | Non-blocking failure: 510 errors / 70 files / 277 checked — NOT A PASS, identical to baseline |
+
+M3 fault matrix (dual-oracle, scratch DBs only): F_TAMPER_03 deleted source
+object fails closed (COVERED → LINEAGE_MISSING); F_TAMPER_04 corrupt bytes
+fail closed (size + SHA256 mismatch, identity row survives); F_TAMPER_35
+trigger prevention + post-bypass detection; F_TAMPER_36 valid-but-wrong parent
+D1 → D2 rejected (only victim O1 flips, coveredCount −1, D2 stays COVERED);
+C1 governed evidence byte-identical with authority intact while eligible
+stray deletes from index and disk; H1 H2 never substitutes missing H1
+(publication byte-identical, canonical resolution raises); X1-A healthy
+restart with no repair (same manifest + reportHash + PASS); X1-B PENDING →
+restart → reconcile (processed=1 → PASS, same identities, 1 ref); F_IO_04
+unavailable declared `.db` fails closed with MARKET_STORE_UNAVAILABLE; X3
+external orphan FAILs with RETENTION_ORPHAN then heals on legitimate removal.
+No false PASS observed. M3 production defects: 0. Full matrix in
+[fable/RHIST03F_EXECUTION_2026-09-15.md](fable/RHIST03F_EXECUTION_2026-09-15.md).
+
+Local counts: M3 focused 10 passed; full 03F 64 passed (474.16s); 03A–03E
+neighborhood 249 passed, 2 warnings (715.15s); full backend 1790 passed
+(1676.38s). These are controlled synthetic-data tests, not production or
+live-data tests.
+
+R-HIST-03F: M0–M3 VERIFIED, code-head CI green, formal acceptance PENDING
+this documentation head's own CI. Full R-HIST-03: NOT COMPLETE.
+LIVE-DATA-VERIFIED / PRODUCTION-ACCEPTED: NO. No authority change.
+
 ## 2026-09-15 - R-HIST-03E documentation-head CI and acceptance
 
 Doc SHA: `7905a631ca9f1df6bd71a126496e6bad24db2903` (docs-only over

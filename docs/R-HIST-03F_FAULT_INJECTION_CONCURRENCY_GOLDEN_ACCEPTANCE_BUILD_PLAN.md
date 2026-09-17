@@ -3,7 +3,7 @@
 **Stage:** R-HIST-03F — prove the complete R-HIST-03 memory system survives crashes, races, corruption and restart without producing false history  
 **Parent plan:** `docs/R-HIST-03_PRODUCER_WIRING_BUILD_PLAN.md`  
 **Depends on:** R-HIST-03D + R-HIST-03E IMPLEMENTED + TESTED  
-**Status:** PLAN READY — IMPLEMENTATION NOT STARTED  
+**Status:** IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED (M0–M3 verified, dual oracles) — code-head CI GREEN (`2e95708` + run `35222154939` SUCCESS, backend 1790 passed); FINAL DOC-HEAD CI PENDING; NOT YET FORMALLY ACCEPTED
 **Next after PASS:** FULL R-HIST-03 acceptance gate only  
 **Safety ceiling:** resilience/integrity testing only; no strategy activation, model auto-approval, broker authority, or live-order expansion.
 

@@ -6,6 +6,31 @@ activation authority, or production certification. File A retains build order,
 public-state definitions and acceptance ceilings. Read this page before dated
 entries in BUILD_STATUS, VALIDATION, architecture notes or remaining-build guides.
 
+## R-HIST-03F M3 code checkpoint - 2026-09-17 (IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED, NOT YET FORMALLY ACCEPTED)
+
+M3 code/test checkpoint `2e957082bad34829cf9e7bed1487a69399566f42`
+(`test(03F): complete M3 cross-store and golden recovery acceptance`: 2 new
+test files, 915 insertions, 0 deletions) on `feat/rhist03-producer-wiring`
+(PR #6) is IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED. Zero production-code
+change. PR-head-associated integration CI `35222154939` is SUCCESS: it checked
+merge ref `49e96168950848f7a3dc455a23763b02902b4e9f`, backend 1790 passed /
+compile PASS / Ruff PASS / frontend PASS; Mypy remains the accepted
+non-blocking legacy failure (510 errors / 70 files / 277 checked — NOT A PASS).
+M0 (golden/crash/replay), M1 (R18/pipeline recovery), M2 (concurrency/storage/
+tamper) and M3 (pipeline tamper, cross-store, cleanup, invention-negative,
+golden restart) are all VERIFIED with dual oracles; full evidence is recorded
+in [fable/RHIST03F_EXECUTION_2026-09-15.md](fable/RHIST03F_EXECUTION_2026-09-15.md)
+and the newest VALIDATION entry.
+
+R-HIST-03F: M0 VERIFIED, M1 VERIFIED, M2 VERIFIED, M3 VERIFIED. CODE CHECKPOINT:
+`2e95708`. CODE-HEAD CI: `35222154939` SUCCESS. FINAL DOCUMENTATION-HEAD CI:
+PENDING. R-HIST-03F is IMPLEMENTED + CONTROLLED ACCEPTANCE TESTED, NOT YET
+FORMALLY ACCEPTED. Full R-HIST-03: NOT COMPLETE. LIVE-DATA-VERIFIED: NO.
+PRODUCTION-ACCEPTED: NO. No broker, execution, strategy-activation,
+model-approval, live-data or production-authority change. Formal acceptance
+requires this documentation head's own exact-head CI first; PR #6 prose still
+describes 03E as in progress and 03F as gated and is refreshed only after that.
+
 ## R-HIST-03E code checkpoint - 2026-09-15 (IMPLEMENTED + TESTED / ACCEPTED)
 
 R-HIST-03E code checkpoint `0a514bd19f8e519e5699c2574ece308851dcada0`
