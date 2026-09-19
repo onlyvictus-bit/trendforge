@@ -142,6 +142,36 @@ def test_r5_row_rejects_confirming_claims_at_boundary() -> None:
         R5StructureRowV1.model_validate(payload)
 
 
+def test_r5_legacy_read_is_lenient_but_new_write_and_s8_publish_fail_closed() -> None:
+    import pytest
+
+    from trendforge_api.s8_retention import evidence_roots_with_r5_history
+    from trendforge_api.selection.r5_live import (
+        R5StructureRowV1,
+        persist_r5_structure_batch,
+    )
+
+    row, _ = _r5_row_from_analysis(EvidenceDirection.BULLISH, _raw_bars("bull"))
+    structure = _rebuild(row, _raw_bars("bull"))
+    payload = row.model_dump()
+    payload["facts"] = [f.model_dump() for f in (structure.facts or ())]
+    payload["source_artifact_hashes"] = []
+
+    # Historical payloads remain readable so adding lineage does not make old
+    # R5 history unreadable merely because it predates the new field.
+    old_row = R5StructureRowV1.model_validate(payload)
+    assert old_row.facts and old_row.source_artifact_hashes == ()
+
+    expected = "WAIT_RHIST03_R5_SOURCE_LINEAGE_MISSING:FIXTURE"
+    with pytest.raises(ValueError, match=expected):
+        persist_r5_structure_batch(SimpleNamespace(rows=(old_row,)))  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match=expected):
+        evidence_roots_with_r5_history(
+            bundle_roots=(),
+            r5=SimpleNamespace(rows=(old_row,)),
+        )
+
+
 def test_r5_row_tolerates_old_payloads_without_new_fields() -> None:
     from trendforge_api.selection.r5_live import R5StructureRowV1
 

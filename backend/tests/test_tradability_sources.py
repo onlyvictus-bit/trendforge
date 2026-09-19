@@ -181,9 +181,9 @@ def test_gate_loader_reads_the_canonical_market_data_last_good(monkeypatch, tmp_
                 fetched_at=None,
             )
 
-        def object_path_for_hash(self, content_hash):
+        def read_object_exact(self, content_hash):
             assert content_hash == "a" * 64
-            return artifact
+            return artifact.read_bytes()
 
     monkeypatch.setattr(
         "trendforge_api.selection.cash_a1_staging.default_market_data_store",
@@ -223,8 +223,8 @@ def test_gate_loader_does_not_mistake_archive_members_for_valid_empty_rows(
                 source_url="https://nsearchives.nseindia.com/illiquid_09072026.xls",
             )
 
-        def object_path_for_hash(self, _content_hash):
-            return artifact
+        def read_object_exact(self, _content_hash):
+            return artifact.read_bytes()
 
     monkeypatch.setattr(
         "trendforge_api.selection.cash_a1_staging.default_market_data_store",

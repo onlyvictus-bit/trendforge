@@ -5,7 +5,6 @@ import json
 import math
 import re
 from datetime import UTC, date, datetime
-from pathlib import Path
 from typing import Any, Callable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -117,8 +116,8 @@ class CanonicalLatestResultLoader:
         fallback: ResultLoader = get_latest_source_parse_result,
     ) -> None:
         self._fallback = fallback
+        self._store = store
         self._attempts = store.latest_all()
-        self._objects_root = (Path(store.root) / "objects").resolve(strict=False)
 
     @staticmethod
     def _invalid(source_key: str) -> dict[str, Any]:
@@ -132,17 +131,11 @@ class CanonicalLatestResultLoader:
         attempt = self._attempts.get(source_key)
         if attempt is None:
             return self._fallback(source_key)
-        object_path_value = getattr(attempt, "object_path", None)
         expected_hash = str(getattr(attempt, "content_hash", "") or "").casefold()
-        if not object_path_value or len(expected_hash) != 64:
-            return self._invalid(source_key)
-        unresolved = Path(object_path_value)
-        if unresolved.is_symlink():
+        if len(expected_hash) != 64:
             return self._invalid(source_key)
         try:
-            object_path = unresolved.resolve(strict=True)
-            object_path.relative_to(self._objects_root)
-            content = object_path.read_bytes()
+            content = self._store.read_object_exact(expected_hash)
         except (OSError, ValueError):
             return self._invalid(source_key)
         if hashlib.sha256(content).hexdigest() != expected_hash:

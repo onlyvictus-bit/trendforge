@@ -138,9 +138,14 @@ class CanonicalManifestSourceProvider:
     """Read-only projection from a committed MD69 manifest into panel sources."""
 
     def __init__(self, *, db_path: Path, data_root: Path) -> None:
+        from .retention_tiering import RetentionTieringStore
+
         self.db_path = db_path.expanduser().resolve(strict=False)
         self.data_root = data_root.expanduser().resolve(strict=False)
         self.objects_root = self.data_root / "objects"
+        self._tiering = RetentionTieringStore(
+            objects_root=self.objects_root, db_path=self.db_path
+        )
 
     @staticmethod
     def _safe_file(path_value: str, root: Path) -> Path | None:
@@ -248,15 +253,10 @@ class CanonicalManifestSourceProvider:
                 or entry.get("status") not in accepted_statuses
             ):
                 continue
-            object_path = self._safe_file(str(entry.get("objectPath") or ""), self.objects_root)
-            if object_path is None:
-                continue
+            content_hash = str(entry.get("contentHash") or "").casefold()
             try:
-                content = object_path.read_bytes()
-            except OSError:
-                continue
-            content_hash = hashlib.sha256(content).hexdigest()
-            if content_hash != str(entry.get("contentHash") or "").casefold():
+                content = self._tiering.read_object_exact(content_hash)
+            except (OSError, ValueError):
                 continue
             try:
                 normalized = json.loads(content)

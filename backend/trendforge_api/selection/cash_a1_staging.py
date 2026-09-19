@@ -205,13 +205,10 @@ def stage_cash_last_good(
             last_good_status=None,
             persisted=False,
         )
-    path = Path(latest.object_path) if latest.object_path else market.object_path_for_hash(
-        latest.content_hash
-    )
-    content = Path(path).read_bytes()
+    content = market.read_object_exact(latest.content_hash)
     return stage_cash_bytes(
         content,
-        raw_path=str(path),
+        raw_path=latest.object_path,
         fetched_at=latest.fetched_at,
         last_good_status=latest.status.value,
         freshness=(

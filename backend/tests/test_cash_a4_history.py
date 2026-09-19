@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, date, datetime
 
 import pytest
 
-from trendforge_api import storage
-from trendforge_api.market_data_store import ManifestStatus
+from trendforge_api import source_resolver, storage
+from trendforge_api.market_data_store import ManifestStatus, MarketDataStore
+from trendforge_api.selection import cash_a4_history
 from trendforge_api.selection.cash_a1_staging import persist_cash_staging, stage_cash_bytes
 from trendforge_api.selection.cash_a2_identity import (
     build_cash_identity_batch,
@@ -14,6 +16,8 @@ from trendforge_api.selection.cash_a2_identity import (
 from trendforge_api.selection.cash_a4_history import (
     CorporateActionVintage,
     build_cash_history_batch,
+    ensure_official_raw_history,
+    list_raw_bars,
     persist_cash_history,
 )
 from trendforge_api.selection.series_layers import SeriesKind, open_adjusted_series, raw_series
@@ -32,6 +36,7 @@ DECISION = datetime(2026, 8, 14, 18, 0, tzinfo=UTC)
 
 def _identity(tmp_path, monkeypatch, csv: bytes, fetched):
     monkeypatch.setattr(storage, "DB_PATH", tmp_path / "cash-a4.db")
+    storage._INITIALIZED_DB_PATHS.clear()
     staging = persist_cash_staging(stage_cash_bytes(csv, fetched_at=fetched))
     return persist_cash_identity(
         build_cash_identity_batch(
@@ -63,6 +68,111 @@ def test_a4_raw_bars_are_immutable_and_baseline_needs_history(tmp_path, monkeypa
                 decision_at=DECISION,
             )
         )
+
+
+def test_official_history_bootstrap_persists_exact_object_before_bar(
+    tmp_path, monkeypatch
+) -> None:
+    _identity(tmp_path, monkeypatch, DAY2, FETCH2)
+    store = MarketDataStore(root=tmp_path / "market-data", db_path=storage.DB_PATH)
+    store.initialize_schema()
+    monkeypatch.setattr(
+        cash_a4_history,
+        "_official_cash_urls",
+        lambda day: [f"https://fixture.invalid/{day.isoformat()}.csv"],
+    )
+    monkeypatch.setattr(
+        source_resolver,
+        "fetch_url",
+        lambda _url, _timeout: (200, {"content-type": "text/csv"}, DAY1),
+    )
+
+    stats = ensure_official_raw_history(
+        date(2026, 8, 14), days=2, timeout_seconds=1, store=store
+    )
+    assert stats["days_saved"] == 1
+    expected_hash = hashlib.sha256(DAY1).hexdigest()
+    bars = list_raw_bars("RELIANCE", through=date(2026, 8, 14))
+    assert len(bars) == 1
+    assert bars[0].artifact_hash == expected_hash
+
+    conn = storage.connect()
+    try:
+        objects = conn.execute(
+            "SELECT content_hash, size_bytes FROM market_data_objects WHERE content_hash=?",
+            (expected_hash,),
+        ).fetchall()
+    finally:
+        conn.close()
+    assert len(objects) == 1
+    assert objects[0]["size_bytes"] == len(DAY1)
+
+    # Replaying the same bootstrap cannot duplicate the content-addressed object.
+    ensure_official_raw_history(
+        date(2026, 8, 14), days=2, timeout_seconds=1, store=store
+    )
+    conn = storage.connect()
+    try:
+        object_count = conn.execute(
+            "SELECT COUNT(*) FROM market_data_objects WHERE content_hash=?",
+            (expected_hash,),
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert object_count == 1
+
+
+def test_official_history_bootstrap_rejects_oversize_before_parse(
+    tmp_path, monkeypatch
+) -> None:
+    _identity(tmp_path, monkeypatch, DAY2, FETCH2)
+    store = MarketDataStore(root=tmp_path / "market-data", db_path=storage.DB_PATH)
+    store.initialize_schema()
+    monkeypatch.setattr(
+        cash_a4_history,
+        "_official_cash_urls",
+        lambda day: [f"https://fixture.invalid/{day.isoformat()}.csv"],
+    )
+    oversized = b"x" * (cash_a4_history.OFFICIAL_HISTORY_MAX_BYTES + 1)
+    monkeypatch.setattr(
+        source_resolver,
+        "fetch_url",
+        lambda _url, _timeout: (200, {}, oversized),
+    )
+
+    stats = ensure_official_raw_history(
+        date(2026, 8, 14), days=2, timeout_seconds=1, store=store
+    )
+    assert int(stats["days_failed"]) >= 1
+    assert list_raw_bars("RELIANCE", through=date(2026, 8, 14)) == []
+
+
+def test_official_history_bootstrap_store_failure_never_writes_bar(
+    tmp_path, monkeypatch
+) -> None:
+    _identity(tmp_path, monkeypatch, DAY2, FETCH2)
+    store = MarketDataStore(root=tmp_path / "market-data", db_path=storage.DB_PATH)
+    store.initialize_schema()
+    monkeypatch.setattr(
+        cash_a4_history,
+        "_official_cash_urls",
+        lambda day: [f"https://fixture.invalid/{day.isoformat()}.csv"],
+    )
+    monkeypatch.setattr(
+        source_resolver,
+        "fetch_url",
+        lambda _url, _timeout: (200, {"content-type": "text/csv"}, DAY1),
+    )
+
+    def fail_install(*_args, **_kwargs):
+        raise RuntimeError("fixture object-store failure")
+
+    monkeypatch.setattr(store, "install_object", fail_install)
+    stats = ensure_official_raw_history(
+        date(2026, 8, 14), days=2, timeout_seconds=1, store=store
+    )
+    assert int(stats["days_failed"]) >= 1
+    assert list_raw_bars("RELIANCE", through=date(2026, 8, 14)) == []
 
 
 def test_a4_future_ca_is_hidden_and_visible_ca_opens_new_series(

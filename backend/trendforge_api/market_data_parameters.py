@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 from datetime import date, datetime
-from pathlib import Path
 from typing import Any
 
 from .market_data_service import ParameterContext
@@ -55,19 +54,14 @@ class SavedMarketParameterProvider:
         source_key: str,
     ) -> tuple[dict[str, Any], ...]:
         attempt = latest.get(source_key)
-        if attempt is None or not attempt.object_path:
-            return ()
-        path = Path(attempt.object_path).resolve(strict=False)
-        objects_root = self.store.objects_root.resolve(strict=False)
-        try:
-            path.relative_to(objects_root)
-        except ValueError:
-            return ()
-        if not path.is_file() or path.stat().st_size > MAX_PARAMETER_OBJECT_BYTES:
+        if attempt is None or not attempt.content_hash:
             return ()
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            raw = self.store.read_object_exact(
+                attempt.content_hash, max_bytes=MAX_PARAMETER_OBJECT_BYTES
+            )
+            payload = json.loads(raw.decode("utf-8"))
+        except (OSError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
             return ()
         rows = payload.get("records") if isinstance(payload, dict) else None
         if not isinstance(rows, list):
