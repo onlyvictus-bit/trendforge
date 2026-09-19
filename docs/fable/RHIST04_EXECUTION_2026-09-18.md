@@ -190,3 +190,17 @@ subsystem, untouched.
 M2A accepted locally on scratch evidence. No commit/push per authority.
 M2B (crash/durability/fencing sweep) not started. LIVE-DATA-VERIFIED = NO.
 PRODUCTION-ACCEPTED = NO. Trading authority unchanged.
+
+## CI finding + fix (PR #7, run 35432686869)
+
+Exact-head CI reported 1 failed / 1885 passed:
+`test_source_path_replacement_during_copy_fails_closed` — DID NOT RAISE on
+Ubuntu. Root cause: a post-open path swap is a no-op on POSIX (the open fd
+pins the original inode, so the copy is byte-correct and legitimately
+succeeds); on Windows the same swap is refused by file locking, so the old
+test passed locally for the wrong reason. This was a platform-fragile test
+expectation, not a production defect. Fix: split into a deterministic
+pre-open swap test (expects SOURCE_CHANGED_DURING_COPY everywhere) and a
+post-open test asserting the true invariant (H2 bytes never land as the H1
+copy, either via failure or via byte-exact success). Follow-up run:
+43 passed + 2 platform skips.

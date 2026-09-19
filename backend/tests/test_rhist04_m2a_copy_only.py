@@ -262,24 +262,60 @@ def test_source_mutation_during_copy_fails_closed(tmp_path: Path) -> None:
     assert verified == 0
 
 
-def test_source_path_replacement_during_copy_fails_closed(tmp_path: Path) -> None:
+def test_source_path_replacement_before_open_fails_closed(tmp_path: Path) -> None:
     ctx = _scratch(tmp_path, b'{"h1": "swap-me"}')
     hot = _hot_path(ctx)
     swapped = tmp_path / "swapped.json"
     swapped.write_bytes(b'{"h2": "intruder"}')
 
     def _swap(name: str) -> None:
-        if name == "before_stream":
+        # No file is open yet at after_claim, so the swap lands on all
+        # platforms; the copier must then read intruder bytes and refuse.
+        if name == "after_claim":
             hot.unlink()
             swapped.rename(hot)
 
-    with pytest.raises(CopyError):
+    with pytest.raises(CopyError) as excinfo:
         _copy(ctx, on_checkpoint=_swap)
+    assert excinfo.value.code == "SOURCE_CHANGED_DURING_COPY"
     assert _warm_replica_rows(ctx) == []
     swapped_back = tmp_path / "restored.json"
     swapped_back.write_bytes(ctx["payload"])
     hot.unlink(missing_ok=True)
     swapped_back.rename(hot)
+    assert_source_H1_intact(ctx)
+
+
+def test_source_path_swap_after_open_never_copies_h2(tmp_path: Path) -> None:
+    """Post-open swap: POSIX pins the open inode (copy stays correct),
+    Windows locks the file (operation fails closed). Either outcome is
+    safe; what must never happen is H2 bytes landing as the H1 copy."""
+    ctx = _scratch(tmp_path, b'{"h1": "swap-late"}')
+    hot = _hot_path(ctx)
+    swapped = tmp_path / "swapped-late.json"
+    swapped.write_bytes(b'{"h2": "intruder"}')
+
+    def _swap(name: str) -> None:
+        if name == "before_stream":
+            try:
+                hot.unlink()
+                swapped.rename(hot)
+            except OSError:
+                pass  # locked open file: platform refused the swap itself
+
+    try:
+        result = _copy(ctx, on_checkpoint=_swap)
+    except CopyError:
+        result = None
+    if result is not None:
+        dest = Path(result.destination_locator)
+        assert hashlib.sha256(dest.read_bytes()).hexdigest() == ctx["content_hash"]
+    for row in _warm_replica_rows(ctx):
+        data = Path(row["locator"]).read_bytes()
+        assert hashlib.sha256(data).hexdigest() == ctx["content_hash"]
+    hot.unlink(missing_ok=True)
+    swapped.unlink(missing_ok=True)
+    hot.write_bytes(ctx["payload"])
     assert_source_H1_intact(ctx)
 
 
