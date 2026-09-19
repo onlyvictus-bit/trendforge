@@ -216,9 +216,15 @@ class MarketDataStore:
     def initialize_schema(self) -> None:
         if borrow_connection(self.db_path) is not None:
             return  # Existing schema only; snapshot reads never run migrations.
+        from .retention_moves import apply_move_schema
+        from .retention_tiering import apply_tiering_schema, record_objects_root
+
         self.root.mkdir(parents=True, exist_ok=True)
         self.objects_root.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
+            apply_tiering_schema(connection)
+            apply_move_schema(connection)
+            record_objects_root(connection, self.objects_root)
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -632,6 +638,33 @@ class MarketDataStore:
         if row is None:
             raise KeyError(f"Unknown content object: {normalized}")
         return Path(row["object_path"])
+
+    def _tiering(self) -> Any:
+        from .retention_tiering import RetentionTieringStore
+
+        return RetentionTieringStore(
+            objects_root=self.objects_root, db_path=self.db_path
+        )
+
+    def read_object_exact(
+        self, content_hash: str, *, max_bytes: int | None = None
+    ) -> bytes:
+        """Return exactly the H1 bytes via the canonical tiering resolver.
+
+        Raises OSError when H1 is unavailable. Never substitutes H2/latest.
+        ``object_path_for_hash`` remains for provenance/diagnostic inspection
+        only; governed readers must use this method.
+        """
+        from .retention_tiering import DEFAULT_MAX_OBJECT_BYTES
+
+        return self._tiering().read_object_exact(
+            content_hash,
+            max_bytes=DEFAULT_MAX_OBJECT_BYTES if max_bytes is None else max_bytes,
+        )
+
+    def exact_object_available(self, content_hash: str) -> bool:
+        """H1-specific availability probe; never raises, never substitutes."""
+        return self._tiering().exact_object_available(content_hash)
 
     def write_manifest(self, manifest: SnapshotManifest) -> SavedManifest:
         self.initialize_schema()

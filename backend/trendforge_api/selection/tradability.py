@@ -657,8 +657,9 @@ def load_restriction_sources(
         try:
             latest = market_store.latest_for(key)
             if latest is not None:
-                artifact = market_store.object_path_for_hash(latest.content_hash)
-                normalized = json.loads(artifact.read_bytes())
+                normalized = json.loads(
+                    market_store.read_object_exact(latest.content_hash)
+                )
                 if (
                     not isinstance(normalized, dict)
                     or normalized.get("sourceKey") != key
