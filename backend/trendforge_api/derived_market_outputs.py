@@ -4,7 +4,6 @@ import json
 from collections import defaultdict
 from datetime import UTC, date, datetime
 from math import isfinite
-from pathlib import Path
 from typing import Any, Iterable
 
 from .derivatives_engine import black_scholes_greeks
@@ -393,11 +392,12 @@ class DerivedMarketOutputService:
 
     def _load(self, source_key: str) -> tuple[dict[str, Any], str, date | None] | None:
         latest = self.store.latest_for(source_key)
-        if latest is None or not latest.object_path or not latest.content_hash:
+        if latest is None or not latest.content_hash:
             return None
         try:
-            payload = json.loads(Path(latest.object_path).read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            raw = self.store.read_object_exact(latest.content_hash)
+            payload = json.loads(raw.decode("utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError, UnicodeDecodeError):
             return None
         if not isinstance(payload, dict):
             return None

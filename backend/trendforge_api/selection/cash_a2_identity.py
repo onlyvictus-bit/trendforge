@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -124,12 +123,7 @@ def assess_ban_restriction(
         if latest is None or not latest.content_hash:
             ban_content = None
         else:
-            path = (
-                Path(latest.object_path)
-                if latest.object_path
-                else market.object_path_for_hash(latest.content_hash)
-            )
-            ban_content = Path(path).read_bytes()
+            ban_content = market.read_object_exact(latest.content_hash)
             last_good_status = latest.status.value
             fetched_at = latest.fetched_at
     if not ban_content:

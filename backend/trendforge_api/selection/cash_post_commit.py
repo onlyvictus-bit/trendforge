@@ -224,12 +224,10 @@ def _read_content(store: MarketDataStore, source_key: str, trading_date: date) -
         or latest.normalized_row_count <= 0
     ):
         return None
-    path = Path(latest.object_path) if latest.object_path else store.object_path_for_hash(
-        latest.content_hash
-    )
-    if not path.is_file():
+    try:
+        return store.read_object_exact(latest.content_hash)
+    except (OSError, ValueError):
         return None
-    return path.read_bytes()
 
 
 def _permission_fingerprint() -> str:
@@ -833,6 +831,7 @@ class CashPostCommitOrchestrator:
             and latest_cash.object_path is not None
             and latest_cash.data_date == trading_date
             and latest_cash.normalized_row_count > 0
+            and self.store.exact_object_available(latest_cash.content_hash)
         )
         cash_attempt_failed = cash_attempt is not None and cash_attempt.status not in SUCCESS_STATES
         if not triggers or not cash_current or cash_attempt_failed:

@@ -5,7 +5,6 @@ import json
 import re
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, date, datetime
-from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -307,11 +306,14 @@ class OpenAlgoReplayStore:
         return json.loads(_canonical_bytes(normalized))
 
     def _read_verified_object(self, content_hash: str) -> bytes:
-        path: Path = self.store.object_path_for_hash(content_hash)
-        payload = path.read_bytes()
-        if hashlib.sha256(payload).hexdigest() != content_hash:
-            raise ValueError("stored OpenAlgo content hash mismatch")
-        return payload
+        # The canonical resolver proves SHA256(payload) == content_hash. Any
+        # resolution failure (missing, damaged, or hash-mismatched bytes)
+        # surfaces here as the contracted ValueError, preserving the
+        # long-standing replay failure type for callers.
+        try:
+            return self.store.read_object_exact(content_hash)
+        except OSError as exc:
+            raise ValueError(f"stored OpenAlgo content hash mismatch: {exc}") from exc
 
     @staticmethod
     def _validate_route_and_identity(

@@ -130,26 +130,24 @@ def _verify_objects(
 ) -> None:
     if any(root.content_hash is None for root in roots):
         raise _fail("CONTENT_HASH_REQUIRED")
+    from .retention_tiering import RetentionTieringStore
+
+    try:
+        tiering = RetentionTieringStore.tiering_for_connection(market)
+    except OSError as exc:
+        raise _fail(f"OBJECT_ROOT_UNKNOWN:{exc}") from exc
     for content_hash in sorted(
         {root.content_hash for root in roots if root.content_hash}
     ):
-        row = market.execute(
-            "SELECT object_path, size_bytes FROM market_data_objects WHERE content_hash=?",
-            (content_hash,),
-        ).fetchone()
-        if row is None:
-            raise _fail("EVIDENCE_OBJECT_MISSING")
-        path = Path(row["object_path"])
-        if (
-            not path.is_file()
-            or path.is_symlink()
-            or path.stat().st_size != row["size_bytes"]
-        ):
-            raise _fail("EVIDENCE_OBJECT_DAMAGED")
-        with path.open("rb") as handle:
-            actual = hashlib.file_digest(handle, "sha256").hexdigest()
-        if actual != content_hash:
-            raise _fail("EVIDENCE_OBJECT_HASH_MISMATCH")
+        try:
+            tiering.read_object_exact(content_hash)
+        except OSError as exc:
+            text = str(exc)
+            if "no legacy object" in text or "no replica records" in text:
+                raise _fail("EVIDENCE_OBJECT_MISSING") from exc
+            if "HASH" in text or "MISMATCH" in text or "hash" in text:
+                raise _fail("EVIDENCE_OBJECT_HASH_MISMATCH") from exc
+            raise _fail("EVIDENCE_OBJECT_DAMAGED") from exc
 
 
 def _verified_publication(

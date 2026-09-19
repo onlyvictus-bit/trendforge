@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 import hashlib
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
@@ -287,11 +288,14 @@ def test_canonical_latest_loader_prefers_refresh_object_and_preserves_fetch_time
     fallback_calls: list[str] = []
 
     class Store:
-        root = tmp_path
-
         @staticmethod
         def latest_all():
             return {attempt.source_key: attempt}
+
+        @staticmethod
+        def read_object_exact(content_hash):
+            assert content_hash == attempt.content_hash
+            return Path(attempt.object_path).read_bytes()
 
     loader = CanonicalLatestResultLoader(
         Store(),
@@ -319,11 +323,14 @@ def test_canonical_latest_loader_fails_closed_on_hash_mismatch(tmp_path) -> None
     fallback_calls: list[str] = []
 
     class Store:
-        root = tmp_path
-
         @staticmethod
         def latest_all():
             return {attempt.source_key: attempt}
+
+        @staticmethod
+        def read_object_exact(content_hash):
+            assert content_hash == attempt.content_hash
+            return Path(attempt.object_path).read_bytes()
 
     loader = CanonicalLatestResultLoader(
         Store(),
